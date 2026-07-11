@@ -1,0 +1,9 @@
+# Source registry configuration — machine-readable companion to
+# docs/data/source-verification.md. Populated per adapter starting Phase 3.
+# Schema (per source): id, publisher, landing_page, access_method,
+# native_geography, key_required, key_env_var, keyless_fallback,
+# license_tier, update_cadence, freshness_warning_days, freshness_stale_days.
+#
+# Empty in Phase 1 — this file exists so config-loading code and its tests
+# can be written against a real (if empty) schema before adapters land.
+sources: []

@@ -1,0 +1,4 @@
+# Canonical geography dimension configuration (PLAN.md §4). Populated
+# starting Phase 2 (geography spine).
+canonical_geography: census_tract_2020
+geographies: []

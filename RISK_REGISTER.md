@@ -104,4 +104,14 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-011 — Dev toolchain runs under Rosetta (x86_64 Homebrew), not native arm64
+
+**Category:** Performance / developer experience. **Likelihood:** Certain (confirmed during Phase 1 bootstrap — this machine's Homebrew resolves to `/usr/local`, the Intel prefix, not `/opt/homebrew`). **Impact:** Low — functionally correct, modestly slower local dev-server/build performance than native arm64.
+
+**Mitigation:** None applied by default (DEC-011) — the bootstrap script deliberately does not install a second, native Homebrew without explicit user action, since that would be a persistent change to the user's machine well beyond this project's scope. A user who wants native arm64 performance can install Homebrew at `/opt/homebrew` themselves and re-run `scripts/bootstrap_macos.sh`.
+
+**Status:** `accepted`.
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

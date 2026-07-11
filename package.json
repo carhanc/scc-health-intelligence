@@ -1,0 +1,17 @@
+{
+  "name": "scc-health-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Santa Clara Health Intelligence — open-data public-health intelligence and advocacy platform.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@11.12.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @scc-health/web dev",
+    "build:web": "pnpm --filter @scc-health/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}

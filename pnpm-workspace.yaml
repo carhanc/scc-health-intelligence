@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  # esbuild: bundler used transitively by Vitest/Vite. sharp: Next.js image
+  # optimization. unrs-resolver: ESLint's Rust-based import resolver. All
+  # three are well-known, widely used build-time tools with no runtime
+  # network/data access — approved for postinstall scripts.
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

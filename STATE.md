@@ -1,51 +1,61 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-11 (end of Phase 0 session)
+**Last updated:** 2026-07-11 (end of Phase 1 session)
 
 ## Current phase and gate
 
-**Phase 0 (Discovery, source verification, architecture approval) — nearly complete.** Plan approved by user. Finishing the remaining Phase 0 governance artifacts before moving into Phase 1.
+**Phase 1 (Repository foundation and reproducible developer experience) — complete and verified.** Gate 1 evidence recorded below. Ready to begin Phase 2 (geography spine, provenance system, data contracts) in the next session.
 
 ## Completed this session
 
-- Read `CLAUDE.md` and all of `docs/00`–`09` plus `MASTER_BUILD_PROMPT.md`, `BOOTSTRAP_PROMPT.txt`, `START_HERE.txt`, `FINAL_VERIFICATION_PROMPT.txt`, `BUILD_PACK_MANIFEST.md`, `README_FIRST.md` in full.
-- Confirmed local dev environment: macOS 26.5, Apple Silicon (arm64), Node v20.16.0, Python 3.9.19, no `uv`/`pnpm` installed yet, Homebrew present, Xcode CLT present.
-- Verified current stable framework versions via WebSearch: Next.js 16.2 LTS, Node 22 LTS (Maintenance) vs 24 LTS (Active), DuckDB 1.5.x (built-in GEOMETRY type), FastAPI 0.136.x/Pydantic 2.13.x, uv 0.11.28, pnpm 11.9–11.11.
-- Dispatched three parallel research agents to verify ~16 Tier-1/2 official data sources against live pages. All completed successfully; findings compiled into `docs/data/source-verification.md`.
-- Wrote and got user approval for the Phase 0 plan (`/Users/arhan/.claude/plans/you-are-the-principal-majestic-codd.md`).
-- Created: `docs/data/source-verification.md`, `PLAN.md`, `DECISIONS.md` (DEC-001 through DEC-010), `RISK_REGISTER.md` (RISK-001 through RISK-010), `TASKS.md`.
-- Created docs subdirectories: `docs/data`, `docs/design`, `docs/architecture`, `docs/security`, `docs/adr`.
+**Phase 0 (carried over from earlier in this session):** all governance artifacts committed (`PLAN.md`, `TASKS.md`, `DECISIONS.md`, `RISK_REGISTER.md`, `docs/data/source-verification.md`, `DATA_DICTIONARY.md`, `MODEL_CARD.md`, design/architecture docs). Commit `439d011`.
 
-## In progress / not yet done this session
+**Phase 1:**
+- Scaffolded the full monorepo structure (`apps/web`, `apps/api`, `packages/{ui,shared-types,eslint-config,tsconfig}`, `pipelines/src/scc_health_pipeline/{sources,geography,normalization,metrics,scoring,uncertainty,validation,routing,optimization,exports,audits}`, `config/`, `tests/{unit,integration,e2e,accessibility,contract,visual}`, `.github/workflows/`).
+- Pinned toolchain: `.nvmrc` (22), `.python-version` (3.12), `pnpm-workspace.yaml`, root `pyproject.toml` (uv workspace, `package = false`), `apps/api/pyproject.toml`, `pipelines/pyproject.toml`.
+- Wrote and **ran successfully** `scripts/bootstrap_macos.sh` — installed `node@22` (22.23.1), pnpm (11.12.0 via Corepack), `uv` (0.11.28), Python 3.12.13 on this machine (which started at Node 20.16/Python 3.9 with no `uv`/`pnpm`, i.e. a genuine fresh-clone-equivalent test).
+- **Discovered and recorded DEC-011/RISK-011:** this machine's Homebrew is the x86_64 build running under Rosetta at `/usr/local`, not native arm64 at `/opt/homebrew`. Bootstrap deliberately does not install a second Homebrew (would modify unrelated system state); documented as an accepted, non-blocking risk.
+- Wrote `scripts/check_clean_room.py` (DEC-001 enforcement) — passes.
+- Built the Phase-1 minimal vertical slice: FastAPI `/api/v1/health`, `/api/v1/version`, `/api/v1/warehouse-status` routes (the last one truthfully reports "not connected — warehouse file does not exist yet" rather than faking success, since `make data` hasn't run); Next.js shell page with a `SystemStatus` client component making one real typed `fetch` to the API via TanStack Query.
+- **Verified end-to-end with running dev servers**, not just static review: started both `uvicorn` and `next dev` in the background, `curl`-verified all three API endpoints return correct/truthful JSON, and `curl`-verified the Next.js page renders the expected title/content/component shell.
+- Attempted full in-browser visual verification: no Chrome extension connected (`list_connected_browsers` returned empty); the Preview tool's sandboxed process spawner rejected every `runtimeExecutable` variant tried (`Operation not permitted` on `getcwd`). This is recorded as a known environment limitation, not a product defect — full browser/UX review is a Phase 5 gate requirement in `docs/07_BUILD_PHASES.md`, not Phase 1, since Phase 1 explicitly says "do not build final visual components yet."
+- Added a Vitest smoke test (`apps/web/lib/api.test.ts`) and confirmed `make test` exercises both the Python (pytest) and TypeScript (Vitest) suites successfully — initially failed because Vitest exits nonzero with zero test files; fixed by adding a real test rather than suppressing the check.
+- Ran the full command surface via the actual `Makefile` targets (not just direct `pnpm`/`uv` calls) and confirmed all green: `make lint`, `make typecheck`, `make test`, `make audit` (clean-room check only — data/analytics audits are Phase 2+), `make build`.
+- Fixed incidental issues found along the way: `TASKS.md` needed adding to the clean-room allowlist (it legitimately documents *not* referencing the sibling repo); `tool.uv.dev-dependencies` deprecation → switched to `[dependency-groups] dev`; `@scc-health/eslint-config` needed `"type": "module"`; ruff `B008` needed a per-file ignore for FastAPI's `Depends()`-in-defaults pattern; pnpm's new build-script allowlist needed explicit approval for `esbuild`/`sharp`/`unrs-resolver` (all legitimate Next.js/Vitest/ESLint build-time tools).
+- Confirmed no generated artifacts (`node_modules`, `.venv`, `.next`, `.duckdb`) are staged — `.gitignore` verified working correctly.
 
-- `STATE.md` (this file — being written now).
-- `DATA_DICTIONARY.md` skeleton.
-- `MODEL_CARD.md` skeleton.
-- `docs/design/information-architecture.md`.
-- `docs/design/user-flows.md`.
-- `docs/architecture/system-context.mmd`, `docs/architecture/data-flow.mmd`, `docs/architecture/deployment.mmd`.
-- Initial git commit of all Phase 0 artifacts (repository is not yet a git repo — `git init` needed first; confirmed via environment check at session start: "Is a git repository: false").
+## Gate 1 evidence
+
+- [x] Effectively-fresh-clone bootstrap succeeds on this Apple Silicon Mac (`scripts/bootstrap_macos.sh` ran clean, idempotent on re-run).
+- [x] `make dev` starts web and API together — verified directly (not just the sub-targets): ran `make dev`, confirmed both servers came up via the log output, and curl-verified both `http://localhost:8000/api/v1/health` (200, correct JSON) and `http://localhost:3000/` (200) while running together.
+- [x] Health checks pass (`/api/v1/health`, `/api/v1/version`, `/api/v1/warehouse-status` all verified via curl with correct, truthful JSON).
+- [x] Linters and type checks pass (`make lint`, `make typecheck` both clean for Python and TypeScript).
+- [x] No secrets or absolute user paths committed (verified via `git status`/`git diff` review; the one local file with an absolute path, `.claude/dev_web_local_preview.sh`, is gitignored and was never staged).
+- [ ] CI runs successfully — **not yet verified**, since there is no GitHub remote to push to and trigger Actions. The workflow file (`.github/workflows/ci.yml`) is written and mirrors the exact local commands that passed, but has not been executed by GitHub Actions itself. Flagged as an open item, not silently claimed as done.
+- [x] `STATE.md` contains exact next steps (this section).
 
 ## Blockers
 
-None. All Phase 0 findings ("changed from spec assumption") have documented fallbacks already anticipated by the spec (see `DECISIONS.md` DEC-003, DEC-005) or are non-blocking watch items (`RISK_REGISTER.md` RISK-004, RISK-005, RISK-009, RISK-010).
+None release-blocking. Two environment-limitation notes only:
+1. No real browser available for visual verification this session (see above) — not blocking Phase 1's actual gate, which doesn't require it.
+2. CI has not been executed against a real GitHub Actions runner (no remote configured) — the workflow is written and locally-equivalent-verified, but not yet proven in CI itself.
 
 ## Last commands run
 
-Read-only research only this session (WebSearch/WebFetch via subagents, `Bash` for environment checks: `node --version`, `python3 --version`, `uv --version`, `pnpm --version`, `git --version`, `brew --version`, `xcode-select -p`, `uname -m`, `sw_vers`, and `mkdir -p` for docs subdirectories). No package installs, no git commits yet.
+`git add -A && git status --short` (67 new/changed paths staged, none of them generated artifacts). Commit not yet made as of this STATE.md write — see "next actions."
 
 ## Next three actions (exact resume point)
 
-1. Finish remaining Phase 0 artifacts: `DATA_DICTIONARY.md` skeleton, `MODEL_CARD.md` skeleton, `docs/design/information-architecture.md`, `docs/design/user-flows.md`, three `docs/architecture/*.mmd` diagrams.
-2. `git init`, add a `.gitignore` appropriate for the monorepo (Node/Python/data artifacts/secrets), and make the first coherent commit covering all Phase 0 governance artifacts.
-3. Begin Phase 1 (repository foundation): scaffold the monorepo structure from `PLAN.md` §3, pin toolchain versions (`.nvmrc`=22, `.python-version`=3.12), write `scripts/bootstrap_macos.sh`, stand up the minimal vertical slice (Next.js shell + FastAPI `/api/v1/health` + DuckDB connectivity check), and get `make bootstrap && make dev` working on this machine (which currently needs Node/Python/uv/pnpm upgrades — bootstrap script must handle this idempotently with explanation before touching anything).
+1. Commit the Phase 1 checkpoint (all files currently staged), then update `TASKS.md` Phase 1 checkboxes with this evidence.
+2. Start Phase 2 (geography spine): build canonical tract/ZCTA/place/supervisor-district dimensions from TIGER2020, the Census ZCTA-to-tract crosswalk (keyless default per DEC-005), and the source-adapter base protocol with data-contract validation — this is the first phase that will actually populate `warehouse/scc_health.duckdb`, which will flip the `/api/v1/warehouse-status` endpoint from "not connected" to "connected."
+3. If a GitHub remote becomes available, push and confirm `.github/workflows/ci.yml` actually runs green on a real Actions runner — currently only locally-equivalent-verified.
 
 ## Current running processes
 
-None. No dev servers or background jobs are currently running.
+None. Both dev servers (uvicorn on :8000, next dev on :3000) were stopped cleanly at the end of this session (`lsof -ti:3000/:8000 | xargs kill -9`; confirmed both ports free).
 
 ## Notes for continuation
 
-- This is a large, multi-session build. Do not attempt to shortcut Phase 1–11 sequencing; follow `docs/07_BUILD_PHASES.md` gate-by-gate.
-- Read this file, `TASKS.md`, `DECISIONS.md`, `RISK_REGISTER.md`, git history, and recent test output before making any further changes in a new session.
-- The three "changed from spec" findings that most affect early implementation: (1) Census API now requires a key for all calls → ACS adapter must default to the keyless bulk-download path (DEC-003); (2) HUD USPS crosswalk now requires registration → default to the keyless Census ZCTA relationship file (DEC-005); (3) CalEnviroScreen 5.0 just finalized July 1, 2026 → re-verify the dataset ID is non-draft at Phase 3 implementation time (DEC-007).
+- Toolchain is now installed on this machine: node@22.23.1 (Homebrew, x86_64/Rosetta — see DEC-011), pnpm 11.12.0, uv 0.11.28, Python 3.12.13. A new session does **not** need to re-run bootstrap unless dependencies changed — `uv sync` / `pnpm install` are enough to pick up any new packages.
+- To run dev servers in a new session: `export PATH="/usr/local/opt/node@22/bin:$PATH"` first (this machine's default `node` on PATH is still v20.16 unless a shell profile change is made — bootstrap deliberately does not touch shell profiles, see Phase 1 rules), then `make dev`.
+- The three "changed from spec" findings from Phase 0 remain relevant for Phase 2/3 adapter work: ACS keyless-bulk-first (DEC-003), ZCTA-relationship-file-default crosswalk (DEC-005), CalEnviroScreen 5.0 final-dataset verification (DEC-007).

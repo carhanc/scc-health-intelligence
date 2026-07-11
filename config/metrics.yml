@@ -1,0 +1,3 @@
+# Metric registry — drives every score and UI label (PLAN.md §10).
+# Schema per docs/03_ANALYTICS_METHODS.md §3. Populated starting Phase 4.
+metrics: []

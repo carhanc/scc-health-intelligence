@@ -1,0 +1,4 @@
+# Per-source freshness thresholds, interpreted relative to each source's
+# own publication cycle (docs/02_DATA_SOURCE_REGISTRY.md §13). Populated
+# starting Phase 3 alongside each source adapter.
+freshness_policies: []

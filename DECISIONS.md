@@ -126,4 +126,18 @@ Each record: context, decision, rationale, alternatives considered, and conseque
 
 ---
 
+### DEC-011 — Accept the existing x86_64 Homebrew (Rosetta) rather than installing a parallel arm64 Homebrew
+
+**Context:** During Phase 1 bootstrap, `brew --prefix` resolved to `/usr/local` rather than the native Apple Silicon path `/opt/homebrew`. This machine's Homebrew installation is the Intel build running under Rosetta 2; `node@22`, `uv`, and the Python 3.12 interpreter it installed are all x86_64 binaries, not arm64-native.
+
+**Decision:** `scripts/bootstrap_macos.sh` uses whatever Homebrew is already on `PATH` (currently the x86_64/Rosetta one at `/usr/local`) rather than installing a second, native arm64 Homebrew at `/opt/homebrew`.
+
+**Alternatives considered:** Installing a parallel arm64 Homebrew at `/opt/homebrew` and directing this project's tooling there for native performance.
+
+**Rationale:** The bootstrap script explicitly promises not to modify unrelated system/shell configuration without explicit permission (`docs/07_BUILD_PHASES.md` Phase 1: "avoid modifying unrelated shell configuration without permission"). Installing a second Homebrew prefix is a significant, persistent change to the user's machine that affects far more than this project and was not requested. Everything installs and runs correctly under Rosetta — this is a performance tradeoff, not a correctness one, and it is reversible by the user at any time by installing Homebrew natively at `/opt/homebrew` themselves and re-running the bootstrap script (which will then pick up whichever `brew` resolves first on `PATH`).
+
+**Consequences:** Local dev-server performance (Node/Python process startup, native module compilation) may be modestly slower than a fully native arm64 toolchain. This is recorded, not treated as a blocker, per `docs/00_PRODUCT_CHARTER.md`'s priority ordering (architecture/cosmetic preferences rank below data integrity, acceptance criteria, and methodology). See `RISK_REGISTER.md` RISK-011.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

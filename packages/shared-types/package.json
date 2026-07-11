@@ -1,0 +1,11 @@
+{
+  "name": "@scc-health/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript types mirroring backend Pydantic schemas.",
+  "main": "index.ts",
+  "devDependencies": {
+    "@scc-health/tsconfig": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}

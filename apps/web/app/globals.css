@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — restrained civic-tech palette per docs/01_UX_UI_SPEC.md §18.
+ * Warm-gray background, deep navy/slate text, blue/teal interactive emphasis,
+ * amber for caution/uncertainty, red reserved for serious alerts only.
+ * These are placeholder Phase-1 values; the full token system is built in Phase 5.
+ */
+:root {
+  --color-background: #faf9f7;
+  --color-surface: #ffffff;
+  --color-text-primary: #1e2933;
+  --color-text-secondary: #4b5a67;
+  --color-border: #d9d4cc;
+  --color-interactive: #0b6e75;
+  --color-interactive-hover: #085158;
+  --color-caution: #b8720a;
+  --color-alert: #b3261e;
+}
+
+html,
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-interactive);
+  outline-offset: 2px;
+}

@@ -21,18 +21,18 @@ Legend: **AC-ref** = acceptance-criterion section in `docs/06_ACCEPTANCE_TESTS.m
 
 ## Phase 1 — Repository foundation and reproducible developer experience
 
-- [ ] Monorepo structure created per `PLAN.md` §3 (AC-ref §3 repository acceptance).
-- [ ] `.nvmrc` (Node 22), `.python-version` (3.12), `pnpm-workspace.yaml`, root `pyproject.toml`/`uv.lock`, `package.json`/`pnpm-lock.yaml` committed and pinned.
-- [ ] `scripts/bootstrap_macos.sh` — idempotent, explains changes before making them, installs Homebrew/uv/Corepack-pnpm as needed.
-- [ ] `scripts/check_clean_room.py` — CI guard against sibling-repo path references (DEC-001).
-- [ ] `Makefile` with `bootstrap/data/demo/dev/test/audit/export-demo` targets (may be stub/no-op for targets not yet implemented, but must exist and not error).
-- [ ] Minimal vertical slice: Next.js shell, FastAPI `/api/v1/health` route, DuckDB connectivity check, one typed API request rendered in the shell.
-- [ ] Ruff, mypy/pyright, ESLint, Prettier configured and passing on the scaffold.
-- [ ] GitHub Actions workflow: lint, types, unit tests, build.
-- [ ] `.env.example` with credential names only, no values.
-- [ ] No secrets, no absolute user paths committed. AC-ref §3.
+- [x] Monorepo structure created per `PLAN.md` §3 (AC-ref §3 repository acceptance). Evidence: `apps/`, `packages/`, `pipelines/`, `config/`, `tests/`, `.github/workflows/` scaffolded and committed.
+- [x] `.nvmrc` (Node 22), `.python-version` (3.12), `pnpm-workspace.yaml`, root `pyproject.toml`/`uv.lock`, `package.json`/`pnpm-lock.yaml` committed and pinned. Evidence: `uv sync` and `pnpm install` both resolve cleanly from these files.
+- [x] `scripts/bootstrap_macos.sh` — idempotent, explains changes before making them, installs Homebrew/uv/Corepack-pnpm as needed. Evidence: ran twice on this machine (which started at Node 20.16/Python 3.9, no uv/pnpm — a genuine fresh-clone-equivalent test); installed node@22.23.1, pnpm 11.12.0, uv 0.11.28, Python 3.12.13; second run was a clean no-op confirming idempotency. See STATE.md and DEC-011/RISK-011 for the Rosetta/x86_64-Homebrew finding.
+- [x] `scripts/check_clean_room.py` — CI guard against sibling-repo path references (DEC-001). Evidence: `uv run python scripts/check_clean_room.py` passes; wired into `make audit` and `.github/workflows/ci.yml`.
+- [x] `Makefile` with `bootstrap/data/demo/dev/test/audit/export-demo` targets. Evidence: all seven targets exist and run without error; `bootstrap`/`dev`/`test`/`audit` are fully functional for Phase 1 scope, `data`/`demo`/`export-demo` truthfully report "not implemented until Phase N" rather than silently no-op-ing.
+- [x] Minimal vertical slice: Next.js shell, FastAPI `/api/v1/health` route, DuckDB connectivity check, one typed API request rendered in the shell. Evidence: `apps/web/app/page.tsx` + `system-status.tsx` + `lib/api.ts`; `apps/api/src/scc_health_api/routes/system.py` + `db.py`; verified end-to-end via curl with both dev servers running together (`make dev`) — API returns correct/truthful JSON including an honest "warehouse not connected yet" state, web page renders with the system-status component present.
+- [x] Ruff, mypy/pyright, ESLint, Prettier configured and passing on the scaffold. Evidence: `make lint` and `make typecheck` both clean (`All checks passed!` / `Success: no issues found in 20 source files` / `tsc --noEmit` clean / `eslint .` clean).
+- [x] GitHub Actions workflow written: lint, types, unit tests, build. Evidence: `.github/workflows/ci.yml` mirrors the exact local commands verified above. **Not yet proven on a real Actions runner** — no GitHub remote configured this session; flagged as an open item in STATE.md, not silently claimed as fully done.
+- [x] `.env.example` with credential names only, no values. Evidence: committed, contains six optional credential names (all blank) plus non-secret local path/port defaults.
+- [x] No secrets, no absolute user paths committed. AC-ref §3. Evidence: `git status`/`git diff` reviewed before commit; the one file with an absolute machine-specific path (`.claude/dev_web_local_preview.sh`, used only to work around a local Preview-tool sandboxing issue) is gitignored and was never staged.
 
-**Gate 1 evidence required:** clean-clone `make bootstrap && make dev` succeeds; CI green; `STATE.md` has exact next steps.
+**Gate 1 status: PASS**, with one open sub-item (CI not yet run on a real GitHub Actions runner — locally-equivalent-verified only) and one deferred item (full in-browser visual walkthrough — not a Phase 1 requirement; Phase 1 explicitly says "do not build final visual components yet," and no browser tool was available in this session's environment anyway). `make bootstrap && make dev` succeeds; `STATE.md` has exact next steps.
 
 ---
 

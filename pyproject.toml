@@ -1,0 +1,46 @@
+[project]
+name = "scc-health-intelligence"
+version = "0.1.0"
+description = "Santa Clara Health Intelligence — open-data public-health intelligence and advocacy platform. Workspace root (not itself a distributable package)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "scc-health-api",
+    "scc-health-pipeline",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.28.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/api", "pipelines"]
+
+[tool.uv.sources]
+scc-health-api = { workspace = true }
+scc-health-pipeline = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = ["data", "warehouse", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's dependency-injection pattern requires Depends(...) as an
+# argument default; this is idiomatic, not a real mutable-default bug.
+"apps/api/src/scc_health_api/routes/*.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+exclude = ["data/", "warehouse/", "\\.venv/"]
