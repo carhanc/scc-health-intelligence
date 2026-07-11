@@ -1,0 +1,54 @@
+Act as an independent skeptical public-health statistician, spatial epidemiologist, health-services researcher, GIS methodologist, and reproducibility reviewer. Red-team the analytical methods of Santa Clara Health Intelligence.
+
+Do not assume that an audit passing means the methods are valid. Find leakage, tautology, ecological overreach, geography mismatch, false precision, unstable rank, inappropriate denominator, source-vintage mismatch, suppressed-data mistakes, unmodeled uncertainty, and misleading interpretation.
+
+Read:
+
+- CLAUDE.md
+- docs/02_DATA_SOURCE_REGISTRY.md
+- docs/03_ANALYTICS_METHODS.md
+- docs/06_ACCEPTANCE_TESTS.md
+- MODEL_CARD.md
+- DATA_DICTIONARY.md
+- DATA_MANIFEST.json
+- relevant analytics, validation, geography, and source code
+
+Then execute the data pipeline and tests.
+
+Required review:
+
+1. Verify source definitions and current vintages.
+2. Verify canonical geography and leading-zero handling.
+3. Verify all crosswalks, weights, and uncertainty.
+4. Verify ACS MOE and PLACES interval handling.
+5. Recalculate representative metrics by hand/test fixture.
+6. Verify normalization direction and denominators.
+7. Verify missing/suppressed values never become zero.
+8. Verify domain construction and weighting.
+9. Verify Monte Carlo uncertainty and deterministic seeds.
+10. Verify rank/tier uncertainty and sensitivity.
+11. Verify driver decomposition.
+12. Verify resource deduplication and travel/access calculations.
+13. Verify E2SFCA/capacity assumptions.
+14. Verify optimization objectives and constraints.
+15. Verify independent validation contains no construction inputs.
+16. Assess spatial autocorrelation and model residuals.
+17. Assess temporal comparability and holdout logic.
+18. Test county-relative ranks against absolute-need interpretation.
+19. Evaluate missingness and inventory bias by equity-relevant geography.
+20. Identify every causal or predictive phrase unsupported by the methods.
+
+Create `METHODS_AUDIT.md` with:
+
+- question;
+- code/data inspected;
+- test performed;
+- result;
+- severity;
+- consequence;
+- remediation;
+- residual limitation.
+
+Fix defects, add regression tests, update MODEL_CARD.md and RISK_REGISTER.md, and re-run `make test` and `make audit`.
+
+Do not hide null findings. Do not treat correlation with an input as validation. Do not approve the release if the public UI communicates more certainty than the methods support.

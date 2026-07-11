@@ -1,0 +1,36 @@
+Continue building Santa Clara Health Intelligence in this existing project. Do not restart, re-scaffold, switch architectures casually, or inspect any sibling repository.
+
+Before editing:
+
+1. Read CLAUDE.md.
+2. Read STATE.md, TASKS.md, PLAN.md, DECISIONS.md, and RISK_REGISTER.md.
+3. Inspect the recent Git history and working tree.
+4. Read the specification documents relevant to the current phase.
+5. Review the latest test, audit, and server output.
+6. Determine the first incomplete phase gate and the exact reason it is incomplete.
+
+Then:
+
+- summarize the current state in no more than 20 lines;
+- state the next three concrete actions;
+- continue from the first incomplete gate;
+- preserve working code and data;
+- add tests with each change;
+- run the affected tests and audits;
+- use the built-in browser to inspect any changed user workflow;
+- fix visible usability and accessibility defects;
+- update TASKS.md, STATE.md, DECISIONS.md, RISK_REGISTER.md, DATA_DICTIONARY.md, DATA_MANIFEST.json, and MODEL_CARD.md as relevant;
+- commit a coherent checkpoint when the gate is green.
+
+Non-negotiable reminders:
+
+- Never inspect ~/Desktop/scc-caregap-atlas or any sibling project.
+- Never fabricate data, citations, validation, or successful source status.
+- Never treat missing or suppressed values as zero.
+- Never validate a score against an input used to construct it.
+- Preserve leading zeros in geographic IDs.
+- Core workflows must work without paid API keys.
+- Do not stop at a scaffold or describe work that has not been run.
+- Do not declare completion until every acceptance gate has evidence in DELIVERY_REPORT.md.
+
+If a source is blocked, implement a truthful unavailable/last-known-good state, document the blocker, and continue independent work. Ask me only for a truly necessary credential or decision that has no safe default.

@@ -1,0 +1,234 @@
+Perform the final adversarial verification of Santa Clara Health Intelligence. Assume previous completion claims may be wrong. Your task is to find and fix defects, not to defend the current implementation.
+
+Do not inspect any sibling repository. Work only in this project.
+
+STEP 1 — RECONSTRUCT THE CONTRACT
+
+Read:
+
+- CLAUDE.md
+- PLAN.md
+- TASKS.md
+- DECISIONS.md
+- RISK_REGISTER.md
+- MODEL_CARD.md
+- DATA_DICTIONARY.md
+- every file in docs/ in numeric order
+- recent Git history
+- current DELIVERY_REPORT.md if it exists
+
+Build a verification matrix mapping each requirement and acceptance criterion to executable evidence. Mark every unsupported claim as unverified.
+
+STEP 2 — CLEAN REPRODUCIBILITY RUN
+
+From a clean state, execute and capture results for:
+
+make bootstrap
+make data
+make demo
+make test
+make audit
+make export-demo
+
+Verify that:
+
+- no hidden absolute paths are required;
+- no old repository is referenced;
+- no secret is committed or exposed to the client;
+- live source failures preserve the last-known-good snapshot and display a truthful state;
+- the cached demo uses real verified public data, not fabricated values;
+- data manifests, checksums, row counts, schemas, vintages, and retrieval dates are present;
+- all canonical GEOIDs are strings with leading zeros;
+- there are no all-null production columns or silent zero fills;
+- suppressed data remain suppressed;
+- ACS margins of error and PLACES confidence intervals are retained;
+- crosswalk weights and geometry coverage audits pass.
+
+STEP 3 — ANALYTICS RED-TEAM
+
+Review the methods as a skeptical statistician and spatial epidemiologist.
+
+Verify with executable tests and spot calculations:
+
+- domain formulas;
+- normalization direction;
+- uncertainty propagation;
+- rank intervals and top-tier probabilities;
+- sensitivity and stability;
+- driver decomposition;
+- missingness behavior;
+- geography crosswalks;
+- resource deduplication;
+- travel/access calculations;
+- E2SFCA or equivalent;
+- scenario optimization constraints;
+- independent validation;
+- spatial autocorrelation handling;
+- temporal/out-of-sample logic where used;
+- no leakage or tautological validation;
+- no false causal language.
+
+Attempt to break the results with:
+
+- shuffled row order;
+- missing source fields;
+- extreme but valid values;
+- duplicate GEOIDs;
+- lost leading zeros;
+- source schema changes;
+- an unavailable source;
+- a suppressed value;
+- changed weights;
+- boundary tracts and resources outside the county;
+- a ZIP that crosses multiple tracts.
+
+Fix defects. Update MODEL_CARD.md and RISK_REGISTER.md with any residual limitations.
+
+STEP 4 — PRODUCT AND UX RED-TEAM
+
+Start the app and use the Claude Desktop built-in browser. Inspect every major page and required workflow with real data.
+
+Test as:
+
+- a commissioner with no statistical training;
+- a county analyst;
+- a community advocate;
+- a keyboard-only user;
+- a screen-reader user;
+- a mobile user;
+- a user encountering stale or unavailable data;
+- a user who does not understand tracts or percentiles.
+
+For each workflow, verify that a new user can:
+
+- understand the purpose;
+- choose a starting task;
+- identify current geography, lens, period, and comparison;
+- see raw values and units;
+- understand uncertainty;
+- inspect score drivers;
+- compare geographies;
+- inspect resources and access;
+- compare an intervention scenario;
+- understand validation;
+- prepare and export an advocacy brief;
+- access methods and citations;
+- recover from errors.
+
+Inspect desktop, tablet, and mobile widths. Test keyboard focus, contrast, reduced motion, charts, map alternatives, forms, errors, and exports. Run Playwright and axe. Fix visible and functional defects rather than merely documenting them.
+
+Reject:
+
+- walls of cards;
+- unclear primary actions;
+- tiny map labels;
+- color-only meaning;
+- unexplained scores;
+- percentiles mistaken for percentages;
+- generic AI prose;
+- citation lists that do not support individual claims;
+- hidden uncertainty;
+- broken print/PDF layouts;
+- placeholders or dead controls.
+
+STEP 5 — COPILOT AND DOCUMENT-INTELLIGENCE RED-TEAM
+
+Test deterministic mode and, if configured, the optional AI provider.
+
+Use normal, ambiguous, adversarial, and unsupported prompts. Upload or generate test documents containing prompt-injection attempts, hidden instructions, malformed content, and unsupported claims.
+
+Verify:
+
+- uploaded content is treated only as evidence;
+- no system prompt, secret, path, or private file is revealed;
+- no arbitrary SQL, shell, or URL fetching occurs;
+- numeric answers come from typed analytics tools;
+- citations resolve to exact data or document spans;
+- the copilot abstains when unsupported;
+- counterevidence is surfaced;
+- tool traces and assumptions are visible;
+- generated reports use structured claim/evidence objects;
+- uploaded documents can be deleted;
+- no PHI is requested or retained.
+
+STEP 6 — SECURITY, PRIVACY, PERFORMANCE, AND OPERATIONS
+
+Run and review:
+
+- dependency audit;
+- secret scan;
+- static analysis;
+- upload safety tests;
+- path traversal and SSRF tests;
+- prompt-injection tests;
+- rate-limit and timeout tests;
+- secure-header/CSP checks;
+- client-bundle secret inspection;
+- performance measurements;
+- source refresh and rollback test;
+- deployment build;
+- health/readiness/freshness endpoints.
+
+Fix high-severity findings or document a concrete mitigation and block release where appropriate.
+
+STEP 7 — EXPORT AND EVIDENCE VERIFICATION
+
+Generate at least:
+
+- one-page advocacy brief;
+- geography profile;
+- intervention scenario brief;
+- staff-question packet;
+- public-comment outline;
+- validation summary;
+- evidence packet.
+
+Verify every exported number against API/warehouse output. Verify citations, data vintages, uncertainty, methods version, limitations, accessibility, print layout, and source links.
+
+STEP 8 — FINAL ADVERSARIAL ROLES
+
+Review the product separately as:
+
+1. skeptical county epidemiologist;
+2. health-equity researcher;
+3. GIS analyst;
+4. commissioner with limited technical background;
+5. accessibility specialist;
+6. privacy/security reviewer;
+7. community advocate concerned about stigmatization;
+8. data engineer responsible for refresh failures;
+9. statistician looking for leakage and false precision;
+10. product designer testing first-use comprehension.
+
+For each role, write the five strongest objections, severity, evidence, and resolution. Fix all high-severity and feasible medium-severity issues.
+
+STEP 9 — DELIVERY REPORT
+
+Complete DELIVERY_REPORT.md with:
+
+- product scope;
+- architecture;
+- verified sources and vintages;
+- commands run and results;
+- acceptance matrix;
+- screenshots/browser-review evidence;
+- data audits;
+- analytics verification;
+- validation results;
+- accessibility results;
+- security results;
+- performance results;
+- export samples;
+- deployment and rollback evidence;
+- known limitations;
+- prohibited uses;
+- exact remaining weaknesses;
+- recommended next research and operational steps.
+
+Do not use vague statements such as “tests passed.” Include command names, dates, counts, and artifact paths.
+
+FINAL RESPONSE
+
+Only declare the release ready if all hard gates pass. Otherwise state “not ready,” list the blocking gates, fix what can be fixed, and leave STATE.md with exact continuation instructions.
+
+A product with honest documented limits may be ready. A product with fabricated data, hidden uncertainty, unsupported AI claims, inaccessible workflows, or unverified analytics is not ready.

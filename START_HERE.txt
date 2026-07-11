@@ -1,0 +1,30 @@
+SANTA CLARA HEALTH INTELLIGENCE — START HERE
+
+1. Put this entire folder at:
+   ~/Desktop/scc-health-intelligence
+
+2. Open Claude Desktop.
+
+3. Open the Code tab and start a new session using this folder as the project folder.
+
+4. Select the strongest coding/reasoning model available.
+
+5. Start in Plan mode.
+
+6. Open BOOTSTRAP_PROMPT.txt, copy all of it, and paste it into Claude Code.
+
+7. Wait for Claude to read the specifications, verify current official sources, and write its detailed plan.
+
+8. Review PLAN.md. When the plan complies with the specifications, paste:
+
+Approved. Switch from planning to implementation. Execute the full plan autonomously, keep TASKS.md and STATE.md current, run every required test and audit, use the built-in browser to inspect and improve the interface, and do not stop at a scaffold or partial prototype.
+
+9. Switch to an edit/auto mode that lets Claude write files and run routine project commands. Keep approval for destructive commands and commands outside the project folder.
+
+10. When a session ends or context is exhausted, start another Code session in the same folder and paste CONTINUATION_PROMPT.txt. Do not ask Claude to restart.
+
+11. When Claude claims the build is complete, paste FINAL_VERIFICATION_PROMPT.txt.
+
+12. Run UX_REVIEW_PROMPT.txt and METHODS_REVIEW_PROMPT.txt as independent specialist reviews before treating the product as demo-ready.
+
+13. Do not delete an older working repository until the new repository passes the final verification and you have a backup.

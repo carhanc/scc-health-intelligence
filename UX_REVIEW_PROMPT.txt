@@ -1,0 +1,98 @@
+Act as an independent, uncompromising principal product designer, civic-technology UX researcher, information-visualization expert, and WCAG 2.2 AA accessibility auditor. Review the current Santa Clara Health Intelligence application as though you had not participated in building it.
+
+Do not praise the design by default. Your objective is to find why a commissioner, county staff member, community advocate, researcher, keyboard-only user, mobile user, or first-time visitor could become confused, distrust the result, make a wrong inference, or abandon the workflow.
+
+Before reviewing:
+
+1. Read CLAUDE.md and docs/01_UX_UI_SPEC.md.
+2. Read docs/08_CONTENT_REPORTING.md.
+3. Read the current information architecture and user flows.
+4. Start the application with real data.
+5. Use the Claude Desktop browser pane, not code inspection alone.
+
+Review every major workflow at desktop, tablet, and mobile widths:
+
+- Overview/Start
+- Explore
+- Prioritize
+- Access Lab
+- Utilization Lab
+- Validation Lab
+- Advocate
+- Document Intelligence
+- Copilot
+- Data & Methods
+- exports/print views
+- loading, empty, stale, unavailable, suppressed, and error states
+
+Run these task scenarios without using developer knowledge:
+
+A. Find the strongest evidence relevant to diabetes prevention in one community.
+B. Explain why a selected tract is flagged without using the phrase “because the score is high.”
+C. Compare two geographies and understand whether the apparent difference is statistically meaningful.
+D. Find where mobile-clinic placement may be worth deeper review and understand the assumptions.
+E. Determine whether resource access is observed, modeled, or incomplete.
+F. Inspect a validation result and understand what it does not prove.
+G. Generate a one-page brief and verify every claim/citation.
+H. Upload a public agenda and identify affected geographies and staff questions.
+I. Complete the same core task without using the map.
+J. Complete the same core task with keyboard navigation only.
+
+For each page and task, evaluate:
+
+- purpose clarity;
+- first action clarity;
+- information hierarchy;
+- cognitive load;
+- terminology;
+- navigation and wayfinding;
+- context persistence;
+- map/table coordination;
+- chart comprehension;
+- score and uncertainty comprehension;
+- comparison clarity;
+- progressive disclosure;
+- source/citation visibility;
+- error prevention and recovery;
+- accessibility;
+- responsive behavior;
+- speed/perceived performance;
+- trust and credibility;
+- usefulness to advocacy.
+
+Look specifically for:
+
+- card walls;
+- competing calls to action;
+- unexplained acronyms;
+- percentiles presented like population percentages;
+- raw values hidden behind scores;
+- uncertainty hidden behind tooltips;
+- unsupported color semantics;
+- tiny labels;
+- map dependence;
+- filters that silently change scope;
+- stale context after navigation;
+- generic AI prose;
+- weak empty/error states;
+- dead controls;
+- exports that lose citations;
+- mobile overflow;
+- keyboard traps;
+- inaccessible charts;
+- overuse of technical language;
+- visual polish masking weak analytical meaning.
+
+Deliverables:
+
+1. Create `UX_AUDIT.md` with findings organized by severity: blocker, high, medium, low.
+2. Include exact page, viewport, reproduction steps, user harm, and recommended fix.
+3. Create a prioritized redesign plan that minimizes churn and maximizes comprehension.
+4. Fix all blocker/high findings and feasible medium findings.
+5. Add or update Playwright/axe tests for the corrected behavior.
+6. Re-run every task scenario in the browser.
+7. Capture before/after screenshots in `docs/design/review/`.
+8. Update the design system and UX specification when the implementation reveals a better general rule.
+9. Do not declare the review complete until a first-time user can reach a useful evidence-backed output without developer guidance.
+
+Use calm civic-product design. Do not solve problems by adding more cards, more text, more colors, or more dashboards. Prefer better hierarchy, language, defaults, progressive disclosure, and task flow.

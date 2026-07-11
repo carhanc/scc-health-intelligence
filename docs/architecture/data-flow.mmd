@@ -1,0 +1,64 @@
+%% Data flow — medallion architecture, Santa Clara Health Intelligence
+%% Phase 0 draft.
+
+flowchart LR
+    subgraph Sources["Official sources (17 adapters)"]
+        S1["CDC PLACES"]
+        S2["ACS 5-year"]
+        S3["TIGER/Line 2020"]
+        S4["SVI 2022"]
+        S5["HPI 3.0"]
+        S6["CalEnviroScreen 5.0"]
+        S7["HCAI facility/ED/\npatient-origin"]
+        S8["HRSA sites/HPSA"]
+        S9["VTA GTFS"]
+        S10["SCC GIS Hub"]
+        S11["USDA SNAP"]
+        S12["Census ZCTA crosswalk\n+ optional HUD"]
+        S13["County meeting docs\n(user upload first)"]
+    end
+
+    subgraph Bronze["data/raw (bronze)"]
+        Raw["Immutable checksummed\nartifacts + retrieval metadata"]
+    end
+
+    subgraph Silver["data/staged (silver)"]
+        Staged["Normalized per-source\nParquet / GeoParquet"]
+    end
+
+    subgraph Gold["data/curated (gold)"]
+        Geo["geo.* canonical\ngeography + crosswalks"]
+        Metrics["analytics.metric_values\n(metric registry driven)"]
+        Domains["analytics.domain_scores"]
+        Scenarios["analytics.scenario_scores\n+ uncertainty draws"]
+        Validation["analytics.validation_results"]
+        Resources["resources.* deduplicated\nfacilities/transit/food"]
+    end
+
+    subgraph Exports["data/exports"]
+        CSV["CSV / GeoParquet"]
+        Tiles["PMTiles"]
+        Reports["Briefs, packets,\naccessible PDF"]
+    end
+
+    Sources -->|fetch + validate| Raw
+    Raw -->|normalize + contract-test| Staged
+    Staged -->|join to canonical geography| Geo
+    Staged -->|metric registry eval| Metrics
+    Geo --> Metrics
+    Metrics -->|subdomain/domain aggregation| Domains
+    Domains -->|scenario weights + Monte Carlo| Scenarios
+    Scenarios -->|independent outcome check| Validation
+    Staged -->|dedup + source-priority| Resources
+
+    Domains --> Exports
+    Scenarios --> Exports
+    Validation --> Exports
+    Resources --> Exports
+    Geo --> Exports
+
+    Exports --> API["FastAPI /api/v1"]
+    API --> Web["Next.js frontend"]
+
+    classDef failure fill:#fff3e0,stroke:#e65100,stroke-width:1px;
+    Raw -.on failure: preserve last-known-good,\nlog reason, expose unavailable state.-> Raw

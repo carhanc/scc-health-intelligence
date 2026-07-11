@@ -1,0 +1,48 @@
+%% Deployment architecture — local/research mode (built) and hosted mode (documented, per DEC-009)
+%% Phase 0 draft.
+
+flowchart TB
+    subgraph Local["Local / research mode (primary deliverable, built and verified)"]
+        direction TB
+        Dev["Developer machine\n(Apple Silicon macOS)"]
+        NextDev["Next.js dev server\n(pnpm dev, apps/web)"]
+        FastAPIDev["FastAPI dev server\n(uvicorn, apps/api)"]
+        DuckLocal[("DuckDB file\nwarehouse/scc_health.duckdb")]
+        LocalData["data/{raw,staged,curated,exports}\n(local filesystem)"]
+        Dev --> NextDev
+        Dev --> FastAPIDev
+        FastAPIDev --> DuckLocal
+        FastAPIDev --> LocalData
+        NextDev <--> FastAPIDev
+    end
+
+    subgraph Hosted["Hosted public mode (architecture documented only — DEC-009: not deployed in this build)"]
+        direction TB
+        CDN["CDN\n(static assets, PMTiles)"]
+        WebHost["Next.js hosting\n(containerized or platform-native)"]
+        APIHost["FastAPI container\n(behind reverse proxy)"]
+        Worker["Background worker\n(scheduled source refresh)"]
+        ObjStore["Object storage\n(raw/curated artifacts, exports)"]
+        DuckHosted[("DuckDB / attached\nanalytical store")]
+        Health["Health / readiness /\ndata-freshness endpoints"]
+
+        CDN --> WebHost
+        WebHost <--> APIHost
+        APIHost --> DuckHosted
+        APIHost --> ObjStore
+        Worker --> ObjStore
+        Worker --> DuckHosted
+        APIHost --> Health
+    end
+
+    subgraph CI["CI (GitHub Actions)"]
+        Lint["lint + typecheck"]
+        UnitTests["unit + contract tests"]
+        Build["build (web + api)"]
+        E2ESmoke["Playwright + axe smoke"]
+        DockerBuild["Docker image build\n(for Hosted mode only)"]
+        Lint --> UnitTests --> Build --> E2ESmoke --> DockerBuild
+    end
+
+    Local -.same codebase, containerized.-> DockerBuild
+    DockerBuild -.not executed against a live\ncloud target in this build.-> Hosted

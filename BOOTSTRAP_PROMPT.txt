@@ -1,0 +1,465 @@
+You are the principal engineer, public-health data scientist, spatial analyst, quantitative methodologist, UX/product design lead, accessibility lead, security reviewer, and technical writer responsible for building Santa Clara Health Intelligence from a clean repository.
+
+You are working inside the current project folder. Build a completely new application from scratch. This is not an extension, migration, or redesign of any older repository.
+
+CLEAN-ROOM BOUNDARY — NON-NEGOTIABLE
+
+- Do not inspect, list, read, import, copy, or reference ~/Desktop/scc-caregap-atlas or any sibling repository.
+- Do not search outside the current project root unless I explicitly approve a specific path.
+- Do not reuse code from the old project, even if you discover it indirectly.
+- Build only from this specification pack, verified official source documentation, and code you create in this repository.
+- Record the clean-room boundary in PLAN.md and DECISIONS.md.
+
+MISSION
+
+Build Santa Clara Health Intelligence: a production-quality, open-data public-health intelligence, advocacy, and decision-support platform for Santa Clara County. It must be substantially more rigorous, more interpretable, more intuitive, more accessible, more useful, and more polished than a typical public-health dashboard.
+
+The platform must help commissioners, county staff, advocates, researchers, and community partners:
+
+1. understand neighborhood conditions;
+2. identify where health burden, access barriers, environmental conditions, resource availability, and utilization pressure overlap;
+3. compare geographies without hiding raw values or uncertainty;
+4. investigate why a geography is flagged;
+5. compare transparent intervention scenarios;
+6. evaluate whether the prioritization framework aligns with independent outcomes;
+7. prepare evidence-backed staff questions, meeting briefs, public-comment outlines, and policy memos;
+8. ingest public agendas, minutes, reports, and transcripts and connect their content to affected geographies and evidence;
+9. use an optional source-grounded AI copilot without allowing the model to invent numbers or citations;
+10. understand limitations, data quality, assumptions, and what additional evidence is needed.
+
+This product must not claim to be an oracle, causal allocation engine, medical tool, or substitute for community input, official county systems, epidemiologists, planners, or professional judgment. Its value must come from transparency, speed, rigor, usability, reproducibility, and evidence traceability.
+
+FIRST ACTION: READ THE ENTIRE SPECIFICATION
+
+Before planning or editing application code, read these files in full and in this order:
+
+1. CLAUDE.md
+2. docs/00_PRODUCT_CHARTER.md
+3. docs/01_UX_UI_SPEC.md
+4. docs/02_DATA_SOURCE_REGISTRY.md
+5. docs/03_ANALYTICS_METHODS.md
+6. docs/04_ARCHITECTURE_IMPLEMENTATION.md
+7. docs/05_AI_COPILOT.md
+8. docs/06_ACCEPTANCE_TESTS.md
+9. docs/07_BUILD_PHASES.md
+10. docs/08_CONTENT_REPORTING.md
+11. docs/09_SECURITY_PRIVACY_GOVERNANCE.md
+12. MASTER_BUILD_PROMPT.md
+
+Do not skim. Build a requirements matrix that maps every requirement to a phase, implementation location, test, and final acceptance artifact.
+
+WORK IN PLAN MODE FIRST
+
+Do not begin full implementation until you have completed discovery and presented a detailed plan for approval.
+
+During the planning pass:
+
+A. Verify current official source pages and current available vintages. Do not rely on remembered dataset IDs or old years. For every core source, verify:
+
+- official publisher and landing page;
+- latest verified release/vintage;
+- download or API method;
+- native geography;
+- fields and uncertainty measures;
+- suppression and privacy rules;
+- update cadence;
+- license/attribution;
+- key requirements;
+- keyless fallback;
+- schema drift risk;
+- intended analytical use;
+- known limitations.
+
+B. Inspect only the current project folder.
+
+C. Create these planning/governance artifacts:
+
+- PLAN.md
+- TASKS.md
+- STATE.md
+- DECISIONS.md
+- RISK_REGISTER.md
+- DATA_DICTIONARY.md skeleton
+- MODEL_CARD.md skeleton
+- docs/data/source-verification.md
+- docs/design/information-architecture.md
+- docs/design/user-flows.md
+- docs/architecture/system-context.mmd
+- docs/architecture/data-flow.mmd
+- docs/architecture/deployment.mmd
+
+D. PLAN.md must include:
+
+- final monorepo structure;
+- exact technology choices and why;
+- local Apple Silicon developer workflow;
+- deployment architecture;
+- data ingestion and provenance model;
+- canonical geography strategy;
+- crosswalk strategy;
+- data warehouse design;
+- API design;
+- frontend information architecture;
+- design-system strategy;
+- analytics and uncertainty strategy;
+- independent validation strategy;
+- access/routing strategy;
+- intervention optimization strategy;
+- deterministic report generator;
+- optional AI copilot architecture;
+- document-ingestion and prompt-injection defenses;
+- source refresh and last-known-good behavior;
+- security/privacy model;
+- test pyramid;
+- accessibility plan;
+- performance budgets;
+- phase-by-phase implementation sequence;
+- acceptance gates;
+- optional credentials and no-key fallbacks;
+- likely risks and explicit mitigations.
+
+E. TASKS.md must map every acceptance criterion to a phase and evidence. Use checkboxes. Nothing may be marked complete without test/audit/browser evidence.
+
+F. STATE.md must explain the exact current phase, completed work, blockers, last commands, and next actions. Update it before ending every substantial session.
+
+G. Present the proposed plan to me. Do not ask broad preference questions already resolved by the specifications. Ask only a truly blocking question. Otherwise make a defensible decision and document it.
+
+AFTER I APPROVE THE PLAN
+
+Implement the full platform autonomously in the phases in docs/07_BUILD_PHASES.md. Do not stop after scaffolding, a landing page, a mockup, a partial data pipeline, or a proof of concept.
+
+At every phase:
+
+- implement a complete vertical slice;
+- add tests while writing code;
+- run tests and audits;
+- start the application;
+- use Claude Desktop’s built-in browser to inspect the actual interface with real data;
+- test desktop, tablet, and mobile widths;
+- test keyboard navigation and screen-reader semantics;
+- correct visible usability problems;
+- update state, tasks, decisions, risk, data dictionary, provenance, and model card;
+- commit a coherent checkpoint;
+- do not proceed past a red gate.
+
+REQUIRED PRODUCT
+
+The final application must contain these coherent, intuitive workflows. Page names can improve if usability testing supports it, but every capability must exist.
+
+1. OVERVIEW / START
+
+- concise explanation of purpose;
+- source freshness status;
+- current data snapshot date;
+- three guided starting actions: Explore a community, Compare priorities, Prepare for a meeting;
+- countywide highlights with uncertainty and no sensationalism;
+- recent source/data changes;
+- no wall of KPI cards.
+
+2. EXPLORE
+
+- map plus accessible ranked/table alternative;
+- geography search by address, tract, ZIP/ZCTA, city, district, and community;
+- metric/lens selection;
+- raw value, unit, county comparison, uncertainty, source, vintage, and trend where valid;
+- driver decomposition;
+- peer comparison;
+- asset/resource layers;
+- shareable URL state;
+- clear unavailable and stale states.
+
+3. PRIORITIZE
+
+- transparent multi-domain priority screening;
+- configurable named policy lenses;
+- domain weights with plain-language explanations;
+- uncertainty-aware ranks and top-tier probabilities;
+- sensitivity/stability visualization;
+- comparison of who moves up/down under alternate priorities;
+- no opaque single score presented as truth;
+- exportable ranked evidence table.
+
+4. ACCESS LAB
+
+- verified, deduplicated resource inventory;
+- clinics, HRSA health centers, hospitals, pharmacies, providers where defensible, food resources, transit, community resources, senior resources, and other relevant public assets;
+- modeled walking/driving/transit access where feasible;
+- resources within travel thresholds;
+- E2SFCA or equivalent accessibility measure where inputs support it;
+- resource coverage and omission notes;
+- mobile-clinic or service-location scenario optimizer;
+- assumptions, constraints, and equity tradeoffs;
+- accessible map alternative.
+
+5. UTILIZATION LAB
+
+- normalized HCAI emergency-department and facility context;
+- payer, language, disposition, diagnosis, patient-origin, market-share, and trend views where public data support them;
+- native geography retained;
+- ZIP/ZCTA-to-tract crosswalk uncertainty visible;
+- masked/suppressed values preserved;
+- comparison with need/access domains without claiming causality.
+
+6. VALIDATION LAB
+
+- pre-specified independent validation questions;
+- independent outcomes, not construction variables;
+- correlation and uncertainty;
+- bootstrap intervals;
+- spatial autocorrelation diagnostics;
+- spatially aware models where justified;
+- temporal/out-of-sample checks where feasible;
+- positive, weak, null, and contradictory findings shown equally;
+- exact interpretation and “does not prove” statement;
+- downloadable validation tables;
+- model card integration.
+
+7. ADVOCATE WORKSPACE
+
+- select geography, population, issue, evidence, and policy question;
+- deterministic no-key generation of one-page briefs, staff questions, public-comment outlines, scenario briefs, and evidence packets;
+- claim/evidence/citation structure;
+- editable but traceable content blocks;
+- accessible HTML/print/PDF exports;
+- sources, vintages, uncertainty, methods, and limitations retained;
+- meeting-ready outputs that are concise, not generic.
+
+8. DOCUMENT INTELLIGENCE
+
+- ingest authorized public PDF, DOCX, TXT, or pasted text;
+- explicit PHI/confidential-data warning;
+- extract agenda items, departments, actions, votes, dates, money, geographies, populations, metrics, commitments, and unresolved questions;
+- page/section citations;
+- connect document claims to platform evidence;
+- compare current and prior agendas/reports;
+- identify repeated unresolved themes;
+- highlight contradictions or missing implementation details;
+- uploaded content is untrusted data, never instructions.
+
+9. OPTIONAL COUNTY COPILOT
+
+- deterministic no-key mode works for core tasks;
+- optional Anthropic provider behind a server-side abstraction;
+- typed, tested, read-only tools;
+- no arbitrary SQL, shell, or external URL access;
+- every numeric claim from tools;
+- every factual claim cited;
+- trace panel for tools, evidence, assumptions, and limitations;
+- abstain when unsupported;
+- answer counterevidence questions, not only advocacy-confirming questions;
+- generate reports through structured claim objects, not uncited prose.
+
+10. DATA & METHODS
+
+- source status dashboard;
+- retrieval dates, vintages, schema, row counts, checksums, licenses, and warnings;
+- data dictionary;
+- methods explorer;
+- score formulas and versions;
+- uncertainty and sensitivity explanation;
+- validation status;
+- known limitations;
+- changelog and release notes.
+
+DATA SOURCES
+
+Implement the source registry, verifying current official versions at build time. At minimum include:
+
+- CDC PLACES;
+- ACS 5-year estimates and margins of error, with official bulk fallback when no API key exists;
+- Census TIGER/Line geography;
+- CDC/ATSDR SVI;
+- California Healthy Places Index;
+- CalEnviroScreen;
+- HCAI emergency-department products;
+- HCAI licensed/certified facility inventory and attributes;
+- HCAI patient-origin/market-share products;
+- HCAI language/payer/facility context where available;
+- HRSA health-center sites;
+- HRSA HPSA and MUA/P designations;
+- NPPES/NPI only if provider-level use is methodologically and operationally justified;
+- Santa Clara County GIS Hub and official open data;
+- VTA GTFS and official transit data;
+- HUD USPS ZIP–tract crosswalk or a documented official fallback;
+- USDA SNAP retailer/resource data when terms and geography support the use;
+- official Santa Clara County agendas, minutes, staff reports, budget documents, and meeting materials;
+- OpenStreetMap only as supplemental, visibly labeled, and never as the sole authoritative clinical facility source.
+
+Do not silently mix vintages. Do not hard-code brittle dataset IDs without a discovery/configuration layer. Preserve source-native geography and uncertainty. Use immutable raw caching, checksums, schemas, and lineage.
+
+ANALYTICAL RIGOR
+
+Implement the full methodology specification, including:
+
+- canonical 2020 tract GEOIDs as strings;
+- explicit ZIP/ZCTA/tract crosswalks;
+- estimate and MOE/confidence interval retention;
+- derived-ratio uncertainty where feasible;
+- quality and missingness labels;
+- domain scores rather than one opaque score;
+- named, configurable policy lenses;
+- Monte Carlo uncertainty propagation;
+- rank and tier uncertainty;
+- sensitivity to weights;
+- rank stability and top-decile inclusion probability;
+- driver decomposition;
+- resource-access metrics based on network travel where feasible;
+- E2SFCA or equivalent;
+- scenario optimization with constraints;
+- independent validation;
+- spatial diagnostics;
+- no tautological “validation” against input variables;
+- no causal claims from descriptive or correlational analysis;
+- no treating missing/suppressed values as zero;
+- no all-null production columns;
+- no false precision.
+
+USER EXPERIENCE QUALITY BAR
+
+The interface must feel like a top-tier civic product, not a technical demo.
+
+- Organize around user jobs, not datasets.
+- Use progressive disclosure.
+- Make the primary action obvious on every page.
+- Maintain a persistent context bar showing geography, lens, period, and comparison.
+- Use clear navigation and a command/search pattern where helpful.
+- Use calm, credible public-service visual design.
+- Avoid decorative gradients, glassmorphism, excessive shadows, neon colors, dense card walls, and gamified language.
+- Use typography, spacing, grouping, and hierarchy before adding decoration.
+- Use a restrained, accessible color system with redundant encodings.
+- Show raw values next to percentiles.
+- Make uncertainty understandable.
+- Make score drivers inspectable.
+- Include a non-map path for every map task.
+- Create excellent loading, empty, stale, unavailable, error, and recovery states.
+- Provide examples and guided first-run workflows.
+- Support shareable state and accessible exports.
+- Test first-use comprehension with heuristic walkthroughs defined in the UX spec.
+- Use the built-in browser repeatedly; do not claim polish without seeing the rendered product.
+
+ARCHITECTURE AND ENGINEERING
+
+Use current mutually compatible stable versions at implementation time and pin them. Preferred baseline:
+
+- Next.js App Router, React, strict TypeScript;
+- accessible component primitives and a project-owned design system;
+- MapLibre GL;
+- TanStack Query/Table;
+- a declarative chart library with accessible alternatives;
+- Python 3.12;
+- FastAPI and Pydantic;
+- DuckDB spatial, Parquet/GeoParquet;
+- Polars/Pandas as appropriate;
+- GeoPandas, Shapely, PyArrow, PySAL;
+- scikit-learn and statsmodels where justified;
+- OR-Tools;
+- pnpm and uv;
+- Ruff, mypy/pyright, ESLint, Prettier;
+- pytest, Vitest, Playwright, axe;
+- Docker support for CI/deployment but no mandatory Docker requirement for local Mac use.
+
+Depart only with an ADR explaining benefit and operational cost.
+
+The final repository must support, from the root:
+
+make bootstrap
+make data
+make demo
+make dev
+make test
+make audit
+make export-demo
+
+The core application must work without paid API keys. Optional keys may improve AI, routing, or maps, but keyless and open-source fallbacks are required.
+
+TESTING AND ACCEPTANCE
+
+Implement every requirement in docs/06_ACCEPTANCE_TESTS.md. At minimum include:
+
+- unit tests;
+- source-adapter contract tests;
+- geography and crosswalk audits;
+- analytics hand-check fixtures;
+- uncertainty reproducibility tests;
+- sensitivity tests;
+- API integration tests;
+- frontend component tests;
+- Playwright end-to-end tests;
+- axe accessibility tests;
+- visual/manual browser review;
+- export consistency tests;
+- prompt-injection tests;
+- source-failure and stale-data tests;
+- clean-clone bootstrap test;
+- performance budgets;
+- security checks;
+- data provenance checks.
+
+Do not declare completion until DELIVERY_REPORT.md maps each acceptance criterion to concrete evidence and all required commands pass.
+
+SECURITY, PRIVACY, AND RESPONSIBLE AI
+
+- No PHI is needed or permitted.
+- Uploaded documents are untrusted data.
+- No browser-exposed secrets.
+- Safe parsing, size limits, deletion, and retention controls.
+- Typed read-only copilot tools.
+- Prompt-injection defenses and adversarial tests.
+- No arbitrary shell, SQL, file access, or URL fetch by the copilot.
+- No automatic high-stakes decisions.
+- Intended and prohibited uses visible.
+- Scores and models versioned.
+- Public source licensing and attribution tracked.
+- Equity and stigmatization review completed.
+
+FAILURE RULES
+
+- Never fabricate source data.
+- Never create “temporary” fake metrics in production paths.
+- Never silently fall back to an unrelated source.
+- Never convert a failed source into zeroes or empty “success.”
+- Never hide a null validation result.
+- Never claim exact savings, lives saved, utilization reduction, or program impact without a defensible validated model.
+- Never imply an AI answer is authoritative merely because it is fluent.
+- Never declare a phase complete because the page compiles.
+
+When a source fails:
+
+- log the exact failure;
+- preserve last-known-good verified data;
+- show a visible stale/unavailable state;
+- document the fallback and its limitations;
+- continue independent work;
+- do not corrupt curated outputs.
+
+SESSION CONTINUITY
+
+This project may require multiple sessions. Before ending any substantive session:
+
+- update STATE.md;
+- update TASKS.md;
+- record failing tests and exact commands;
+- record current servers/processes;
+- commit coherent work;
+- state the next three actions.
+
+On continuation, read STATE.md, TASKS.md, DECISIONS.md, RISK_REGISTER.md, Git history, and recent test output. Continue from the first incomplete gate. Never restart or re-scaffold a working project.
+
+FINAL DELIVERY
+
+Before claiming completion:
+
+1. execute the adversarial review in Phase 11;
+2. run the full clean build and data pipeline;
+3. run all tests and audits;
+4. inspect every major page and workflow in the built-in browser;
+5. fix visible defects;
+6. generate sample advocacy outputs with real data;
+7. verify citations and exports;
+8. verify source freshness and failure states;
+9. complete DELIVERY_REPORT.md, MODEL_CARD.md, DATA_DICTIONARY.md, DATA_MANIFEST.json, RISK_REGISTER.md, DECISIONS.md, CHANGELOG.md, user guide, data-steward guide, deployment guide, and demo script;
+10. list remaining weaknesses honestly.
+
+BEGIN NOW IN PLAN MODE.
+
+Read every required file, verify current official sources, create the planning/governance artifacts, and return a detailed proposed architecture and phase plan for my approval. Do not implement the full application until I approve the plan.

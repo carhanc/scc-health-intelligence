@@ -1,0 +1,61 @@
+%% System context — Santa Clara Health Intelligence
+%% Phase 0 draft. Shows external actors, official data sources, and system boundary.
+
+graph TB
+    subgraph Users["People"]
+        Commissioner["Health Advisory\nCommissioner"]
+        Analyst["County / health-system\nanalyst"]
+        Advocate["Community advocate /\nnonprofit leader"]
+        Researcher["Researcher / student"]
+        Public["Public visitor"]
+    end
+
+    subgraph System["Santa Clara Health Intelligence"]
+        Web["apps/web\n(Next.js frontend)"]
+        API["apps/api\n(FastAPI backend)"]
+        Pipelines["pipelines\n(source adapters, analytics, exports)"]
+        Warehouse[("warehouse\n(DuckDB spatial)")]
+        Copilot["Copilot\n(deterministic + optional LLM)"]
+    end
+
+    subgraph OfficialSources["Official public data sources (Tier 1/2)"]
+        Census["US Census Bureau\n(ACS, TIGER/Line, ZCTA crosswalk)"]
+        CDC["CDC\n(PLACES, ATSDR SVI)"]
+        CA["State of California\n(HCAI, CalEnviroScreen, HPI)"]
+        HRSA["HRSA\n(health centers, HPSA/MUA)"]
+        HUD["HUD USER\n(ZIP-tract crosswalk, optional)"]
+        VTA["VTA\n(GTFS transit feed)"]
+        SCC["Santa Clara County\n(GIS Hub, meeting portal)"]
+        USDA["USDA FNA\n(SNAP retailer locator)"]
+    end
+
+    subgraph OptionalExternal["Optional external services (never required)"]
+        Anthropic["Anthropic API\n(ANTHROPIC_API_KEY)"]
+        Mapbox["Mapbox\n(MAPBOX_TOKEN, optional basemap)"]
+        ORS["OpenRouteService\n(optional routing enhancement)"]
+    end
+
+    Commissioner --> Web
+    Analyst --> Web
+    Advocate --> Web
+    Researcher --> Web
+    Public --> Web
+
+    Web <--> API
+    API <--> Warehouse
+    API --> Copilot
+    Pipelines --> Warehouse
+    Pipelines --> OfficialSources
+
+    Census --> Pipelines
+    CDC --> Pipelines
+    CA --> Pipelines
+    HRSA --> Pipelines
+    HUD -.optional, keyless fallback exists.-> Pipelines
+    VTA --> Pipelines
+    SCC --> Pipelines
+    USDA --> Pipelines
+
+    Copilot -.optional, deterministic mode default.-> Anthropic
+    Web -.optional, keyless basemap default.-> Mapbox
+    Pipelines -.optional, OSM-network default.-> ORS
