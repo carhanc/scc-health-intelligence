@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     scc_health_data_dir: Path = REPO_ROOT / "data"
     scc_health_warehouse_path: Path = REPO_ROOT / "warehouse" / "scc_health.duckdb"
+    scc_health_demo_warehouse_path: Path = REPO_ROOT / "warehouse" / "scc_health_demo.duckdb"
     scc_health_api_port: int = 8000
 
     # Optional credentials. All are None by default; core functionality

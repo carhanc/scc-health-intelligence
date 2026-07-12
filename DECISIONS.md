@@ -140,4 +140,70 @@ Each record: context, decision, rationale, alternatives considered, and conseque
 
 ---
 
+### DEC-012 — Supervisor district source: reject the OBJECTID-only 2021 layer, use the labeled Planning Office layer
+
+**Context:** Phase 2 needed a canonical Santa Clara County supervisor district boundary source. Two official candidates were found on ArcGIS Online, both owned by `SCC.Planning.Office`:
+1. Item `5cae68d4bb2c47fd89d62dac2856e989` ("Santa Clara County Supervisorial District Boundaries 2021", service `Supervisorial_Districts_2021`, layer 24) — 5 polygon features, but the **only attributes are `OBJECTID`, `Shape__Area`, `Shape__Length`**. There is no field identifying which OBJECTID corresponds to official District 1–5.
+2. Item `eb0277c396494f98b71d8781e417464d` ("Supervisorial Districts", service `PlanningOfficeDataService2`, layer 5, last modified 2025-09-25) — 5 polygon features with explicit `DISTRICT` (integer 1–5) and `SUPERVISOR` (name) fields, matching current officeholders (Sylvia Arenas–D1, Betty Duong–D2, Otto Lee–D3, Susan Ellenberg–D4, Margaret Abe-Koga–D5).
+
+**Decision:** Use source 2 (`PlanningOfficeDataService2`/layer 5) as the canonical supervisor-district boundary. Do not use source 1.
+
+**Rationale:** A geometry-only layer with an arbitrary `OBJECTID` cannot be safely matched to real district numbers without an unverifiable guess — assigning "OBJECTID 1 = District 1" would be exactly the kind of silent, unverified assumption CLAUDE.md prohibits ("Never fabricate... source data"). Source 2 carries the district identity directly from the publisher and is also more recently maintained.
+
+**Consequences:** `DATA_MANIFEST.json` records both items were evaluated; source 1 is not ingested. If source 2 ever becomes unavailable, the correct fallback is to re-verify a labeled source rather than falling back to the unlabeled one.
+
+### DEC-013 — Cartographic (generalized) boundaries for county and ZCTA; full-resolution TIGER for tract and place
+
+**Context:** Raw TIGER/Line boundary files are only published nationally for county and ZCTA layers (no per-state partition), making them large (80MB county, and ZCTA is larger still) for a build that only needs Santa Clara County's single county boundary and a handful of ZCTAs. Census also publishes cartographic (generalized) boundary files from the same TIGER/Line program at 1:500,000 scale, which are official Census Bureau products, just simplified.
+
+**Decision:** Use the cartographic 500k boundary files for **county** (`cb_2020_us_county_500k.zip`, 12.6MB vs. 80.6MB raw) and **ZCTA** (`cb_2020_us_zcta520_500k.zip`, 66.7MB, still filtered down to Santa Clara-relevant ZCTAs after fetch). Use full-resolution state-partitioned TIGER/Line for **tract** (`tl_2020_06_tract.zip`, the canonical analytical unit, where precision matters most) and **place** (`tl_2020_06_place.zip`).
+
+**Rationale:** `docs/02_DATA_SOURCE_REGISTRY.md` §4.3 explicitly permits storing "original and simplified geometries" and requires recording simplification tolerance — this is exactly that tradeoff, applied only to the two layers where a single county's worth of full-resolution national data would be disproportionately expensive relative to their use (county boundary is a coarse containment reference; ZCTA is a crosswalk/utilization-context layer, not the canonical analytical unit).
+
+**Consequences:** `geo.county` and `geo.zctas` geometries are recorded with `geometry_precision = "cartographic_500k"` in their provenance metadata; `geo.tracts` and `geo.places` are recorded as `geometry_precision = "full_resolution"`. If a future phase needs full-resolution county/ZCTA geometry (e.g., precise ZCTA-based routing), re-ingest from the raw national TIGER file at that time with a new decision record.
+
+### DEC-014 — HUD USPS crosswalk enhancement path deferred past Phase 2
+
+**Context:** DEC-005 already established that the Census ZCTA-to-tract relationship file is the default (keyless) crosswalk and the HUD USPS crosswalk is an optional higher-confidence enhancement gated on a free `HUD_USER_TOKEN`. Phase 2 scope is the geography spine; no `HUD_USER_TOKEN` was requested or provided this session.
+
+**Decision:** Phase 2 implements the Census ZCTA-relationship crosswalk fully (weights computed, audited, loaded). The HUD-crosswalk enhancement path is stubbed with a typed "not configured" adapter result rather than implemented end-to-end, since it requires a credential this session does not have.
+
+**Rationale:** Matches the "no all-null production columns... but truthful unavailable state" principle — the enhancement is clearly absent, not silently faked or partially built against guessed API responses.
+
+**Consequences:** `RISK_REGISTER.md` records this as an open enhancement, not a defect. Any future session with a `HUD_USER_TOKEN` can complete the adapter using the already-documented API pattern in `docs/data/source-verification.md` §5.
+
+---
+
+### DEC-015 — Demo warehouse is a separate file from the live warehouse
+
+**Context:** `make demo` must produce a deterministic offline snapshot without ever risking corruption of a live `make data` build, per `docs/04_ARCHITECTURE_IMPLEMENTATION.md` §22.
+
+**Decision:** `make demo` writes to `warehouse/scc_health_demo.duckdb`, entirely separate from `warehouse/scc_health.duckdb` (live). The API's `resolve_warehouse_path()` prefers the live warehouse if present, falls back to the demo warehouse, and otherwise reports a truthful `unavailable` state — every geography API response carries an explicit `data_mode: "live" | "demo"` field so the frontend can label demo data as such rather than presenting it as current.
+
+**Rationale:** Directly satisfies the "demo mode must be visibly labeled and must not be confused with live/current data" requirement without any risk of one build overwriting the other.
+
+**Consequences:** `data/demo/geography/*.parquet` (the checked-in snapshot `make demo` reads from) must be regenerated via `scripts/build_demo_geography_snapshot.py` whenever the live geography pipeline's schema changes materially.
+
+### DEC-016 — Demo snapshot is a frozen copy of real Phase 2 data, not synthetic data
+
+**Context:** `docs/04_ARCHITECTURE_IMPLEMENTATION.md` §22 requires demo mode to use "small checked-in source fixtures... never invented production values."
+
+**Decision:** `data/demo/geography/*.parquet` is a direct, unmodified copy of the real curated Phase 2 output (408 real tracts, 30 real places, 5 real supervisor districts, etc.), frozen at the time `scripts/build_demo_geography_snapshot.py` was run, not a synthetic or reduced subset.
+
+**Rationale:** Santa Clara County's full geography spine is small enough (3.2MB across all curated tables) to check into git in full; there is no need to fabricate or down-sample data, and doing so would violate the "never invented production values" rule in spirit even for demo purposes.
+
+**Consequences:** Every number a user sees in demo mode is a real, sourced number — the only thing distinguishing demo from live is freshness (frozen at snapshot time vs. current), which is exactly the honest distinction the `data_mode` field is designed to communicate.
+
+### DEC-017 — No browser-based visual verification tooling available this session; relied on HTTP-level verification instead
+
+**Context:** `docs/07_BUILD_PHASES.md` calls for using "the built-in browser" to visually inspect each phase's UI. In this environment, `mcp__Claude_in_Chrome__list_connected_browsers` returned empty (no extension connected) both in Phase 1 and Phase 2, and the Preview tool's process spawner failed with a sandbox-level `getcwd: cannot access parent directories: Operation not permitted` error before even reaching the launch command, in both a plain `pnpm dev` invocation and a wrapper-script invocation.
+
+**Decision:** Verified the Phase 2 frontend work (geography search page) via: production build success (`next build`), ESLint/TypeScript strict-mode cleanliness, Vitest unit tests, direct HTTP inspection of server-rendered HTML output (`curl` against the dev server, confirming expected headings/labels/input IDs appear), live end-to-end API calls confirmed via `curl` returning correct real data, and a CORS preflight-equivalent check confirming the browser-origin request pattern is permitted.
+
+**Rationale:** This is the most rigorous verification achievable without functioning browser tooling in this specific environment. It is not equivalent to an actual visual/interaction review and is not claimed as such.
+
+**Consequences:** A true in-browser visual/accessibility/interaction walkthrough (screenshots, keyboard navigation, screen-reader checks) remains outstanding and is explicitly deferred to Phase 5, which is where `docs/07_BUILD_PHASES.md` itself first requires browser-based UX review evidence (Phase 2's gate does not). If browser tooling becomes available in a future session, a retroactive visual check of the Phase 2 Explore scaffold would be a reasonable first action.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

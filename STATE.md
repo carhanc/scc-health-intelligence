@@ -1,61 +1,55 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-11 (end of Phase 1 session)
+**Last updated:** 2026-07-11 (end of Phase 2 session)
 
 ## Current phase and gate
 
-**Phase 1 (Repository foundation and reproducible developer experience) — complete and verified.** Gate 1 evidence recorded below. Ready to begin Phase 2 (geography spine, provenance system, data contracts) in the next session.
+**Phase 2 (Geography spine, provenance system, data contracts) — complete and verified. Gate 2: PASS.** Ready to begin Phase 3 (core federal/state/local data ingestion — the remaining ~11 health/social/resource/utilization source adapters) in the next session.
 
 ## Completed this session
 
-**Phase 0 (carried over from earlier in this session):** all governance artifacts committed (`PLAN.md`, `TASKS.md`, `DECISIONS.md`, `RISK_REGISTER.md`, `docs/data/source-verification.md`, `DATA_DICTIONARY.md`, `MODEL_CARD.md`, design/architecture docs). Commit `439d011`.
+**Phase 0 and Phase 1** (carried over from earlier in this session): see prior STATE.md history in git log (commits `439d011`, `f46526b`).
 
-**Phase 1:**
-- Scaffolded the full monorepo structure (`apps/web`, `apps/api`, `packages/{ui,shared-types,eslint-config,tsconfig}`, `pipelines/src/scc_health_pipeline/{sources,geography,normalization,metrics,scoring,uncertainty,validation,routing,optimization,exports,audits}`, `config/`, `tests/{unit,integration,e2e,accessibility,contract,visual}`, `.github/workflows/`).
-- Pinned toolchain: `.nvmrc` (22), `.python-version` (3.12), `pnpm-workspace.yaml`, root `pyproject.toml` (uv workspace, `package = false`), `apps/api/pyproject.toml`, `pipelines/pyproject.toml`.
-- Wrote and **ran successfully** `scripts/bootstrap_macos.sh` — installed `node@22` (22.23.1), pnpm (11.12.0 via Corepack), `uv` (0.11.28), Python 3.12.13 on this machine (which started at Node 20.16/Python 3.9 with no `uv`/`pnpm`, i.e. a genuine fresh-clone-equivalent test).
-- **Discovered and recorded DEC-011/RISK-011:** this machine's Homebrew is the x86_64 build running under Rosetta at `/usr/local`, not native arm64 at `/opt/homebrew`. Bootstrap deliberately does not install a second Homebrew (would modify unrelated system state); documented as an accepted, non-blocking risk.
-- Wrote `scripts/check_clean_room.py` (DEC-001 enforcement) — passes.
-- Built the Phase-1 minimal vertical slice: FastAPI `/api/v1/health`, `/api/v1/version`, `/api/v1/warehouse-status` routes (the last one truthfully reports "not connected — warehouse file does not exist yet" rather than faking success, since `make data` hasn't run); Next.js shell page with a `SystemStatus` client component making one real typed `fetch` to the API via TanStack Query.
-- **Verified end-to-end with running dev servers**, not just static review: started both `uvicorn` and `next dev` in the background, `curl`-verified all three API endpoints return correct/truthful JSON, and `curl`-verified the Next.js page renders the expected title/content/component shell.
-- Attempted full in-browser visual verification: no Chrome extension connected (`list_connected_browsers` returned empty); the Preview tool's sandboxed process spawner rejected every `runtimeExecutable` variant tried (`Operation not permitted` on `getcwd`). This is recorded as a known environment limitation, not a product defect — full browser/UX review is a Phase 5 gate requirement in `docs/07_BUILD_PHASES.md`, not Phase 1, since Phase 1 explicitly says "do not build final visual components yet."
-- Added a Vitest smoke test (`apps/web/lib/api.test.ts`) and confirmed `make test` exercises both the Python (pytest) and TypeScript (Vitest) suites successfully — initially failed because Vitest exits nonzero with zero test files; fixed by adding a real test rather than suppressing the check.
-- Ran the full command surface via the actual `Makefile` targets (not just direct `pnpm`/`uv` calls) and confirmed all green: `make lint`, `make typecheck`, `make test`, `make audit` (clean-room check only — data/analytics audits are Phase 2+), `make build`.
-- Fixed incidental issues found along the way: `TASKS.md` needed adding to the clean-room allowlist (it legitimately documents *not* referencing the sibling repo); `tool.uv.dev-dependencies` deprecation → switched to `[dependency-groups] dev`; `@scc-health/eslint-config` needed `"type": "module"`; ruff `B008` needed a per-file ignore for FastAPI's `Depends()`-in-defaults pattern; pnpm's new build-script allowlist needed explicit approval for `esbuild`/`sharp`/`unrs-resolver` (all legitimate Next.js/Vitest/ESLint build-time tools).
-- Confirmed no generated artifacts (`node_modules`, `.venv`, `.next`, `.duckdb`) are staged — `.gitignore` verified working correctly.
+**Phase 2:**
+- Verified exact live download URLs for all 6 geography sources before writing any adapter code (TIGER tract/place, cartographic county/ZCTA, Census ZCTA-tract relationship file, SCC supervisor districts ArcGIS endpoint).
+- Built the source-adapter protocol (`pipelines/src/scc_health_pipeline/sources/base.py`) plus shared HTTP fetch-with-retry (`http_fetch.py`) and `DATA_MANIFEST.json` read/write (`manifest.py`) helpers.
+- Implemented and **ran against live data** 6 concrete adapters: `tiger_tract.py`, `tiger_place.py`, `census_county_cartographic.py`, `census_zcta_cartographic.py`, `census_zcta_tract_relationship.py`, `scc_supervisor_districts.py`.
+- Built `geography/harmonize.py` (cross-source spatial harmonization: place/ZCTA county-intersection filtering, majority-area-overlap tract-to-district assignment with explicit boundary-crossing disclosure) and `geography/warehouse_loader.py` (DuckDB `geo.*` schema loader).
+- Built the geography audit suite (`audits/geography_audits.py`, 18 checks) wired into `make audit`.
+- Built and ran the demo snapshot pipeline (`scripts/build_demo_geography_snapshot.py` + `run_demo_pipeline.py`), producing `data/demo/geography/*.parquet` (checked in, 3.2MB, real frozen Phase 2 data per DEC-016) and a separate `scc_health_demo.duckdb`.
+- Built geography API endpoints (`/api/v1/geographies/{search,tract/{id},place/{id},supervisor_district/{n},{type}/{id}/boundary}`, `/api/v1/sources`) with live/demo/unavailable data-mode resolution (`db.py::resolve_warehouse_path`).
+- Built a Phase 2 functional frontend scaffold (`apps/web/app/explore`): geography search + profile view wired to the real API, URL-persisted selection, truthful loading/error/empty states.
+- **Ran the full pipeline against live official sources** — this is real data, not a dry run: 408 tracts, 30 places, 70 ZCTAs, 1 county, 5 supervisor districts, 638 crosswalk rows, 4 unassigned-land-sliver rows, all hand-verified (see `docs/methods/geography.md` and `TASKS.md` Phase 2 for evidence).
+- Found and fixed 6 real bugs during implementation (not merely hypothetical edge cases): a path-derivation off-by-one that wrote staged output to the wrong directory (found in 6 files); wrong assumed field names for the ZCTA cartographic shapefile; a DuckDB VARCHAR/DECIMAL cast error in the CRS-plausibility audit (TIGER's lat/lon fields are text, not numeric); a pytest `tests`-package name collision between `apps/api/tests` and `pipelines/tests` (fixed via `--import-mode=importlib`); a second identical path-depth bug in `routes/sources.py`; and a near-miss data bug where naive substring matching would have confused ZCTA `06085` (a Connecticut ZIP) with Santa Clara County's `06085` FIPS prefix (caught before it shipped, fixed with field-based matching).
+- Made and recorded 7 new decisions (DEC-011 through DEC-017) and updated/added risk entries (RISK-001, RISK-002 statuses updated to `mitigated` for Phase 2 scope; RISK-011 updated; RISK-012 added for the browser-tooling gap).
+- Full local verification: `make lint`, `make typecheck` (mypy strict, zero errors across 44 Python files), `make test` (25 Python + 1 TS = 26 tests, all passing, including 11 fixture-based offline contract tests built from real-but-small data subsets), `make audit` (18/18 geography checks green), `make data` (live), `make demo` (offline), `make dev` (both servers verified together), frontend production build (`next build`) all pass.
+- Attempted in-browser visual verification twice (no Chrome extension connected; Preview tool blocked by a sandbox-level `getcwd` permission error) — documented as DEC-017/RISK-012, substituted with thorough HTTP-level verification (curl against both dev servers, CORS header check, rendered-HTML inspection).
 
-## Gate 1 evidence
+## Gate 2 evidence
 
-- [x] Effectively-fresh-clone bootstrap succeeds on this Apple Silicon Mac (`scripts/bootstrap_macos.sh` ran clean, idempotent on re-run).
-- [x] `make dev` starts web and API together — verified directly (not just the sub-targets): ran `make dev`, confirmed both servers came up via the log output, and curl-verified both `http://localhost:8000/api/v1/health` (200, correct JSON) and `http://localhost:3000/` (200) while running together.
-- [x] Health checks pass (`/api/v1/health`, `/api/v1/version`, `/api/v1/warehouse-status` all verified via curl with correct, truthful JSON).
-- [x] Linters and type checks pass (`make lint`, `make typecheck` both clean for Python and TypeScript).
-- [x] No secrets or absolute user paths committed (verified via `git status`/`git diff` review; the one local file with an absolute path, `.claude/dev_web_local_preview.sh`, is gitignored and was never staged).
-- [ ] CI runs successfully — **not yet verified**, since there is no GitHub remote to push to and trigger Actions. The workflow file (`.github/workflows/ci.yml`) is written and mirrors the exact local commands that passed, but has not been executed by GitHub Actions itself. Flagged as an open item, not silently claimed as done.
-- [x] `STATE.md` contains exact next steps (this section).
+All Phase 2 checklist items in `TASKS.md` are checked with evidence. Full detail there; headline: geometry/coverage audits pass (18/18), every tract has a canonical 11-digit GEOID, crosswalk weights sum within documented tolerance, demo snapshot runs fully offline.
 
 ## Blockers
 
-None release-blocking. Two environment-limitation notes only:
-1. No real browser available for visual verification this session (see above) — not blocking Phase 1's actual gate, which doesn't require it.
-2. CI has not been executed against a real GitHub Actions runner (no remote configured) — the workflow is written and locally-equivalent-verified, but not yet proven in CI itself.
+None release-blocking. One open environment limitation: no browser-based visual verification tooling available this session (RISK-012, `monitoring` status) — will retry at the start of the next session; not required until Phase 5's gate.
 
 ## Last commands run
 
-`git add -A && git status --short` (67 new/changed paths staged, none of them generated artifacts). Commit not yet made as of this STATE.md write — see "next actions."
+`make lint && make typecheck && make test && make audit` — all green. Dev servers (`make dev`) started, smoke-tested via curl, stopped cleanly. Commit not yet made as of this STATE.md write — see "next actions."
 
 ## Next three actions (exact resume point)
 
-1. Commit the Phase 1 checkpoint (all files currently staged), then update `TASKS.md` Phase 1 checkboxes with this evidence.
-2. Start Phase 2 (geography spine): build canonical tract/ZCTA/place/supervisor-district dimensions from TIGER2020, the Census ZCTA-to-tract crosswalk (keyless default per DEC-005), and the source-adapter base protocol with data-contract validation — this is the first phase that will actually populate `warehouse/scc_health.duckdb`, which will flip the `/api/v1/warehouse-status` endpoint from "not connected" to "connected."
-3. If a GitHub remote becomes available, push and confirm `.github/workflows/ci.yml` actually runs green on a real Actions runner — currently only locally-equivalent-verified.
+1. Commit the Phase 2 checkpoint (geography spine + API + frontend scaffold + governance docs), following the same coherent-commit pattern as Phases 0–1.
+2. Report Phase 2 completion to the user with the evidence summary requested (files changed, sources used, row counts, audit results, test/command outcomes, unresolved risks, commit hash, exact Phase 3 resume point) — **do not proceed to Phase 3 without the user's go-ahead**, per this session's explicit instruction ("Do not proceed to Phase 3").
+3. When authorized to continue: start Phase 3 (core federal/state/local data ingestion) per `docs/07_BUILD_PHASES.md` — build adapters for the remaining ~11 sources (CDC PLACES, ACS 5-year, CDC/ATSDR SVI, CA HPI, CalEnviroScreen, HCAI facility/ED/patient-origin ×3, HRSA health centers, HRSA HPSA/MUA, VTA GTFS, USDA SNAP), reusing the `SourceAdapter` protocol and manifest/audit infrastructure built in Phase 2. Read `PLAN.md` §5 for the adapter priority order.
 
 ## Current running processes
 
-None. Both dev servers (uvicorn on :8000, next dev on :3000) were stopped cleanly at the end of this session (`lsof -ti:3000/:8000 | xargs kill -9`; confirmed both ports free).
+None. Both dev servers were stopped cleanly at the end of this session (confirmed via `lsof -i:3000 -i:8000` returning nothing and `ps aux | grep -E "uvicorn|next dev"` showing no lingering processes).
 
 ## Notes for continuation
 
-- Toolchain is now installed on this machine: node@22.23.1 (Homebrew, x86_64/Rosetta — see DEC-011), pnpm 11.12.0, uv 0.11.28, Python 3.12.13. A new session does **not** need to re-run bootstrap unless dependencies changed — `uv sync` / `pnpm install` are enough to pick up any new packages.
-- To run dev servers in a new session: `export PATH="/usr/local/opt/node@22/bin:$PATH"` first (this machine's default `node` on PATH is still v20.16 unless a shell profile change is made — bootstrap deliberately does not touch shell profiles, see Phase 1 rules), then `make dev`.
-- The three "changed from spec" findings from Phase 0 remain relevant for Phase 2/3 adapter work: ACS keyless-bulk-first (DEC-003), ZCTA-relationship-file-default crosswalk (DEC-005), CalEnviroScreen 5.0 final-dataset verification (DEC-007).
+- Toolchain remains installed from Phase 1 (node@22.23.1, pnpm 11.12.0, uv 0.11.28, Python 3.12.13). `POLARS_SKIP_CPU_CHECK=1` is now automatically exported by the Makefile (was previously a manual `export` a new session might forget).
+- To run dev servers in a new session: `export PATH="/usr/local/opt/node@22/bin:$PATH"` first, then `make dev`.
+- `data/raw/`, `data/staged/`, `data/curated/`, and `warehouse/*.duckdb` are gitignored (regenerable via `make data`); `data/demo/geography/*.parquet` is intentionally committed (the offline demo snapshot).
+- The Phase 0 "changed from spec" findings remain relevant for Phase 3: ACS keyless-bulk-first (DEC-003), CalEnviroScreen 5.0 final-dataset re-verification at implementation time (DEC-007) — do this first thing in Phase 3 since it's now 10 days further from the July 1 finalization date.

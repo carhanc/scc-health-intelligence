@@ -23,4 +23,5 @@ class WarehouseStatusResponse(BaseModel):
     connected: bool
     path: str
     spatial_extension_loaded: bool
+    data_mode: Literal["live", "demo", "unavailable"]
     detail: str | None = None

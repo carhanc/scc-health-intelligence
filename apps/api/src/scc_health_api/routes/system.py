@@ -63,5 +63,6 @@ def get_warehouse_status(
         connected=status.connected,
         path=status.path,
         spatial_extension_loaded=status.spatial_extension_loaded,
+        data_mode=status.data_mode,
         detail=status.detail,
     )

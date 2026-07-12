@@ -10,7 +10,7 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Mitigation:** Every source adapter validates schema and row count against an expected contract before promoting data to `staged`/`curated`; schema-fingerprint mismatches fail loudly and preserve the last-known-good snapshot rather than corrupting curated output. Discovery-based dataset-ID resolution (not hardcoded IDs) for sources like CDC PLACES whose Socrata ID rotates annually.
 
-**Status:** `open` — mitigation designed in `PLAN.md` §4, implemented starting Phase 2 (data contracts) and Phase 3 (adapters). **Owner phase:** 2–3.
+**Status:** `mitigated` for the 6 geography sources implemented in Phase 2 — each adapter's `validate_raw`/`quality_checks` caught real issues during implementation (a wrong assumed field-name schema for the ZCTA cartographic file, an implausible-size guard), proving the mitigation works in practice, not just in design. `open` for the ~11 remaining Phase 3 sources (health/social/resource/utilization). **Owner phase:** 2 (done for geography) –3 (remaining).
 
 ---
 
@@ -20,7 +20,7 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Mitigation:** Canonical 2020-tract GEOID as an 11-char string everywhere; explicit, tested crosswalks (Census ZCTA-relationship default, HUD optional enhancement per DEC-005); never join by string similarity; crosswalk-weight sum checks in `make audit`; allocated (crosswalked) values always labeled distinctly from native/observed values in the UI.
 
-**Status:** `open` — audits designed, implemented Phase 2. **Owner phase:** 2, revisited 7 (Utilization Lab).
+**Status:** `mitigated` for the ZCTA-tract crosswalk built in Phase 2 — `make audit`'s `crosswalk_weight_sums` check passes (0 out-of-range ZCTAs among 70), and implementation caught a real near-miss: naive substring matching on `"06085"` would have incorrectly matched ZCTA `06085` (a Connecticut ZIP code) as if it were Santa Clara County's `06085` FIPS prefix. Field-based matching was used instead specifically because of this discovery. `open` for Phase 7's HCAI ZIP-level utilization data, which will exercise this crosswalk against real health data for the first time. **Owner phase:** 2 (done for the crosswalk itself), revisited 7 (Utilization Lab).
 
 ---
 
@@ -108,9 +108,19 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Category:** Performance / developer experience. **Likelihood:** Certain (confirmed during Phase 1 bootstrap — this machine's Homebrew resolves to `/usr/local`, the Intel prefix, not `/opt/homebrew`). **Impact:** Low — functionally correct, modestly slower local dev-server/build performance than native arm64.
 
-**Mitigation:** None applied by default (DEC-011) — the bootstrap script deliberately does not install a second, native Homebrew without explicit user action, since that would be a persistent change to the user's machine well beyond this project's scope. A user who wants native arm64 performance can install Homebrew at `/opt/homebrew` themselves and re-run `scripts/bootstrap_macos.sh`.
+**Mitigation:** None applied by default (DEC-011) — the bootstrap script deliberately does not install a second, native Homebrew without explicit user action, since that would be a persistent change to the user's machine well beyond this project's scope. A user who wants native arm64 performance can install Homebrew at `/opt/homebrew` themselves and re-run `scripts/bootstrap_macos.sh`. Phase 2 addendum: this also causes Polars to emit a CPU-compatibility warning on every run (harmless, but noisy) — mitigated by setting `POLARS_SKIP_CPU_CHECK=1` automatically in the Makefile rather than requiring every session to remember it.
 
 **Status:** `accepted`.
+
+---
+
+## RISK-012 — No browser-based visual verification tooling available in this environment
+
+**Category:** Process / verification completeness. **Likelihood:** Confirmed (Phase 1 and Phase 2 both attempted, both blocked). **Impact:** Medium — reduces confidence in visual/interaction/accessibility correctness beyond what HTTP-level and automated testing can confirm.
+
+**Mitigation:** `mcp__Claude_in_Chrome__list_connected_browsers` returns empty (no extension connected). The Preview tool's process spawner fails with a sandbox-level `getcwd` permission error before reaching the launch command, tried with two different launch configurations. DEC-017 documents the HTTP-level verification approach used instead (production build success, strict lint/typecheck, unit tests, server-rendered HTML inspection via curl, live end-to-end API calls, CORS verification). This substitutes for, but does not equal, an actual visual/keyboard/screen-reader review.
+
+**Status:** `monitoring` — re-attempt browser tooling at the start of each future session; a true visual/accessibility pass is required no later than Phase 5's gate, which explicitly mandates it (`docs/07_BUILD_PHASES.md` Phase 5: "browser inspection evidence is recorded").
 
 ---
 

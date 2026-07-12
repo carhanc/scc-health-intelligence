@@ -44,3 +44,18 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.12"
 strict = true
 exclude = ["data/", "warehouse/", "\\.venv/"]
+
+[[tool.mypy.overrides]]
+# geopandas/fiona/pyogrio/shapely's geo stack (and pandas, which
+# geopandas.GeoDataFrame extends) does not ship complete type stubs
+# (community "types-geopandas"/"pandas-stubs" packages are incomplete);
+# this is standard practice for mypy --strict projects on this ecosystem.
+module = ["geopandas.*", "pyogrio.*", "shapely.*", "fiona.*", "pandas.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# importlib import mode avoids a module-name collision between the two
+# same-named "tests" packages in this monorepo (apps/api/tests and
+# pipelines/tests), which otherwise fails collection when both are run
+# together (discovered running `make test` for the first time in Phase 2).
+addopts = "--import-mode=importlib"
