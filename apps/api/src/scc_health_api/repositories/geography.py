@@ -162,3 +162,73 @@ def get_geography_boundary(
         "geometry": geometry,
         "properties": {"geography_type": geography_type, "geography_id": geography_id},
     }
+
+
+def _table_exists(conn: duckdb.DuckDBPyConnection, schema: str, table: str) -> bool:
+    row = conn.execute(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
+        [schema, table],
+    ).fetchone()
+    return bool(row and row[0] > 0)
+
+
+def get_all_tract_boundaries_with_scores(
+    conn: duckdb.DuckDBPyConnection, scenario_id: str | None
+) -> list[dict[str, Any]]:
+    """Bulk tract geometry for the Explore map choropleth (DEC-038). Every
+    tract is always returned with its identity + geometry; score fields
+    are only joined in when a scenario_id is supplied and analytics
+    tables exist (never fabricated, never zero -- absent means "no
+    scoring data for this tract/scenario," not "zero concern")."""
+    has_scores = bool(scenario_id) and _table_exists(conn, "analytics", "scenario_scores")
+    has_stability = bool(scenario_id) and _table_exists(conn, "analytics", "stability_labels")
+
+    if has_scores:
+        score_join = (
+            "LEFT JOIN analytics.scenario_scores s "
+            "ON t.tract_geoid_2020 = s.tract_geoid_2020 AND s.scenario_id = ?"
+        )
+        score_cols = "s.score, s.coverage_fraction"
+        params: list[Any] = [scenario_id]
+    else:
+        score_join = ""
+        score_cols = "NULL AS score, NULL AS coverage_fraction"
+        params = []
+
+    if has_stability:
+        stability_join = (
+            "LEFT JOIN analytics.stability_labels st "
+            "ON t.tract_geoid_2020 = st.tract_geoid_2020 AND st.scenario_id = ?"
+        )
+        stability_col = "st.stability_label"
+        params.append(scenario_id)
+    else:
+        stability_join = ""
+        stability_col = "NULL AS stability_label"
+
+    sql = f"""
+        SELECT t.tract_geoid_2020, t.name_long, ST_AsGeoJSON(t.geometry),
+               {score_cols}, {stability_col}
+        FROM geo.tracts t
+        {score_join}
+        {stability_join}
+        ORDER BY t.tract_geoid_2020
+    """
+    rows = conn.execute(sql, params).fetchall()
+
+    features = []
+    for tract_geoid, name_long, geometry_json, score, coverage_fraction, stability_label in rows:
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": json.loads(geometry_json),
+                "properties": {
+                    "tract_geoid_2020": tract_geoid,
+                    "name": name_long,
+                    "score": score,
+                    "coverage_fraction": coverage_fraction,
+                    "stability_label": stability_label,
+                },
+            }
+        )
+    return features

@@ -164,3 +164,22 @@ def test_correlation_diagnostics_are_never_tautological(client: TestClient) -> N
         assert d["spearman_r"] is not None
         assert -1.0 <= d["spearman_r"] <= 1.0
         assert d["n_paired_observations"] == 408
+
+
+def test_tract_boundaries_join_real_scenario_scores(client: TestClient) -> None:
+    response = client.get(f"/api/v1/geographies/tracts/boundaries?scenario_id={KNOWN_SCENARIO_ID}")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["features"]) == 408
+    scored = [f for f in body["features"] if f["properties"]["score"] is not None]
+    # Every tract has full domain coverage for the default scenario in
+    # this dataset (verified live, Phase 4), so every tract should score.
+    assert len(scored) == 408
+    for f in scored:
+        assert 0.0 <= f["properties"]["score"] <= 100.0
+        assert f["properties"]["stability_label"] in {
+            "Robust",
+            "Moderately stable",
+            "Assumption-sensitive",
+            "Data-limited",
+        }

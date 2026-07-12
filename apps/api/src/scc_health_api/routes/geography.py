@@ -17,11 +17,49 @@ from scc_health_api.schemas.geography import (
     GeographySearchResult,
     PlaceProfile,
     SupervisorDistrictProfile,
+    TractBoundaryCollectionResponse,
     TractProfile,
 )
 from scc_health_api.settings import Settings, get_settings
 
 router = APIRouter(prefix="/api/v1/geographies", tags=["geography"])
+
+
+def _geography_not_found(geography_type: str, requested_id: str) -> HTTPException:
+    """A structured 404 body (Phase 5 hotfix): every geography-lookup miss
+    carries a machine-readable error code plus the exact type and
+    identifier that was requested, in addition to a plain-language
+    message -- so a malformed identifier (e.g. the literal word "tract",
+    or a display label instead of a GEOID) is immediately diagnosable
+    from the response body rather than only from a generic 404 string.
+    """
+    label = geography_type.replace("_", " ")
+    return HTTPException(
+        status_code=404,
+        detail={
+            "error_code": "geography_not_found",
+            "geography_type": geography_type,
+            "requested_id": requested_id,
+            "message": f"We couldn't find a {label} with identifier \"{requested_id}\".",
+        },
+    )
+
+
+@router.get("/tracts/boundaries", response_model=TractBoundaryCollectionResponse)
+def get_all_tract_boundaries(
+    scenario_id: str | None = Query(
+        None, description="If supplied, joins each tract's score for this scenario."
+    ),
+    settings: Settings = Depends(get_settings),
+) -> TractBoundaryCollectionResponse:
+    try:
+        with get_read_only_connection(settings) as (conn, mode):
+            features = geography_repo.get_all_tract_boundaries_with_scores(conn, scenario_id)
+    except WarehouseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return TractBoundaryCollectionResponse(
+        features=features, scenario_id=scenario_id, data_mode=mode
+    )
 
 
 @router.get("/search", response_model=GeographySearchResponse)
@@ -51,7 +89,7 @@ def get_tract(tract_geoid: str, settings: Settings = Depends(get_settings)) -> T
     except WarehouseUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if profile is None:
-        raise HTTPException(status_code=404, detail=f"Tract {tract_geoid} not found.")
+        raise _geography_not_found("tract", tract_geoid)
     return TractProfile(data_mode=mode, **profile)
 
 
@@ -63,7 +101,7 @@ def get_place(place_geoid: str, settings: Settings = Depends(get_settings)) -> P
     except WarehouseUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if profile is None:
-        raise HTTPException(status_code=404, detail=f"Place {place_geoid} not found.")
+        raise _geography_not_found("place", place_geoid)
     return PlaceProfile(data_mode=mode, **profile)
 
 
@@ -80,7 +118,7 @@ def get_supervisor_district(
     except WarehouseUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if profile is None:
-        raise HTTPException(status_code=404, detail=f"District {district_number} not found.")
+        raise _geography_not_found("supervisor_district", str(district_number))
     return SupervisorDistrictProfile(data_mode=mode, **profile)
 
 
@@ -94,10 +132,7 @@ def get_geography_boundary(
     except WarehouseUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if boundary is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No boundary found for {geography_type}/{geography_id}.",
-        )
+        raise _geography_not_found(geography_type, geography_id)
     return GeographyBoundaryResponse(
         geography_type=geography_type,  # type: ignore[arg-type]
         geography_id=geography_id,

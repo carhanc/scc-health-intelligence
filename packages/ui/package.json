@@ -2,10 +2,24 @@
   "name": "@scc-health/ui",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared design-system components (built starting Phase 5).",
+  "description": "Shared design-system components. Consumed as raw TypeScript source via Next.js transpilePackages (DEC-039) -- no separate build step.",
   "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "@tanstack/react-table": "^8.20.0"
+  },
   "devDependencies": {
+    "@scc-health/eslint-config": "workspace:*",
     "@scc-health/tsconfig": "workspace:*",
+    "@tanstack/react-table": "^8.20.0",
+    "@types/react": "^19.2.0",
+    "eslint": "^9.0.0",
+    "react": "^19.2.0",
     "typescript": "^5.7.0"
   }
 }

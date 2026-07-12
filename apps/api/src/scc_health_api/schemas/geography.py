@@ -72,6 +72,19 @@ class GeographyBoundaryResponse(BaseModel):
     data_mode: DataMode
 
 
+class TractBoundaryCollectionResponse(BaseModel):
+    """Bulk tract geometry for the Explore map choropleth (DEC-038). Each
+    feature's properties always carry identity (tract_geoid_2020, name);
+    score/coverage_fraction/stability_label are present only when a valid
+    scenario_id was supplied and analytics tables exist -- absent, not
+    zero, when scoring data isn't available for a tract or at all."""
+
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[dict[str, Any]]
+    scenario_id: str | None
+    data_mode: DataMode
+
+
 FreshnessState = Literal[
     "unavailable", "draft", "intentional_older", "newest_verified", "lagged", "stale"
 ]

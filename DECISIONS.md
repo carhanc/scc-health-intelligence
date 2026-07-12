@@ -384,6 +384,77 @@ Each record: context, decision, rationale, alternatives considered, and conseque
 
 **Consequences:** `RISK_REGISTER.md` records this as an open, disclosed gap. A future session extending `make demo` should freeze the `analytics.*` tables the same way `data/demo/geography/*.parquet` freezes Phase 2 output (DEC-016's pattern).
 
+### DEC-036 — Navigation resolved to 9 primary items, updating (not superseding) DEC-008
+
+**Context:** DEC-008 deferred the exact nav grouping to Phase 5's UX review. This session's explicit instructions list 9 required nav destinations by name (Overview, Explore, Prioritize, Access Lab, Utilization, Validate, Advocate, Copilot, Data), matching `docs/00_PRODUCT_CHARTER.md` §8.1's 9 required modules exactly, rather than `docs/01_UX_UI_SPEC.md` §3's suggested 7-8-item collapse.
+
+**Decision:** The nav shell implements all 9 items as distinct top-level destinations, `Validate` and `Data` always visible per the explicit "do not bury trust features" instruction.
+
+**Rationale:** Resolves DEC-008's open question with a direct instruction from the user rather than a guessed usability judgment — the more authoritative source for this specific build session.
+
+**Consequences:** DEC-008 is updated in place (its own text says this entry would be updated once Phase 5 produces a concrete answer) rather than duplicated. Only Overview and Explore are fully built this phase; the remaining 7 are truthful "coming in a later phase" shells (DEC-037), never broken links or fabricated content.
+
+### DEC-037 — Six of nine nav destinations are truthful, informative shells in Phase 5
+
+**Context:** This session's explicit scope is "Only Overview and Explore need to be complete in this phase," while all 9 nav destinations must exist and be reachable.
+
+**Decision:** `Prioritize`, `Access Lab`, `Utilization`, `Validate`, `Advocate`, and `Copilot` each render a real page (not a 404 or a stub route) stating plainly what the section will contain, which phase builds it (per `docs/07_BUILD_PHASES.md`), and — where real Phase 3/4 data already partially supports the underlying capability (e.g., Validate could show today's audit-suite pass/fail counts) — a small honest preview rather than an empty page. `Data` (built in Phase 3) is restyled into the new design system and nav shell but its functional scope is unchanged this phase.
+
+**Rationale:** Directly satisfies "all navigation destinations must exist as truthful 'coming in later phase' shells rather than broken links" without pretending unbuilt functionality exists.
+
+**Consequences:** `docs/06_ACCEPTANCE_TESTS.md` §13's Prioritize/Access Lab/Utilization/Advocate/Copilot functional-acceptance items (scenario wizard, resource filters, brief builder, etc.) remain explicitly deferred and are not claimed as passing.
+
+### DEC-038 — New `/api/v1/geographies/tracts/boundaries` endpoint for the Explore map choropleth
+
+**Context:** The Explore map needs all 408 tract geometries plus each tract's current-scenario score in one response to render a choropleth; the existing single-tract boundary endpoint (`/api/v1/geographies/{type}/{id}/boundary`, Phase 2) only returns one geometry at a time, and no endpoint joins geometry to `analytics.scenario_scores`.
+
+**Decision:** `apps/api/src/scc_health_api/routes/geography.py` gains `GET /api/v1/geographies/tracts/boundaries?scenario_id=<id>` returning a GeoJSON `FeatureCollection` (one feature per tract, geometry + identity always present; score/coverage_fraction/stability_label present only when `scenario_id` is supplied and `analytics.*` tables exist). Implemented as a SQL join within the same read-only DuckDB connection (`geo.tracts` × `analytics.scenario_scores`) — no scoring logic is computed in the endpoint, only assembled from already-persisted tables (same principle as DEC-030).
+
+**Rationale:** A genuinely new, small, read-only, warehouse-native endpoint is the correct way to satisfy "use the real Phase 4 API and warehouse outputs, do not duplicate scoring logic in frontend code" for a capability (bulk choropleth data) that Phase 2's per-tract endpoint was never designed for.
+
+**Consequences:** Response size is nontrivial (408 full-resolution TIGER tract polygons, DEC-004/DEC-013 — full resolution, not cartographic-simplified, since tract is the canonical analytical unit). If this proves a real performance problem in Phase 10's budget review, a follow-up decision can add server-side simplification (`ST_SimplifyPreserveTopology`) or vector tiles; not attempted here to avoid premature optimization ahead of measurement.
+
+### DEC-039 — `packages/ui` is transpiled TypeScript source, not a separately built package
+
+**Context:** `packages/ui` existed only as an empty placeholder (`export {}`). Building a full design-system component library requires deciding whether it ships as a compiled/published package (its own `tsc`/`tsup` build step, `dist/` output, `exports` map) or as raw TypeScript source consumed directly by the Next.js app.
+
+**Decision:** `packages/ui` ships raw `.tsx`/`.ts` source; `apps/web/next.config.ts` adds `transpilePackages: ["@scc-health/ui"]` so Next.js's own build pipeline compiles it alongside the app, with no separate build step, `dist/` directory, or publish process.
+
+**Rationale:** This is a private, single-consumer workspace package (only `apps/web` imports it) inside one monorepo — a compiled-package boundary adds real build-step complexity (watch mode, stale-dist bugs, an extra `pnpm build` step in CI) with no corresponding benefit at this stage, since there is no external consumer and no need to version or publish it independently.
+
+**Consequences:** If a second consumer (e.g. a future marketing site or Storybook instance) needs `@scc-health/ui` outside the Next.js build pipeline, revisit this decision then — `transpilePackages` only works within a Next.js build.
+
+### DEC-040 — Explore map renders only Santa Clara County's own tract/place geometry, with no external basemap tile provider
+
+**Context:** MapLibre GL typically pairs vector/raster polygon data with a basemap tile layer (streets, satellite, or a stylized reference map) for geographic context. CLAUDE.md requires core functionality to work without paid API keys, and most quality basemap tile providers (Mapbox, Google, most commercial vector-tile services) require a key or have restrictive free-tier rate limits that would make the map unreliable for other users of this codebase.
+
+**Decision:** The Explore map renders exactly two data layers sourced entirely from this platform's own API: (1) the tract choropleth (`/api/v1/geographies/tracts/boundaries`) and (2) place-name labels (from `geo.places`, already available via the existing geography search/boundary endpoints) — no external raster or vector basemap tiles are loaded.
+
+**Rationale:** Fully keyless and fully reliable (no dependency on a third-party tile service's uptime or rate limits — a real risk for a public-interest civic tool meant to keep working "without paid API keys," CLAUDE.md's own non-negotiable rule). `docs/01_UX_UI_SPEC.md` §2 also explicitly asks for maps "without visual noise" — a plain choropleth against a neutral background, with the county boundary and place labels for orientation, satisfies the map's actual analytical purpose (comparing tracts) without street-level clutter that isn't relevant to a tract-level health-equity screen.
+
+**Consequences:** Users lose street/landmark-level geographic orientation (e.g., "is this tract near the airport") that a basemap would provide. If a future session adds a keyless basemap option (e.g., a self-hosted PMTiles basemap, matching `PLAN.md` §2's originally documented MapLibre + PMTiles stack choice), this decision should be revisited — it is a scope/reliability tradeoff for Phase 5, not a permanent architectural rule.
+
+### DEC-041 — Phase 5 hotfix: a single canonical `SelectedGeography` model replaces ad hoc per-component selection callbacks, after a parameter-count bug silently substituted the geography-type literal for a tract's GEOID
+
+**Context:** A release-blocking defect was reported after Phase 5 was believed complete: clicking a tract on the Explore map showed a correct hover popup ("Census Tract 5033.21 — Score: 53/100") but the detail panel then showed "Couldn't load this tract" / "Tract tract not found." Table-row selection worked correctly, isolating the defect to the map's click path.
+
+**Root cause (confirmed by static trace, not guessed):** `ExploreMap`'s `onSelect` prop was typed `(type: "tract", id: string) => void` — a two-argument function. The parent (`explore-client.tsx`) passed it `handleSelectTract`, a *one*-argument function `(tractGeoid: string) => void`. TypeScript's structural typing allows a function that accepts *fewer* parameters to satisfy a type requiring *more* (safe in general, since JS silently ignores extra call-site arguments), so this passed `tsc --noEmit` with zero errors. At runtime, the map's click handler called `onSelect("tract", geoid)` — two arguments — but the receiving function's single parameter bound positionally to the *first* argument, the literal string `"tract"`, silently discarding the real GEOID (the second argument). This produced a URL of `/explore?geography=tract&id=tract`, which flowed into `api.getTractProfile("tract")` → `GET /api/v1/geographies/tract/tract` → a genuine backend 404 with the literal (and confusing) message `"Tract tract not found."`. Table selection was unaffected because `ExploreTable` always called its callback with exactly one argument, which happened to bind correctly.
+
+**Decision:** Introduced one canonical selection model (`apps/web/app/explore/selection.ts`) used by every selection entry point — map, table, search, comparison, and URL state:
+```ts
+interface SelectedGeography {
+  geographyType: GeographyType;
+  geoid: string;        // canonical identifier, never a display label or the type itself
+  displayName: string;
+  source: "map" | "table" | "search" | "comparison" | "url";
+}
+```
+Every selection callback across `explore-map.tsx`, `explore-table.tsx`, `search-panel.tsx`, `comparison-panel.tsx`, and `explore-client.tsx` now takes exactly one `SelectedGeography` argument — the class of bug that comes from mismatched call-site arity is no longer structurally possible, because there is only ever one argument to mismatch. Added `isValidGeographyId(geographyType, id)` (regex + Santa-Clara-prefix / in-range validation per geography type) as a boundary guard: the map's click handler, the table's row-select handler, the search-result buttons, and the URL-parsing function (`parseSelectedGeographyFromParams`) all reject a malformed or missing identifier *before* it can reach an API call, rather than after. Also gave FastAPI's geography-lookup 404s a structured body (`error_code`, `geography_type`, `requested_id`, plain-language `message`) instead of an interpolated string, and gave the frontend detail panels a truthful primary error message ("We couldn't load census tract 06085503321") with Retry and Clear-selection actions, pushing the raw technical detail behind a `<details>` disclosure.
+
+**Rationale:** The bug was invisible to `tsc` because parameter-count contravariance is a deliberate, generally-safe TypeScript rule — the fix is not "annotate more carefully" (an easy thing to get wrong again) but "make the mismatch impossible by construction": one shared type, one argument, used everywhere. Runtime validation at the boundary (map click, table select, search select, URL parse) is the second, independent layer — even if a future refactor reintroduces a shape bug upstream, a malformed identifier still cannot reach `fetch()`.
+
+**Consequences:** `StateMessageProps.secondaryAction` (`packages/ui/src/StateMessage.tsx`) was widened to accept either `{ href }` (real navigation) or `{ onClick }` (a non-navigating action like "Clear selection"), a small, generally useful design-system change. Regression coverage added: `apps/web/test/selection.test.ts` (validation + URL round-trip, including the exact `"tract"`-as-id case), `apps/web/test/explore-table.test.tsx` (table selection produces the correct canonical shape via click and keyboard), and `apps/api/tests/test_geography_routes.py` (structured 404 body, literal-type-as-id, short-display-label, leading-zero preservation). Phase 5's gate, which had been signed off before this defect was reported, is **not** considered valid until this hotfix's own verification (below) passes.
+
 ---
 
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

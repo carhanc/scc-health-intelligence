@@ -2,11 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
+import { FreshnessBadge } from "@scc-health/ui";
 import {
   api,
   ApiError,
   type DataExplorerTable,
-  type FreshnessState,
   type SourceStatusEntry,
 } from "@/lib/api";
 
@@ -183,43 +183,6 @@ function SourceRow({ entry }: { entry: SourceStatusEntry }) {
       </td>
     </tr>
   );
-}
-
-function FreshnessBadge({ state }: { state: FreshnessState }) {
-  const { label, colorVar } = freshnessDisplay(state);
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
-      style={{ borderColor: colorVar, color: colorVar }}
-    >
-      <span
-        aria-hidden="true"
-        className="inline-block h-1.5 w-1.5 rounded-full"
-        style={{ backgroundColor: colorVar }}
-      />
-      {label}
-    </span>
-  );
-}
-
-function freshnessDisplay(state: FreshnessState): {
-  label: string;
-  colorVar: string;
-} {
-  switch (state) {
-    case "newest_verified":
-      return { label: "newest verified", colorVar: "var(--color-interactive)" };
-    case "intentional_older":
-      return { label: "fixed vintage", colorVar: "var(--color-text-secondary)" };
-    case "lagged":
-      return { label: "lagged — refresh soon", colorVar: "var(--color-caution)" };
-    case "stale":
-      return { label: "stale — overdue", colorVar: "var(--color-alert)" };
-    case "draft":
-      return { label: "draft — rejected", colorVar: "var(--color-caution)" };
-    case "unavailable":
-      return { label: "unavailable (documented)", colorVar: "var(--color-alert)" };
-  }
 }
 
 function formatDate(iso: string): string {

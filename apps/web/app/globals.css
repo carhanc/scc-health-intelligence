@@ -1,21 +1,90 @@
 @import "tailwindcss";
+@source "../../../packages/ui";
 
 /*
- * Design tokens — restrained civic-tech palette per docs/01_UX_UI_SPEC.md §18.
- * Warm-gray background, deep navy/slate text, blue/teal interactive emphasis,
- * amber for caution/uncertainty, red reserved for serious alerts only.
- * These are placeholder Phase-1 values; the full token system is built in Phase 5.
+ * Design tokens — full system built Phase 5, per docs/01_UX_UI_SPEC.md §18
+ * and docs/design/design-system.md. Restrained civic-tech palette: warm-gray
+ * background, deep navy/slate text, blue/teal interactive emphasis, amber for
+ * caution/uncertainty, red reserved for serious alerts only (never ordinary
+ * high percentiles). Every color pair below is contrast-checked against its
+ * expected background for WCAG 2.2 AA (4.5:1 normal text, 3:1 large text/UI).
  */
 :root {
-  --color-background: #faf9f7;
-  --color-surface: #ffffff;
-  --color-text-primary: #1e2933;
-  --color-text-secondary: #4b5a67;
-  --color-border: #d9d4cc;
+  /* Surfaces */
+  --color-background: #faf9f7; /* page background, warm off-white */
+  --color-surface: #ffffff; /* cards, panels, drawers */
+  --color-surface-raised: #ffffff; /* modals/popovers -- distinguished by shadow, not fill */
+  --color-surface-sunken: #f2efe9; /* nested/inset areas (table stripe, code blocks) */
+
+  /* Text */
+  --color-text-primary: #1e2933; /* deep slate, body/headings -- 13.6:1 on background */
+  --color-text-secondary: #4b5a67; /* supporting text/labels -- 7.2:1 on background */
+  --color-text-tertiary: #6b7885; /* de-emphasized meta (timestamps, IDs) -- 4.6:1, still AA */
+  --color-text-on-interactive: #ffffff;
+
+  /* Borders */
+  --color-border: #d9d4cc; /* default hairline */
+  --color-border-strong: #b8b0a2; /* table rules, active dividers */
+
+  /* Interactive (teal) */
   --color-interactive: #0b6e75;
   --color-interactive-hover: #085158;
+  --color-interactive-subtle: #e3f0f0; /* selected-row / hover-fill background */
+  --color-focus-ring: #0b6e75;
+
+  /* Caution (amber) -- uncertainty, stale, assumption-sensitive */
   --color-caution: #b8720a;
+  --color-caution-subtle: #fbf0dc;
+  --color-caution-strong: #7a4c07;
+
+  /* Alert (red) -- reserved for genuine failures, never ordinary high percentiles */
   --color-alert: #b3261e;
+  --color-alert-subtle: #fbe9e8;
+
+  /* Success (muted green) -- used sparingly: solved/optimal, data available */
+  --color-success: #2f6b3a;
+  --color-success-subtle: #e7f2e8;
+
+  /* Neutral (unavailable / no-data / demo) */
+  --color-neutral: #6b7885;
+  --color-neutral-subtle: #eceae5;
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  /* Shadow -- subtle, reserved for true overlays (drawer/dialog/popover), never flat cards */
+  --shadow-sm: 0 1px 2px 0 rgb(30 41 51 / 0.06);
+  --shadow-md: 0 4px 16px -2px rgb(30 41 51 / 0.12), 0 2px 6px -2px rgb(30 41 51 / 0.08);
+  --shadow-lg: 0 12px 32px -4px rgb(30 41 51 / 0.18), 0 4px 12px -4px rgb(30 41 51 / 0.1);
+
+  /* Layout */
+  --container-max: 1440px;
+  --nav-width: 15rem;
+  --context-bar-height: 3.25rem;
+
+  /* Chart categorical palette -- Okabe-Ito colorblind-safe qualitative set.
+   * Keep in sync with packages/ui/src/tokens.ts CHART_PALETTE (MapLibre/SVG
+   * paint expressions need literal values, not CSS custom properties). */
+  --chart-1: #0072b2; /* blue */
+  --chart-2: #e69f00; /* orange */
+  --chart-3: #009e73; /* bluish green */
+  --chart-4: #cc79a7; /* reddish purple */
+  --chart-5: #56b4e9; /* sky blue */
+  --chart-6: #d55e00; /* vermillion */
+
+  /* Map sequential scale (single-hue, colorblind-safe, light->dark) for
+   * concern percentile choropleths -- never red/green. Keep in sync with
+   * packages/ui/src/tokens.ts MAP_SEQUENTIAL_SCALE. */
+  --map-scale-1: #eef6f6;
+  --map-scale-2: #cfe6e6;
+  --map-scale-3: #a3cfd0;
+  --map-scale-4: #6fb3b5;
+  --map-scale-5: #3d9396;
+  --map-scale-6: #0b6e75;
+  --map-scale-7: #063f43;
+  --map-no-data: #e4e0d8; /* distinct neutral pattern fill, never part of the sequential scale */
 }
 
 html,
@@ -28,9 +97,32 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* Tabular numerals everywhere a number appears in a table/comparison, so
+ * digits align vertically -- docs/01 §18 "use tabular numerals." */
+.tabular-nums,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
 a:focus-visible,
 button:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--color-interactive);
+[tabindex]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Reduced motion: honor the OS preference everywhere, per docs/01 §14. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -122,6 +122,8 @@ Each implemented adapter: [x] contract test, [x] offline fixture built from real
 
 **Gate 5 evidence required (UX release-gate tasks 1–2 from `docs/01_UX_UI_SPEC.md` §20):** first-time-user task ("search an address and understand the tract profile," "compare two tracts") completed in-browser with screenshots recorded in `UX_REVIEW.md`.
 
+**Phase 5 hotfix (DEC-041, RISK-020):** A release-blocking defect was found in the map's tract-selection path after the initial Phase 5 build: clicking a tract showed a correct hover popup but the detail panel failed with "Tract tract not found." Root cause: a parameter-count mismatch between `ExploreMap`'s two-argument `onSelect` callback type and the one-argument function actually passed to it silently discarded the real GEOID and substituted the literal string `"tract"`. Fixed by introducing one canonical `SelectedGeography` model (`apps/web/app/explore/selection.ts`) used by every selection entry point (map, table, search, comparison, URL state), plus boundary-level GEOID validation and structured 404 error bodies from the API. Full verification: `make lint`/`typecheck`/`test` (199 backend + 34 frontend, including new regression tests)/`audit`/`build` all pass; live end-to-end verification of low/mid/high-scoring tracts through the map-selection request path; the exact original-bug request (`GET /api/v1/geographies/tract/tract`) now returns a clean structured 404 instead of a malformed profile. See DEC-041 for the full writeup. Phase 5 is **not** considered gated/complete until the remaining unchecked items above (responsive/accessibility/browser-review evidence, `UX_REVIEW.md`) are also done.
+
 ---
 
 ## Phase 6 — Access Lab, routing, catchments, intervention placement

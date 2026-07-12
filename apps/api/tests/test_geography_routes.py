@@ -73,6 +73,46 @@ def test_get_tract_profile_includes_district_assignment(client: TestClient) -> N
 def test_get_tract_profile_404_for_unknown_geoid(client: TestClient) -> None:
     response = client.get("/api/v1/geographies/tract/00000000000")
     assert response.status_code == 404
+    detail = response.json()["detail"]
+    # Phase 5 hotfix: a lookup miss must return a structured, diagnosable
+    # body -- error code, the geography type, and the exact identifier
+    # that was requested -- not just an opaque string.
+    assert detail["error_code"] == "geography_not_found"
+    assert detail["geography_type"] == "tract"
+    assert detail["requested_id"] == "00000000000"
+    assert "message" in detail
+
+
+def test_get_tract_profile_404_for_literal_geography_type_as_id(client: TestClient) -> None:
+    # Regression test for the Phase 5 map-selection defect: a bug that
+    # passed the literal string "tract" as if it were a GEOID must fail
+    # with a clean, structured 404 -- never a malformed 500, never a
+    # silently-wrong profile.
+    response = client.get("/api/v1/geographies/tract/tract")
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "geography_not_found"
+    assert detail["requested_id"] == "tract"
+
+
+def test_get_tract_profile_404_for_short_display_label(client: TestClient) -> None:
+    # A short display label like "5033.21" (not the canonical 11-digit
+    # GEOID "06085503321") must never resolve to a tract -- the API
+    # performs a literal GEOID lookup and does not guess at labels.
+    response = client.get("/api/v1/geographies/tract/5033.21")
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "geography_not_found"
+    assert detail["requested_id"] == "5033.21"
+
+
+def test_get_tract_profile_preserves_leading_zero(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/tract/06085500100")
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body["tract_geoid_2020"], str)
+    assert body["tract_geoid_2020"].startswith("0")
+    assert body["tract_geoid_2020"] == "06085500100"
 
 
 def test_get_supervisor_district_profile(client: TestClient) -> None:
@@ -95,6 +135,41 @@ def test_get_tract_boundary_returns_geojson_polygon(client: TestClient) -> None:
 def test_get_boundary_404_for_unknown_geography(client: TestClient) -> None:
     response = client.get("/api/v1/geographies/tract/00000000000/boundary")
     assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "geography_not_found"
+    assert detail["geography_type"] == "tract"
+    assert detail["requested_id"] == "00000000000"
+
+
+def test_get_all_tract_boundaries_returns_every_tract(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/tracts/boundaries")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["type"] == "FeatureCollection"
+    assert len(body["features"]) == 408
+    assert body["scenario_id"] is None
+    first = body["features"][0]
+    assert first["type"] == "Feature"
+    assert first["geometry"]["type"] in {"Polygon", "MultiPolygon"}
+    assert "tract_geoid_2020" in first["properties"]
+    # The demo warehouse has no analytics.* tables (Phase 4 analytics are
+    # live-only, DEC-035) -- scores must be absent, never fabricated as 0.
+    assert first["properties"]["score"] is None
+
+
+def test_get_all_tract_boundaries_with_unknown_scenario_still_returns_geometry(
+    client: TestClient,
+) -> None:
+    # analytics.scenario_scores doesn't exist in the demo warehouse at
+    # all, so even a scenario_id query param must degrade gracefully to
+    # geometry-only rather than erroring.
+    response = client.get(
+        "/api/v1/geographies/tracts/boundaries?scenario_id=default_integrated_screen_v1"
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["features"]) == 408
+    assert body["features"][0]["properties"]["score"] is None
 
 
 def test_sources_endpoint_lists_manifest_entries(client: TestClient) -> None:
