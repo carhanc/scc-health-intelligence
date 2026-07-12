@@ -21,6 +21,7 @@ import {
   type DomainContributionDetail,
 } from "@/lib/api";
 import type { SelectedGeography } from "./selection";
+import { domainLabel } from "@/lib/labels";
 
 export function GeographyDetail({
   selected,
@@ -59,8 +60,8 @@ export function GeographyDetail({
   }
   return (
     <EmptyState
-      title={selected.geographyType === "zcta" ? "ZCTA selected" : "County selected"}
-      description="Detailed scenario scoring is calculated per census tract. Search for a tract inside this area, or use the map, to see scores and drivers."
+      title={selected.geographyType === "zcta" ? "ZIP-code area selected" : "County selected"}
+      description="Scores are calculated per census tract, not for a whole ZIP-code area or county at once. Search for a tract inside this area, or use the map, to see scores and drivers."
     />
   );
 }
@@ -192,7 +193,7 @@ function TractDetail({
             <strong>{scoreBandLabel(explanation.score)}</strong> relative to the rest of Santa Clara County
             {topDomain ? (
               <>
-                , driven mainly by <strong>{topDomain.domain}</strong>
+                , driven mainly by <strong>{domainLabel(topDomain.domain)}</strong>
               </>
             ) : null}
             .
@@ -218,7 +219,7 @@ function TractDetail({
         </div>
         {explanation.domains_missing.length > 0 && (
           <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-            Not enough data was available for: {explanation.domains_missing.join(", ")}.
+            Not enough data was available for: {explanation.domains_missing.map(domainLabel).join(", ")}.
           </p>
         )}
       </div>
@@ -301,7 +302,7 @@ function DomainDisclosure({ domain }: { domain: DomainContributionDetail }) {
   return (
     <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 open:pb-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-        <span className="text-sm font-medium text-[var(--color-text-primary)]">{domain.domain}</span>
+        <span className="text-sm font-medium text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</span>
         <span className="flex items-center gap-2">
           {domain.domain_score !== null ? (
             <span className="tabular-nums text-sm text-[var(--color-text-secondary)]">
@@ -347,9 +348,9 @@ function EvidenceContent({ explanation }: { explanation: ScoreExplanationRespons
       </p>
       {explanation.domains.map((domain) => (
         <div key={domain.domain}>
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{domain.domain}</h3>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</h3>
           <table className="mt-2 w-full border-collapse text-left text-xs">
-            <caption className="sr-only">{domain.domain} metric sources</caption>
+            <caption className="sr-only">{domainLabel(domain.domain)} metric sources</caption>
             <thead>
               <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
                 <th scope="col" className="py-1.5 pr-2 font-medium">
@@ -410,7 +411,7 @@ function PlaceDetail({ placeGeoid, onClearSelection }: { placeGeoid: string; onC
     <div>
       <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{profile.name_long}</h2>
       <p className="text-sm text-[var(--color-text-secondary)]">
-        Place GEOID {profile.place_geoid} · <DataModeBadge mode={profile.data_mode} />
+        Place ID {profile.place_geoid} · <DataModeBadge mode={profile.data_mode} />
       </p>
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div>
@@ -419,8 +420,8 @@ function PlaceDetail({ placeGeoid, onClearSelection }: { placeGeoid: string; onC
         </div>
       </dl>
       <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
-        Scenario scores are calculated per census tract. Search for a tract inside {profile.name_long}, or click a
-        tract on the map within this area, to see its combined score and drivers.
+        Scores are calculated per census tract, not for a whole city at once. Search for a tract inside{" "}
+        {profile.name_long}, or click a tract on the map within this area, to see its combined score and drivers.
       </p>
     </div>
   );
@@ -476,8 +477,8 @@ function DistrictDetail({
         </div>
       </dl>
       <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
-        Scenario scores are calculated per census tract. Search for a tract inside this district, or click a tract
-        on the map within this area, to see its combined score and drivers.
+        Scores are calculated per census tract, not for a whole district at once. Search for a tract inside this
+        district, or click a tract on the map within this area, to see its combined score and drivers.
       </p>
     </div>
   );

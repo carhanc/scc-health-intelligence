@@ -1,0 +1,104 @@
+import { test, expect } from "@playwright/test";
+
+/**
+ * Responsive verification (Phase 5 closeout item D) at the six required
+ * widths. These checks go beyond "does it stack" -- each asserts that the
+ * actual workflow (navigate, search, select, read a score, compare,
+ * inspect evidence) is still completable and nothing critical is clipped
+ * or hidden at that width.
+ */
+const BREAKPOINTS = [
+  { name: "1440-desktop", width: 1440, height: 900 },
+  { name: "1280-desktop", width: 1280, height: 800 },
+  { name: "1024-tablet-landscape", width: 1024, height: 900 },
+  { name: "768-tablet-portrait", width: 768, height: 1024 },
+  { name: "390-mobile", width: 390, height: 844 },
+  { name: "320-mobile-small", width: 320, height: 700 },
+];
+
+for (const bp of BREAKPOINTS) {
+  test.describe(`Responsive @ ${bp.name} (${bp.width}px)`, () => {
+    test.use({ viewport: { width: bp.width, height: bp.height } });
+
+    test("Overview: navigation, hero, and task actions are all reachable without horizontal scroll", async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await expect(page.getByRole("heading", { name: /Find where health needs/i })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      // No horizontal overflow at any of the required widths -- a
+      // content-width wider than the viewport is exactly the "just
+      // stacked, not redesigned" anti-pattern the closeout calls out.
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "page must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      if (bp.width < 1024) {
+        // Below the desktop-sidebar breakpoint, navigation must be
+        // reachable via the mobile menu button, not a permanently
+        // visible sidebar competing for space.
+        await expect(page.getByRole("button", { name: "Open navigation menu" })).toBeVisible();
+        await page.getByRole("button", { name: "Open navigation menu" }).click();
+        await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
+        await page.getByRole("button", { name: "Close", exact: true }).click();
+      } else {
+        await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
+      }
+
+      await expect(page.getByRole("link", { name: "Explore a community" })).toBeVisible();
+    });
+
+    test("Explore: search, view toggle, and scenario selector remain usable", async ({ page }) => {
+      await page.goto("/explore");
+      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByLabel("Priorities")).toBeVisible();
+      await expect(page.getByRole("radio", { name: "Map" })).toBeVisible();
+      await expect(page.getByRole("radio", { name: "Table" })).toBeVisible();
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Explore must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      await page.getByLabel("Find a place").fill("06085500100");
+      await page.getByRole("button", { name: "Search" }).click();
+      const result = page.getByRole("button", { name: /06085500100/ });
+      await expect(result).toBeVisible({ timeout: 10_000 });
+      await result.click();
+
+      await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+    });
+
+    test("Explore table view: table remains readable (horizontally scrollable if needed, not clipped)", async ({
+      page,
+    }) => {
+      await page.goto("/explore?tab=table");
+      const table = page.getByRole("table");
+      await expect(table).toBeVisible({ timeout: 15_000 });
+      // A data table with many columns may legitimately need its own
+      // internal horizontal scroll on narrow viewports -- that is
+      // acceptable; the page itself must not overflow.
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+    });
+
+    test("Tract detail, comparison, and evidence drawer remain operable", async ({ page }) => {
+      await page.goto("/explore?geography=tract&id=06085500100");
+      await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible();
+
+      await page.getByRole("button", { name: "Compare" }).click();
+      await expect(page.getByRole("region", { name: "Compare with another place" })).toBeVisible();
+
+      await page.getByRole("button", { name: "View sources & evidence" }).click();
+      const dialog = page.getByRole("dialog", { name: "Sources and evidence" });
+      await expect(dialog).toBeVisible();
+      // The drawer must not itself force page-level horizontal overflow.
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+    });
+  });
+}

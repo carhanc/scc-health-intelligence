@@ -11,6 +11,8 @@ import { isValidGeographyId, type SelectedGeography } from "./selection";
 const FILL_LAYER = "tract-fill";
 const LINE_LAYER = "tract-outline";
 const SELECTED_LAYER = "tract-selected";
+const PLACE_OUTLINE_SOURCE = "selected-place-boundary";
+const PLACE_OUTLINE_LAYER = "selected-place-outline";
 
 /**
  * The choropleth shows only the platform's own tract polygons and place
@@ -42,6 +44,19 @@ export function ExploreMap({
     queryKey: ["tract-boundaries", scenarioId],
     queryFn: () => api.getAllTractBoundaries(scenarioId),
     retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // A city, district, ZIP-code area, or county has no single point on the
+  // map -- without this, a user who searches "Sunnyvale" gets a profile
+  // card but no way to see where Sunnyvale's tracts actually are, so they
+  // can never get from "found the city" to "found its leading concerns."
+  // Fetches the same boundary endpoint the old per-geography profile page
+  // already used, only for non-tract selections.
+  const placeBoundaryQuery = useQuery({
+    queryKey: ["geography-boundary", selected?.geographyType, selected?.geoid],
+    queryFn: () => api.getGeographyBoundary(selected!.geographyType, selected!.geoid),
+    enabled: !!selected && selected.geographyType !== "tract",
     staleTime: 5 * 60 * 1000,
   });
 
@@ -173,6 +188,62 @@ export function ExploreMap({
     ]);
   }, [selected, mapReady]);
 
+  // Pan/zoom to a selected tract -- covers selection via search or the
+  // table, where the tract may be nowhere near the map's current view.
+  // A tract selected by clicking the map is already in view, so this is
+  // a no-op zoom-to-self in that case (still harmless).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || selected?.geographyType !== "tract" || !boundariesQuery.data) return;
+    const feature = boundariesQuery.data.features.find(
+      (f) => f.properties.tract_geoid_2020 === selected.geoid,
+    );
+    if (!feature) return;
+    const bounds = new maplibregl.LngLatBounds();
+    for (const [lng, lat] of flattenCoordinates(feature.geometry)) bounds.extend([lng, lat]);
+    // A generous padding looks better on a wide map, but the middle
+    // column can be as narrow as ~210px at some in-range viewport widths
+    // (e.g. 1280px, where the 3-column layout has just activated) --
+    // fixed 120px padding on each side can then exceed the available
+    // canvas and trigger MapLibre's "cannot fit" warning. 40px keeps a
+    // sensible margin at any width the map column actually renders at.
+    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 40, maxZoom: 14, duration: 400 });
+  }, [selected?.geoid, selected?.geographyType, mapReady, boundariesQuery.data]);
+
+  // Pan/zoom to a selected place/district/ZCTA/county's real boundary,
+  // and outline it so the user can see exactly which tracts fall inside
+  // it and click one to see its concerns (Explore usability task:
+  // "find a city and identify its leading concerns").
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const geometry = placeBoundaryQuery.data?.geojson.geometry;
+    const existingSource = map.getSource(PLACE_OUTLINE_SOURCE) as maplibregl.GeoJSONSource | undefined;
+
+    if (!geometry) {
+      existingSource?.setData({ type: "FeatureCollection", features: [] });
+      return;
+    }
+
+    const feature: GeoJSON.Feature = { type: "Feature", properties: {}, geometry };
+    if (existingSource) {
+      existingSource.setData(feature as GeoJSON.Feature);
+    } else {
+      map.addSource(PLACE_OUTLINE_SOURCE, { type: "geojson", data: feature as GeoJSON.Feature });
+      map.addLayer({
+        id: PLACE_OUTLINE_LAYER,
+        type: "line",
+        source: PLACE_OUTLINE_SOURCE,
+        paint: { "line-color": "#1e2933", "line-width": 3, "line-dasharray": [2, 1] },
+      });
+    }
+
+    const bounds = new maplibregl.LngLatBounds();
+    for (const [lng, lat] of flattenCoordinates(geometry)) bounds.extend([lng, lat]);
+    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 40, duration: 400 });
+  }, [mapReady, placeBoundaryQuery.data]);
+
   if (boundariesQuery.isError) {
     return (
       <ErrorState
@@ -204,6 +275,12 @@ export function ExploreMap({
       {clickError && (
         <p role="alert" className="mt-2 text-xs text-[var(--color-alert)]">
           {clickError}
+        </p>
+      )}
+      {selected && selected.geographyType !== "tract" && (
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+          The dashed outline shows {selected.displayName || "the selected area"}. Click any tract inside it to see
+          that tract&rsquo;s score.
         </p>
       )}
       {hoverInfo && (

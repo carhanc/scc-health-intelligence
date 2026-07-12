@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 
 interface DialogProps {
@@ -18,6 +18,7 @@ interface DialogProps {
  * hand-rolled focus-trap implementation. */
 export function Dialog({ open, onClose, title, children, variant = "center" }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const el = ref.current;
@@ -42,12 +43,12 @@ export function Dialog({ open, onClose, title, children, variant = "center" }: D
   return (
     <dialog
       ref={ref}
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
       className={`border border-[var(--color-border)] bg-[var(--color-surface)] p-0 shadow-[var(--shadow-lg)] backdrop:bg-[var(--color-text-primary)]/40 ${positionClasses}`}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
-          <h2 id="dialog-title" className="text-base font-semibold text-[var(--color-text-primary)]">
+          <h2 id={titleId} className="text-base font-semibold text-[var(--color-text-primary)]">
             {title}
           </h2>
           <button
@@ -66,7 +67,15 @@ export function Dialog({ open, onClose, title, children, variant = "center" }: D
             </svg>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {/* tabIndex makes the scrollable region itself keyboard-operable
+            (arrow/Page keys scroll it directly) -- a scrollable region
+            that can only be reached by tabbing through its focusable
+            descendants fails WCAG 2.1.1 for content that has none, or
+            content past the last focusable child (axe-core
+            scrollable-region-focusable). */}
+        <div tabIndex={0} className="flex-1 overflow-y-auto px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]">
+          {children}
+        </div>
       </div>
     </dialog>
   );

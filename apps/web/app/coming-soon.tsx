@@ -3,12 +3,13 @@ import { Badge } from "@scc-health/ui";
 
 /**
  * A truthful "not built yet" destination -- never a 404, never fabricated
- * content. States plainly what the page will contain and which build
- * phase delivers it (DEC-037), and points the user at what already works.
+ * content. States plainly what the page will contain, and points the user
+ * at what already works. `phase` is kept as internal roadmap metadata
+ * (DEC-037) but is never shown to the reader -- a build-phase number
+ * means nothing to a first-time visitor.
  */
 export function ComingSoonPage({
   title,
-  phase,
   whatItWillDo,
   whyItMatters,
 }: {
@@ -23,7 +24,7 @@ export function ComingSoonPage({
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">{title}</h1>
           <Badge tone="caution" dot>
-            Coming in {phase}
+            Coming soon
           </Badge>
         </div>
         <p className="mt-3 text-sm text-[var(--color-text-secondary)]">{whyItMatters}</p>

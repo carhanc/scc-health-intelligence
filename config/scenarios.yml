@@ -18,8 +18,8 @@
 
 scenarios:
   - scenario_id: default_integrated_screen_v1
-    label: "Default integrated screen"
-    description: "An equally-weighted combination of all 5 domains, offered as a starting point -- the UI must still show these weights and let users choose an issue-specific scenario instead (docs/03 §7.1)."
+    label: "Balanced overview"
+    description: "Weighs health, access, environment, and resource factors equally, as a starting point before narrowing in on a specific issue."
     weights:
       health_burden: 0.20
       access_barriers: 0.20

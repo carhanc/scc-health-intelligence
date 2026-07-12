@@ -39,7 +39,7 @@ export const COLOR = {
   surfaceSunken: "#f2efe9",
   textPrimary: "#1e2933",
   textSecondary: "#4b5a67",
-  textTertiary: "#6b7885",
+  textTertiary: "#5c6874",
   border: "#d9d4cc",
   borderStrong: "#b8b0a2",
   interactive: "#0b6e75",

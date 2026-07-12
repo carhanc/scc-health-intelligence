@@ -33,9 +33,13 @@ function StateMessageBase({
         </div>
       )}
       <h3 className="text-base font-semibold text-[var(--color-text-primary)]">{title}</h3>
-      <p className="mx-auto mt-1.5 max-w-md text-sm text-[var(--color-text-secondary)]">
+      {/* A <div>, not a <p> -- `description` is typed as ReactNode and
+          callers legitimately nest block-level content in it (e.g. a
+          <details> disclosure for technical error detail), which is
+          invalid inside a <p> and triggers a real hydration error. */}
+      <div className="mx-auto mt-1.5 max-w-md text-sm text-[var(--color-text-secondary)]">
         {description}
-      </p>
+      </div>
       {(action || secondaryAction) && (
         <div className="mt-4 flex justify-center gap-3">
           {action && (

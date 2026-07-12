@@ -32,7 +32,7 @@ export function ExploreTable({
     () => [
       {
         accessorKey: "tract_geoid_2020",
-        header: "Tract GEOID",
+        header: "Census tract number",
         cell: (info) => <span className="tabular-nums">{info.getValue() as string}</span>,
       },
       {

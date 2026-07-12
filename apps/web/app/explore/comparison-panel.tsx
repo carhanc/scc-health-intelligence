@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, LoadingRegion, SkeletonText, ErrorState, PercentileBar } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { SearchPanel } from "./search-panel";
 import type { SelectedGeography } from "./selection";
+import { domainLabel } from "@/lib/labels";
 
 /**
  * Compares two tracts side by side using the same already-computed
@@ -22,11 +23,14 @@ export function ComparisonPanel({
   onClose: () => void;
 }) {
   const [compareSelection, setCompareSelection] = useState<SelectedGeography | null>(null);
+  const headingId = useId();
 
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
+    <section aria-labelledby={headingId} className="rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Compare with another place</h3>
+        <h3 id={headingId} className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Compare with another place
+        </h3>
         <Button variant="ghost" size="sm" onClick={onClose}>
           Close comparison
         </Button>
@@ -53,7 +57,7 @@ export function ComparisonPanel({
           onReset={() => setCompareSelection(null)}
         />
       )}
-    </div>
+    </section>
   );
 }
 
@@ -148,13 +152,13 @@ function ComparisonResult({
           const domainB = b.domains.find((d) => d.domain === domainA.domain);
           return (
             <div key={domainA.domain}>
-              <p className="text-xs font-medium text-[var(--color-text-primary)]">{domainA.domain}</p>
+              <p className="text-xs font-medium text-[var(--color-text-primary)]">{domainLabel(domainA.domain)}</p>
               <div className="mt-1 grid grid-cols-2 gap-3">
                 <PercentileBar
                   percentile={
                     domainA.domain_score !== null && domainA.domain_score !== undefined ? domainA.domain_score : null
                   }
-                  label={`Tract ${tractA} ${domainA.domain}`}
+                  label={`Tract ${tractA} ${domainLabel(domainA.domain)}`}
                 />
                 <PercentileBar
                   percentile={
@@ -162,7 +166,7 @@ function ComparisonResult({
                       ? domainB.domain_score
                       : null
                   }
-                  label={`Tract ${tractB} ${domainA.domain}`}
+                  label={`Tract ${tractB} ${domainLabel(domainA.domain)}`}
                 />
               </div>
             </div>

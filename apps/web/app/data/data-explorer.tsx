@@ -37,10 +37,8 @@ export function DataExplorer() {
           Sources
         </h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Every source this platform attempts to load, read directly from{" "}
-          <code>DATA_MANIFEST.json</code>. A source with no warehouse table
-          is either an intermediate crosswalk or a documented-blocked source
-          (see <code>DECISIONS.md</code>).
+          Every source this platform attempts to load. A source with no table listed below is either an
+          intermediate step used to build other tables, or a source we could not use for a documented reason.
         </p>
         <div className="mt-4">
           <SourcesTable />
@@ -49,11 +47,10 @@ export function DataExplorer() {
 
       <section>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          Warehouse tables
+          Data tables
         </h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Select a table to preview its columns and up to 50 rows, read live
-          from the DuckDB warehouse.
+          Select a table to preview its columns and up to 50 rows, read live from the database.
         </p>
         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
           <TablesList

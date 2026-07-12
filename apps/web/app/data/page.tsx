@@ -9,8 +9,8 @@ export default function DataPage() {
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Data</h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
           Every source this platform loads: its publisher, vintage, freshness, and license, plus a live preview of
-          every table in the warehouse. This transparency tool reads directly from{" "}
-          <code>DATA_MANIFEST.json</code> and the running warehouse -- nothing here is a mockup.
+          every table behind the scenes. This page reads directly from our published source catalog and the live
+          database -- nothing here is a mockup.
         </p>
       </div>
       <div className="mt-8">

@@ -38,14 +38,16 @@ dev-api:
 	uv run --package scc-health-api uvicorn scc_health_api.main:app --reload --port $${SCC_HEALTH_API_PORT:-8000}
 
 test: test-unit
-	@echo "make test: e2e/accessibility suites are added starting Phase 5. See TASKS.md."
+	@echo "make test: unit/component tests only. Run 'make test-e2e' for the"
+	@echo "Playwright browser suite (search/selection/comparison/accessibility/"
+	@echo "responsive) -- kept separate since it needs live API+web servers."
 
 test-unit:
 	uv run pytest apps/api/tests pipelines/tests
 	pnpm -r test
 
 test-e2e:
-	@echo "make test-e2e: Playwright suite added starting Phase 5. See TASKS.md."
+	pnpm --filter @scc-health/web e2e
 
 audit:
 	uv run python scripts/check_clean_room.py

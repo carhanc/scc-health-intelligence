@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingRegion, SkeletonText, DataModeBadge } from "@scc-health/ui";
 import { api, ApiError, type GeographyType } from "@/lib/api";
@@ -21,6 +21,7 @@ export function SearchPanel({
   onSelect: (selection: SelectedGeography) => void;
   selected: SelectedGeography | null;
 }) {
+  const inputId = useId();
   const [inputValue, setInputValue] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
 
@@ -39,15 +40,15 @@ export function SearchPanel({
   return (
     <div>
       <form onSubmit={handleSubmit} role="search">
-        <label htmlFor="geo-search" className="block text-sm font-medium text-[var(--color-text-primary)]">
+        <label htmlFor={inputId} className="block text-sm font-medium text-[var(--color-text-primary)]">
           Find a place
         </label>
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-          Search a city, a supervisor district, or a census tract GEOID.
+          Search a city, a supervisor district, or a census tract number.
         </p>
         <div className="mt-2 flex gap-2">
           <input
-            id="geo-search"
+            id={inputId}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -84,7 +85,7 @@ export function SearchPanel({
         {searchQuery.data && searchQuery.data.results.length === 0 && (
           <p className="text-sm text-[var(--color-text-secondary)]">
             No places matched &ldquo;{submittedQuery}&rdquo;. Try a different city name, district number, or tract
-            GEOID.
+            number.
           </p>
         )}
         {searchQuery.data && searchQuery.data.results.length > 0 && (
@@ -118,6 +119,11 @@ export function SearchPanel({
                       </span>
                       <br />
                       {result.label}
+                      {result.geography_type === "tract" && (
+                        <span className="ml-1.5 tabular-nums text-[var(--color-text-tertiary)]">
+                          ({result.geography_id})
+                        </span>
+                      )}
                     </button>
                   </li>
                 );

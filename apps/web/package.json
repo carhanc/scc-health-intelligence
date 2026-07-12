@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@scc-health/ui": "workspace:*",
@@ -20,6 +21,8 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "@scc-health/eslint-config": "workspace:*",
     "@scc-health/tsconfig": "workspace:*",
     "@tailwindcss/postcss": "^4.1.0",

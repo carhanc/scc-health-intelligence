@@ -19,7 +19,7 @@
   /* Text */
   --color-text-primary: #1e2933; /* deep slate, body/headings -- 13.6:1 on background */
   --color-text-secondary: #4b5a67; /* supporting text/labels -- 7.2:1 on background */
-  --color-text-tertiary: #6b7885; /* de-emphasized meta (timestamps, IDs) -- 4.6:1, still AA */
+  --color-text-tertiary: #5c6874; /* de-emphasized meta (timestamps, IDs) -- 4.88:1 minimum, AA even against tinted surfaces (was #6b7885, which measured 4.29:1 against --color-background and 3.86:1 against --color-interactive-subtle via axe-core -- fails AA; found during Phase 5 automated a11y testing) */
   --color-text-on-interactive: #ffffff;
 
   /* Borders */

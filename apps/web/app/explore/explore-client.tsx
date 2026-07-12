@@ -109,12 +109,18 @@ export function ExploreClient() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)_380px]">
-        <div className="order-2 lg:order-1">
+      {/* The 3-column layout needs 320px + 380px of fixed-width columns
+          plus gaps and padding on top of the desktop nav sidebar --
+          that doesn't fit at 1024px (a required responsive breakpoint),
+          so the 3-column grid activates at xl (1280px) instead of lg;
+          1024-1279px gets the same stacked single-column layout as
+          tablet/mobile, which stays fully usable at that width. */}
+      <div className="mt-4 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)_380px]">
+        <div className="order-2 xl:order-1">
           <SearchPanel selected={selected} onSelect={handleGeographySelect} />
         </div>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 xl:order-2">
           {view === "map" ? (
             <ExploreMap scenarioId={scenarioId} selected={selected} onSelect={handleGeographySelect} />
           ) : (
