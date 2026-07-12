@@ -100,7 +100,7 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Mitigation:** `DATA_MANIFEST.json` records `license_or_terms` per individual source artifact, not once per publisher; ED and patient-origin/market-share data are explicitly tagged with OPA no-modification/commercial-approval terms, while facility attributes are tagged CC-BY, as documented in `docs/data/source-verification.md` §8–10.
 
-**Status:** `open` — manifest schema designed; populated starting Phase 3.
+**Status:** `mitigated` — populated for all 25 live Phase 3 sources plus HPI's documented-unavailable entry; verified via `manifest_provenance_complete` in `pipelines/.../audits/core_sources_audits.py`.
 
 ---
 
@@ -120,7 +120,29 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Mitigation:** `mcp__Claude_in_Chrome__list_connected_browsers` returns empty (no extension connected). The Preview tool's process spawner fails with a sandbox-level `getcwd` permission error before reaching the launch command, tried with two different launch configurations. DEC-017 documents the HTTP-level verification approach used instead (production build success, strict lint/typecheck, unit tests, server-rendered HTML inspection via curl, live end-to-end API calls, CORS verification). This substitutes for, but does not equal, an actual visual/keyboard/screen-reader review.
 
-**Status:** `monitoring` — re-attempt browser tooling at the start of each future session; a true visual/accessibility pass is required no later than Phase 5's gate, which explicitly mandates it (`docs/07_BUILD_PHASES.md` Phase 5: "browser inspection evidence is recorded").
+**Phase 3 update:** Re-attempted at the start of the Phase 3 session with two independent mechanisms: (1) fixed a real bug in `.claude/dev_web_local_preview.sh` (it invoked the `next` shell-script wrapper directly via `node`, causing a syntax error) and retried `preview_start` — still blocked by the identical sandbox-level `getcwd` error, confirming the blocker is environment-level, not the launch script; (2) checked `mcp__Claude_in_Chrome__list_connected_browsers` — still empty. Substituted the same HTTP-level verification approach (curl against every new endpoint including the new `/api/v1/data-explorer` routes, dev-server 200 checks for the new `/data` page, full lint/typecheck/test suite).
+
+**Status:** `monitoring` — persisted across Phase 1, 2, and 3 sessions with the same root cause; re-attempt at the start of each future session; a true visual/accessibility pass is required no later than Phase 5's gate, which explicitly mandates it (`docs/07_BUILD_PHASES.md` Phase 5: "browser inspection evidence is recorded"). If still blocked by Phase 5, this should be escalated to the user as an environment configuration question rather than re-attempted silently again.
+
+---
+
+## RISK-013 — California Healthy Places Index (HPI) has no automatable keyless data path
+
+**Category:** Data completeness. **Likelihood:** Confirmed (re-verified live during Phase 3). **Impact:** Medium — one context source (HPI 3.0, 2022) is absent from the platform; every other required context source (SVI, CalEnviroScreen) is present.
+
+**Mitigation:** DEC-018 documents the decision to implement `CaHpiAdapter` as an intentionally-blocked source with a truthful `"status": "unavailable"` manifest entry, rather than fabricate data or cite an unofficial third-party mirror. `RISK-013` remains open until either (a) a maintainer supplies an HPI API registration credential, or (b) a maintainer approves reconciling the bulk 2010-geography HPI file against this project's 2020-tract canonical geography via a documented crosswalk.
+
+**Status:** `open` — accepted gap, truthfully surfaced in `/api/v1/sources` and the frontend Data page, not a blocker to Phase 3 completion per this session's explicit instructions ("every required adapter either passes its gate or is explicitly documented as blocked with a truthful unavailable state").
+
+---
+
+## RISK-014 — ACS 5-year coverage is a 3-table subset, not the full conceptual measure list
+
+**Category:** Data completeness / scope. **Likelihood:** Confirmed (deliberate scope decision, DEC-020). **Impact:** Low-medium — population, poverty, and disability estimates are available with margins of error; income, insurance coverage, vehicle access, language isolation, housing cost burden, and education estimates are not yet implemented.
+
+**Mitigation:** `AcsTableAdapter` is generic and parameterized by table ID, so adding a new ACS table is a small, well-tested addition rather than new architecture. `TASKS.md` lists the deferred table IDs explicitly.
+
+**Status:** `open` — tracked as Phase 3+ backlog, not silently missing (every currently-loaded ACS estimate is real and carries a real margin of error; no ACS field is a placeholder).
 
 ---
 

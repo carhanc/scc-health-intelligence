@@ -72,16 +72,24 @@ class GeographyBoundaryResponse(BaseModel):
     data_mode: DataMode
 
 
+FreshnessState = Literal[
+    "unavailable", "draft", "intentional_older", "newest_verified", "lagged", "stale"
+]
+
+
 class SourceStatusEntry(BaseModel):
     source_id: str
     resource_id: str
     publisher: str
     landing_page: str
     source_vintage: str
+    release_date: str | None = None
     retrieved_at: str
     status: str
     license_or_terms: str
+    freshness_state: FreshnessState
     row_count: int | None = None
+    warehouse_tables: list[str] = []
 
 
 class SourceStatusResponse(BaseModel):
@@ -91,3 +99,26 @@ class SourceStatusResponse(BaseModel):
     # truthful state here (unlike geography endpoints, which require a
     # warehouse and therefore only ever report "live" or "demo").
     warehouse_data_mode: Literal["live", "demo", "unavailable"]
+
+
+class DataExplorerTable(BaseModel):
+    schema_name: str
+    table_name: str
+    description: str
+    row_count: int | None
+    column_count: int | None
+    available: bool
+
+
+class DataExplorerResponse(BaseModel):
+    tables: list[DataExplorerTable]
+    warehouse_data_mode: Literal["live", "demo", "unavailable"]
+
+
+class DataExplorerTablePreview(BaseModel):
+    schema_name: str
+    table_name: str
+    columns: list[str]
+    rows: list[dict[str, object]]
+    row_count: int
+    data_mode: Literal["live", "demo"]

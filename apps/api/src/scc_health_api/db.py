@@ -97,8 +97,7 @@ def get_read_only_connection(
     path, mode = resolve_warehouse_path(settings)
     if path is None or mode == "unavailable":
         raise WarehouseUnavailableError(
-            "Neither the live nor the demo warehouse exists. "
-            "Run `make data` or `make demo` first."
+            "Neither the live nor the demo warehouse exists. Run `make data` or `make demo` first."
         )
     conn = duckdb.connect(str(path), read_only=True)
     try:

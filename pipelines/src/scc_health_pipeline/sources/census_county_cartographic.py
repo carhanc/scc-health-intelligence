@@ -86,9 +86,7 @@ class CensusCountyCartographicAdapter(TigerZipAdapterMixin):
 
         gdf = gpd.read_parquet(normalized_paths[0])
         if len(gdf) != 1:
-            report.add_error(
-                f"Expected exactly 1 county row (Santa Clara), found {len(gdf)}."
-            )
+            report.add_error(f"Expected exactly 1 county row (Santa Clara), found {len(gdf)}.")
             return report
         if gdf.iloc[0]["county_geoid"] != COUNTY_GEOID_SANTA_CLARA:
             report.add_error("County GEOID does not match Santa Clara County (06085).")

@@ -14,13 +14,17 @@ bootstrap:
 
 data:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_geography_pipeline
-	@echo "make data: geography spine implemented (Phase 2). Health/social/utilization"
-	@echo "sources are added starting Phase 3. See TASKS.md."
+	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_core_sources_pipeline
+	@echo "make data: geography spine (Phase 2) + core health/social/resource/utilization"
+	@echo "sources (Phase 3) implemented. See TASKS.md for scope and DECISIONS.md for the"
+	@echo "documented-blocked HPI source and the ACS/SCC-GIS scope narrowing decisions."
 
 demo:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_demo_pipeline
 	@echo "make demo: geography demo snapshot implemented (Phase 2), offline, no network access."
-	@echo "Health/social/utilization demo data added starting Phase 3. See TASKS.md."
+	@echo "Health/social/resource/utilization demo data (Phase 3 sources) is not yet frozen"
+	@echo "into an offline demo snapshot -- 'demo' mode currently covers geography only;"
+	@echo "'live' mode (make data) covers all Phase 3 sources. See TASKS.md and STATE.md."
 
 dev:
 	@echo "Starting API and web dev servers. Ctrl-C stops both."
@@ -45,7 +49,9 @@ test-e2e:
 audit:
 	uv run python scripts/check_clean_room.py
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_audits
-	@echo "make audit: analytics/output audits beyond geography are added starting Phase 4. See TASKS.md."
+	@echo "make audit: geography, core-source data-quality, and freshness/vintage audits"
+	@echo "(Phases 2-3) implemented. Analytics-output audits (scores, uncertainty,"
+	@echo "validation tautology guard) are added starting Phase 4. See TASKS.md."
 
 export-demo:
 	@echo "make export-demo: sample advocacy brief/evidence packet generation — implemented starting Phase 9."

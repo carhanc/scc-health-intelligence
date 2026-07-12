@@ -1,0 +1,6 @@
+Patient County,Service year,Disposition,Encounters,AnnotationCode,AnnotationDesc
+Santa Clara,2008,Acute Care,2895,,
+Santa Clara,2008,Childrens_or_Cancer,205,,
+Santa Clara,2024,Invalid/Blank,,2,Cell suppressed for complementary cell
+Santa Clara,2024,Disaster_Care_Site,,1,Cell suppressed for small numbers
+Alameda,2008,Acute Care,5073,,

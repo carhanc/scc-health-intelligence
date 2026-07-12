@@ -51,29 +51,36 @@ Legend: **AC-ref** = acceptance-criterion section in `docs/06_ACCEPTANCE_TESTS.m
 
 ---
 
-## Phase 3 — Core data ingestion (17 adapters)
+## Phase 3 — Core data ingestion
 
-- [ ] TIGER/Line 2020 boundaries
-- [ ] Census ZCTA-tract relationship file
-- [ ] ACS 5-year 2020–2024 (keyless bulk path default, `CENSUS_API_KEY` optional — DEC-003)
-- [ ] CDC PLACES 2025 (tract dataset `cwsq-ngmh`, discovery-based ID resolution)
-- [ ] CDC/ATSDR SVI 2022
-- [ ] California Healthy Places Index 3.0
-- [ ] CalEnviroScreen 5.0 final (non-draft — DEC-007)
-- [ ] HCAI facility attributes (CC-BY)
-- [ ] HCAI Emergency Department encounters (OPA terms)
-- [ ] HCAI patient-origin/market-share pivot profiles (OPA terms)
-- [ ] HRSA health center service-delivery sites
-- [ ] HRSA HPSA / MUA/P shortage designations
-- [ ] VTA static GTFS
-- [ ] Santa Clara County GIS Hub (supervisor districts + facility layers)
-- [ ] USDA SNAP retailer locator (FNS→FNA transition)
-- [ ] HUD USPS ZIP crosswalk (optional enhancement)
-- [ ] OpenStreetMap/Overpass supplemental layer (clearly labeled, never sole source)
+- [x] TIGER/Line 2020 boundaries — Phase 2.
+- [x] Census ZCTA-tract relationship file — Phase 2.
+- [x] ACS 5-year 2020–2024, keyless bulk Summary File path (DEC-003), 3 representative tables (B01003 total population, B17001 poverty, B18101 disability) — narrowed scope, DEC-020. Evidence: `acs_5year.py`, geo crosswalk 408 rows, B01003 408, B17001 24,072, B18101 15,912 (all in `social.acs_observations`, 40,392 total rows), MOE→SE hand-verified, `test_acs_5year_contract.py` (3 tests).
+- [x] CDC PLACES 2025 (tract dataset `cwsq-ngmh`). Evidence: `cdc_places.py`, 16,320 rows, `test_cdc_places_contract.py` (5 tests).
+- [x] CDC/ATSDR SVI 2022 (ArcGIS FeatureServer). Evidence: `cdc_atsdr_svi.py`, 408/408 tracts, `test_svi_contract.py` (4 tests).
+- [x] California Healthy Places Index 3.0 — **documented-blocked**, no automatable keyless path (DEC-018, RISK-013). Evidence: `ca_hpi.py`, `test_ca_hpi_blocked.py` (4 tests), truthful `"status": "unavailable"` manifest entry.
+- [x] CalEnviroScreen 5.0 final (non-draft — DEC-007, re-verified live at Phase 3 implementation time). Evidence: `calenviroscreen.py`, 408/408 tracts, draft-URL-rejection guard, `test_calenviroscreen_contract.py` (4 tests).
+- [x] HCAI facility attributes (CC-BY, dynamic CKAN discovery + spatial join). Evidence: `hcai_facility_attributes.py`, 204 SCC facilities, `test_hcai_facility_attributes_contract.py` (2 tests).
+- [x] HCAI Emergency Department patient-county encounters (OPA terms), 4 breakdowns (disposition/race/sex/payer). Evidence: `hcai_ed_patient_county.py`, 796 rows incl. 2 real suppressed rows preserved as null (never zero), `test_hcai_ed_patient_county_contract.py` (4 tests).
+- [x] HCAI Emergency Department facility-profile pivot (OPA terms). Evidence: `hcai_ed_facility_profile.py`, 9 SCC facility rows, `test_hcai_ed_facility_profile_contract.py` (4 tests).
+- [x] HCAI patient-origin/market-share pivot profile (OPA terms), ambulatory-surgery exclusion disclosed inline. Evidence: `hcai_patient_origin.py`, 31,462 rows, `test_hcai_patient_origin_contract.py` (3 tests).
+- [x] HRSA health center service-delivery sites. Evidence: `hrsa_health_centers.py`, 98 SCC sites, `test_hrsa_health_centers_contract.py` (2 tests).
+- [x] HRSA HPSA (primary care/dental/mental health) + MUA/P shortage designations, kept as separate typed tables per source registry guidance. Evidence: `hrsa_shortage_areas.py`, 148 HPSA rows (31/17/100) + 48 MUA/P rows, `test_hrsa_shortage_areas_contract.py` (5 tests).
+- [x] VTA static GTFS (stops/routes/trips/stop_times/calendar + derived frequency summary), foreign-key integrity checked. Evidence: `vta_gtfs.py`, 3,345 stops / 72 routes / 11,085 trips / 427,720 stop_times, `test_vta_gtfs_contract.py` (6 tests).
+- [x] Santa Clara County GIS Hub — supervisor districts done in Phase 2; Parks/Community Service Districts layers verified live but deferred (DEC-021).
+- [x] USDA SNAP retailer locator (FNS→FNA rebrand handled). Evidence: `usda_snap_retailers.py`, 2,163 historical SCC records / 796 currently authorized, `test_usda_snap_contract.py` (3 tests).
+- [ ] HUD USPS ZIP crosswalk (optional enhancement) — still deferred, DEC-014.
+- [ ] OpenStreetMap/Overpass supplemental layer — deferred to Phase 6 (Access Lab), where it is actually consumed.
 
-Each adapter: [ ] contract test, [ ] offline fixture, [ ] manifest entry, [ ] retry/backoff, [ ] content-type validation, [ ] last-known-good cache behavior tested. AC-ref §4.
+Each implemented adapter: [x] contract test, [x] offline fixture built from real data, [x] manifest entry, [x] retry/backoff (`http_fetch.py`), [x] content-type validation, [x] cache reuse verified (second `make data` run reused cached raw artifacts). AC-ref §4.
 
-**Gate 3 evidence required:** every metric has unit/directionality/denominator/source/vintage/uncertainty where available; ACS MOEs and PLACES CIs retained; HCAI suppression preserved; data explorer accurately reports failures; no production metric from mock data.
+- [x] Orchestration + warehouse loading: `run_core_sources_pipeline.py` runs every adapter end-to-end and loads 17 tables into `warehouse/scc_health.duckdb` across `health`/`context`/`social`/`resources`/`utilization` schemas; wired into `make data` alongside the Phase 2 geography pipeline.
+- [x] Phase 3 data-quality audit suite (`audits/core_sources_audits.py`): expected-table/row-count checks, orphan-geography checks, all-null-column detection with a hand-verified explained-exception list (DEC-019), PLACES percentage/CI bounds, ACS MOE/estimate non-negativity + retention-rate, HCAI suppression-never-zero, coordinate-bounds checks, manifest-provenance completeness. Wired into `make audit`.
+- [x] Freshness/vintage-transparency audit (`audits/vintage_audits.py`): classifies every source into unavailable/draft/intentional_older/newest_verified/lagged/stale, keeping source_vintage (observation period) and retrieved_at (fetch time) always distinguished. 7 unit tests (`test_vintage_audits.py`).
+- [x] API extensions: `/api/v1/sources` now reports `freshness_state`, `release_date`, `row_count`, `warehouse_tables` per source; new `/api/v1/data-explorer` (table list with live row/column counts) and `/api/v1/data-explorer/{schema}/{table}` (bounded 50-row preview). 4 integration tests (`test_source_status_routes.py`).
+- [x] Frontend internal data-explorer page (`apps/web/app/data`): sources table with freshness badges, browsable warehouse-table list grouped by schema, live bounded table preview. Functional Phase 3 transparency tool, not final Phase 5 design.
+
+**Gate 3 evidence:** 16 of 18 named sources implemented and loaded with real live data (2 explicitly deferred with a documented reason: HUD crosswalk optional-enhancement DEC-014, OSM deferred to Phase 6 where consumed; HPI is implemented as a documented-blocked adapter, not silently missing). Every metric column that reached the warehouse carries source/vintage/retrieval-time provenance via `DATA_MANIFEST.json` and `/api/v1/sources`. ACS MOEs (100% retention) and PLACES CIs retained. HCAI suppression preserved as null, verified by an automated audit that actively rejects the suppressed-as-zero anti-pattern. Data explorer (`/api/v1/data-explorer`) accurately reports live row/column counts against the real warehouse. No production metric derived from mock/fabricated data — the only intentionally-blocked source (HPI) is visibly `unavailable`, not silently absent. 100/100 tests passing (`pytest apps/api/tests pipelines/tests`), `ruff check .` / `uv run mypy` / `pnpm -r lint` / `pnpm -r typecheck` all clean, full `make data` + `make audit` run green end to end. One caveat carried from Phase 2: no in-browser visual verification was possible this session either (RISK-012 persisted across all three sessions with the same environment-level root cause) — verified instead via curl against every new endpoint, dev-server 200 checks, and the full automated test/lint/typecheck suite. Second caveat: `make demo` (offline snapshot mode) still covers geography only — Phase 3 sources are available in `live` mode (`make data`) but have not yet been frozen into an offline demo snapshot; this is an honest, disclosed gap (Makefile echoes it explicitly), not a silent one.
 
 ---
 

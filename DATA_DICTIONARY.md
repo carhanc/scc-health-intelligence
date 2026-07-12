@@ -1,6 +1,8 @@
 # DATA_DICTIONARY.md
 
-**Status: geography dimension tables complete (Phase 2); metric tables pending Phase 3–4.** This document is populated incrementally as each source adapter and metric is implemented. It is the human-readable companion to `config/metrics.yml` (machine-readable, authoritative for scoring/UI) and `DATA_MANIFEST.json` (machine-readable, authoritative for provenance). No metric may appear in the product before it has an entry here.
+**Status: geography dimension tables complete (Phase 2); raw source tables loaded (Phase 3); derived metric/domain-score tables pending Phase 4.** This document is populated incrementally as each source adapter and metric is implemented. It is the human-readable companion to `config/metrics.yml` (machine-readable, authoritative for scoring/UI) and `DATA_MANIFEST.json` (machine-readable, authoritative for provenance). No metric may appear in the product before it has an entry here.
+
+Phase 3 loaded the *raw/staged source tables* listed in "Source tables (Phase 3 — implemented)" below — these are normalized, tract/facility/stop-level tables straight from each source adapter, not yet the derived, weighted, uncertainty-propagated domain-score metrics Phase 4 will build on top of them. A Phase 3 table appearing here does not mean its values are already scored into a composite index.
 
 ## How to read this document
 
@@ -88,12 +90,73 @@ Small tract-land slivers with zero ZCTA overlap (a real, rare edge case in the s
 - `geo.hpsa_mua` (HPSA/MUA/P designation areas) — Phase 3, alongside the HRSA HPSA source adapter.
 - State/federal legislative and congressional districts — not required by Phase 2 scope.
 
-## Resource dimension tables (Phase 3/6)
+## Source tables (Phase 3 — implemented)
 
-- `resources.facilities` (HCAI licensed facilities, HRSA health centers, deduplicated)
-- `resources.transit_stops` (VTA GTFS)
-- `resources.food_resources` (USDA SNAP retailers)
-- `resources.community_resources` (SCC GIS Hub public assets)
+All tables live in `warehouse/scc_health.duckdb`, loaded by
+`pipelines/src/scc_health_pipeline/run_core_sources_pipeline.py`. Row counts
+are from the live Phase 3 build (2026-07-12); see `DATA_MANIFEST.json` for
+per-source publisher/vintage/license/retrieval-time provenance and
+`docs/data/source-verification.md` for source verification detail.
+
+### `health.places_observations` — 16,320 rows
+
+CDC PLACES 2025 release, tract-level health measure estimates (BRFSS 2022–2023 underlying survey years). Long-form: one row per tract per measure. Key fields: `tract_geoid_2020` (string, 11 chars), `measure`/`short_question_text`, `data_value` (estimate), `data_value_unit` (e.g. `%`), `low_confidence_limit`/`high_confidence_limit` (95% CI bounds — see `uncertainty/moe.py::places_ci_to_standard_error`), `suppression_flag` (all-null for this county/release — DEC-019). Not yet folded into a health-burden domain score (Phase 4).
+
+### `context.svi` — 408 rows
+
+CDC/ATSDR Social Vulnerability Index 2022 (underlying ACS 2018–2022), tract level, one row per tract. Percentile-rank fields; `-999` source sentinel nulled and flagged via `had_suppressed_field`. Used as an independent benchmark, not folded into composite scores (per `docs/02_DATA_SOURCE_REGISTRY.md` §7.1).
+
+### `context.calenviroscreen` — 408 rows
+
+CalEnviroScreen 5.0 final release (finalized 2026-07-01), tract level. All indicator + percentile columns preserved, including two new-in-5.0 indicators (`diabetes`/`diabetesP`, `SmATS`/`SmATSP`). Not directly comparable to 4.0-era scores (DEC-007).
+
+### `social.acs_observations` — 40,392 rows
+
+ACS 2020–2024 5-year estimates, long-form (one row per tract per table per line). Currently covers 3 tables (DEC-020): B01003 (total population), B17001 (poverty status by sex/age), B18101 (disability status by sex/age). Fields: `tract_geoid_2020`, `table_id`, `line`, `estimate`, `moe_90` (90% CI margin of error, `-555555555` sentinel nulled), `standard_error` (derived via `uncertainty/moe.py::acs_moe_to_standard_error`). 100% of rows retain a margin of error.
+
+### `resources.hcai_facilities` — 204 rows
+
+HCAI-licensed healthcare facility attributes (CC-BY), dynamically discovered via CKAN `package_show` with a pinned fallback URL, filtered to Santa Clara County via a real point-in-polygon spatial join against `geo.county` (not city/ZIP text matching).
+
+### `resources.hrsa_health_center_sites` — 98 rows
+
+HRSA-funded health center service-delivery and look-alike sites, daily-refresh source.
+
+### `resources.snap_retailers` — 2,163 rows
+
+USDA SNAP-authorized retailer locations, historical bulk file 2005–2025 (FNS→FNA rebrand handled). `currently_authorized` derived from a blank End Date. 796 currently authorized; the remainder are historical/deauthorized and retained for completeness.
+
+### `resources.transit_stops` / `transit_routes` / `transit_trips` / `transit_stop_times` / `transit_calendar` / `transit_stop_frequency_summary`
+
+VTA static GTFS feed, parsed into the standard GTFS tables plus one derived per-stop frequency summary. 3,345 stops, 72 routes, 11,085 trips, 427,720 stop_times. Foreign-key integrity (trips→routes, stop_times→trips/stops) checked in `quality_checks()`.
+
+### `resources.hrsa_hpsa` — 148 rows
+
+HRSA Health Professional Shortage Area designations, three disciplines unioned into one table with a `discipline` column (primary care 31, dental 17, mental health 100) — kept distinguishable, never collapsed into a single "has a shortage" flag.
+
+### `resources.hrsa_mua_p` — 48 rows
+
+HRSA Medically Underserved Area/Population designations. `designation_population` is all-null for this county (verified against the raw source file — DEC-019).
+
+### `utilization.hcai_ed_patient_county` — 796 rows
+
+HCAI ED encounters by patient county of residence, four breakdowns unioned with a `breakdown_category` column (disposition/race_group/sex/expected_payer). `is_suppressed` flag + null (never zero) `encounters` for masked cells — includes 2 real suppressed Santa Clara County rows. Native geography is patient county of residence, not tract, not facility location.
+
+### `utilization.hcai_ed_facility_profile` — 9 rows
+
+HCAI ED characteristics by facility, 2024, pivot-profile "Data" sheet only (the workbook's "Profile"/"Pivot" sheets are interactive Excel UI, not tabular data, and are not parsed).
+
+### `utilization.hcai_patient_origin` — 31,462 rows
+
+HCAI patient-origin/market-share pivot profile, 2024. Native geography is patient ZIP / facility, not tract. Ambulatory-surgery market share excludes physician-owned clinics by design (`AMBULATORY_SURGERY_EXCLUSION_NOTE` on every row) — disclosed, not silently absorbed into the estimate.
+
+### Not yet implemented (deferred, documented)
+
+- California Healthy Places Index 3.0 — intentionally blocked, no automatable keyless path (DEC-018, RISK-013).
+- ACS tables beyond population/poverty/disability (income, insurance coverage, vehicle access, language isolation, housing cost burden, education) — DEC-020, RISK-014.
+- HUD USPS ZIP-tract crosswalk (optional enhancement, DEC-014).
+- Additional SCC GIS layers beyond supervisor districts (Parks, Community Service Districts — verified available, DEC-021).
+- A unified, deduplicated `resources.facilities` table merging `resources.hcai_facilities` and `resources.hrsa_health_center_sites` by coordinate/name/address — deferred to Phase 6 (Access Lab), where deduplication is actually needed for routing/optimization.
 
 ## Versioning
 

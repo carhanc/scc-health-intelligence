@@ -93,21 +93,55 @@ export interface GeographyBoundaryResponse {
   data_mode: DataMode;
 }
 
+export type FreshnessState =
+  | "unavailable"
+  | "draft"
+  | "intentional_older"
+  | "newest_verified"
+  | "lagged"
+  | "stale";
+
 export interface SourceStatusEntry {
   source_id: string;
   resource_id: string;
   publisher: string;
   landing_page: string;
   source_vintage: string;
+  release_date: string | null;
   retrieved_at: string;
   status: string;
   license_or_terms: string;
+  freshness_state: FreshnessState;
   row_count: number | null;
+  warehouse_tables: string[];
 }
 
 export interface SourceStatusResponse {
   sources: SourceStatusEntry[];
   warehouse_data_mode: WarehouseDataMode;
+}
+
+export interface DataExplorerTable {
+  schema_name: string;
+  table_name: string;
+  description: string;
+  row_count: number | null;
+  column_count: number | null;
+  available: boolean;
+}
+
+export interface DataExplorerResponse {
+  tables: DataExplorerTable[];
+  warehouse_data_mode: WarehouseDataMode;
+}
+
+export interface DataExplorerTablePreview {
+  schema_name: string;
+  table_name: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  row_count: number;
+  data_mode: DataMode;
 }
 
 export class ApiError extends Error {
@@ -162,4 +196,9 @@ export const api = {
       `/api/v1/geographies/${geographyType}/${encodeURIComponent(geographyId)}/boundary`,
     ),
   getSources: () => apiGet<SourceStatusResponse>("/api/v1/sources"),
+  getDataExplorer: () => apiGet<DataExplorerResponse>("/api/v1/data-explorer"),
+  getDataExplorerTablePreview: (schemaName: string, tableName: string) =>
+    apiGet<DataExplorerTablePreview>(
+      `/api/v1/data-explorer/${encodeURIComponent(schemaName)}/${encodeURIComponent(tableName)}`,
+    ),
 };

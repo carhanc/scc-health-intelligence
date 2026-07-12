@@ -141,9 +141,7 @@ def harmonize_geography(staged_root: Path, curated_root: Path) -> HarmonizeResul
                 "supervisor_district": primary_district,
                 "primary_district_share": round(primary_share, 6),
                 "is_clean_assignment": is_clean,
-                "all_district_shares": ";".join(
-                    f"{d}:{round(s, 4)}" for d, s in shares
-                ),
+                "all_district_shares": ";".join(f"{d}:{round(s, 4)}" for d, s in shares),
             }
         )
 

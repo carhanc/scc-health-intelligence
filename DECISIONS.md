@@ -204,6 +204,56 @@ Each record: context, decision, rationale, alternatives considered, and conseque
 
 **Consequences:** A true in-browser visual/accessibility/interaction walkthrough (screenshots, keyboard navigation, screen-reader checks) remains outstanding and is explicitly deferred to Phase 5, which is where `docs/07_BUILD_PHASES.md` itself first requires browser-based UX review evidence (Phase 2's gate does not). If browser tooling becomes available in a future session, a retroactive visual check of the Phase 2 Explore scaffold would be a reasonable first action.
 
+### DEC-018 — California Healthy Places Index (HPI) is a documented-blocked source, not a fabricated or third-party-mirrored one
+
+**Context:** `docs/02_DATA_SOURCE_REGISTRY.md` requires HPI as a core context source, but re-verification at Phase 3 implementation time confirmed there is no official keyless bulk-download path: the HPI API requires registration, the only stable bulk artifact ships 2010-vintage census geography (misaligned with this project's 2020-tract canonical geography), and third-party CSV mirrors are not authoritative sources this project is willing to cite.
+
+**Decision:** `pipelines/src/scc_health_pipeline/sources/ca_hpi.py::CaHpiAdapter` is implemented as an intentionally-blocked adapter: `discover()` returns an empty resource list, `fetch()` raises `NotImplementedError` if ever called, and `quality_checks()` always fails. `blocked_manifest_entry()` writes a `DATA_MANIFEST.json` entry with `"status": "unavailable"` and an explanatory `notes` field, so the source is visibly and truthfully absent rather than silently missing or invented.
+
+**Rationale:** CLAUDE.md is explicit that a failed source must produce "a visible unavailable state, a logged reason, and a documented fallback" rather than fabricated or silently-substituted data. Registering for API access, or manually reconciling 2010-vintage HPI geography against this project's 2020-tract canonical geography, is out of scope for an unattended keyless build; both remain a documented option for a future session with a maintainer-provided credential and a geography-crosswalk exercise, not a blocker to declaring Phase 3 otherwise complete.
+
+**Consequences:** Every UI/API surface that would show HPI must render a truthful "data unavailable" state (see `/api/v1/sources`, which reports `ca_hpi_3_0` with `freshness_state: "unavailable"`) rather than an empty chart or a zero. `RISK_REGISTER.md` carries this as an open, accepted gap, not a silent one.
+
+### DEC-019 — All-null warehouse columns must be explained against the raw source file, not merely tolerated or silently dropped
+
+**Context:** The Phase 3 data-quality audit (`pipelines/src/scc_health_pipeline/audits/core_sources_audits.py`) flagged four columns as entirely null across every Santa Clara County row: `health.places_observations.suppression_flag`, `resources.transit_stops.stop_url`, `resources.hrsa_mua_p.designation_population`, and `utilization.hcai_ed_facility_profile.RURAL_HOSPITAL_DESC`. Each was manually re-verified against the *raw* source file (not just the warehouse) before being accepted: CDC PLACES applied zero footnote/suppression codes to any of 16,320 Santa Clara County rows in this release; VTA's GTFS feed leaves `stop_url` blank for all 3,345 stops; HRSA's national MUA_DET.csv leaves the designation-population field blank for all 48 Santa Clara County MUA/P rows; and `RURAL_HOSPITAL_DESC` is populated statewide only for facilities HCAI itself labels `SMALL/RURAL` — a category Santa Clara County, being fully urban, has none of.
+
+**Decision:** Rather than dropping these columns (which would lose real source-schema fidelity and silently discard a field that could become populated in a future release) or treating them as a permanent audit failure, `core_sources_audits.py::_EXPLAINED_ALL_NULL_COLUMNS` records the verified reason per column, and the audit reports them informationally rather than failing the gate.
+
+**Rationale:** CLAUDE.md prohibits "unexplained... all-null production columns" — the operative word is *unexplained*. A column confirmed, against the raw file, to be genuinely inapplicable to every row in this specific county/data slice is a true fact about the source, not a pipeline defect; collapsing that distinction (either by deleting the column or by permanently red-flagging it) would itself be a form of data-transparency loss.
+
+**Consequences:** Any future all-null column not already in `_EXPLAINED_ALL_NULL_COLUMNS` still fails the audit gate by default — this decision only exempts columns that were individually hand-verified, not a blanket allowance.
+
+### DEC-020 — ACS 5-year adapter scope narrowed to 3 representative tables (total population, poverty, disability), not the full ~20-measure conceptual list
+
+**Context:** `docs/02_DATA_SOURCE_REGISTRY.md` describes a broad set of ACS-derived measures (income, insurance coverage, vehicle access, language isolation, housing cost burden, education, etc.). Each additional ACS table requires downloading a separate national-scope Summary File `.dat` artifact (18-120MB each) and building its own estimate/MOE column mapping.
+
+**Decision:** Phase 3 implements `AcsTableAdapter` generically (parameterized by table ID) and wires up 3 tables — B01003 (total population), B17001 (poverty status by sex by age), B18101 (disability status by sex by age) — as a representative, real, fully-tested slice, rather than fabricating or stubbing the remaining ~17 tables.
+
+**Rationale:** CLAUDE.md prohibits placeholder/fabricated metrics; implementing all ~20 tables with real data inside this session was not achievable given per-table download and validation cost, so the honest choice is a documented, narrower real subset plus a clear "not yet implemented" list, rather than a wider surface with fake or missing data behind it.
+
+**Consequences:** `social.acs_observations` currently covers population, poverty, and disability only. `TASKS.md` and `DATA_DICTIONARY.md` list the deferred ACS tables explicitly as a Phase 3+ backlog item, not a silently-missing feature — adding a new table is a one-line addition to `AcsTableAdapter`'s call sites in `run_core_sources_pipeline.py`, since the adapter itself is already generic.
+
+### DEC-021 — Additional Santa Clara County GIS layers (Parks, Community Service Districts) verified available but deferred past Phase 3
+
+**Context:** Beyond the supervisor-district boundaries already implemented in Phase 2, the SCC GIS Hub (`prod-sccgov.opendata.arcgis.com`) hosts other ArcGIS FeatureServer layers (e.g. a `Community_Service_Districts` layer, confirmed live and queryable during Phase 3). `docs/02_DATA_SOURCE_REGISTRY.md` does not name a specific required list of additional county GIS layers beyond supervisor districts.
+
+**Decision:** Confirmed these additional layers are live and queryable (spot-checked via a `?f=json` FeatureServer metadata request) but did not build adapters for them in Phase 3, prioritizing the explicitly-required core health/social/resource/utilization sources, the audit suite, and the API/frontend transparency surfaces instead.
+
+**Rationale:** No specification document names these specific layers as required for Phase 3; they are better scoped alongside the analytics/access-lab work in a later phase where their actual use (e.g. a park-proximity access metric) is defined, rather than ingested speculatively now.
+
+**Consequences:** `TASKS.md` records these as a verified-available, not-yet-implemented backlog item with the confirmed FeatureServer endpoint pattern, so a future session does not need to re-discover them.
+
+### DEC-022 — The API layer reimplements a lightweight freshness classifier rather than importing `scc_health_pipeline`
+
+**Context:** The Phase 3 freshness/vintage-transparency audit (`pipelines/.../audits/vintage_audits.py`) classifies each source into states like `newest_verified`/`lagged`/`stale`/`intentional_older`. The API's new `/api/v1/sources` endpoint needs the same classification to display a freshness badge per source.
+
+**Decision:** Rather than adding `scc-health-pipeline` as a dependency of `scc-health-api` (which would pull geopandas/polars/PySAL and the rest of the analytics dependency chain into a request-serving process), `apps/api/src/scc_health_api/services/freshness.py` is a small, self-contained reimplementation of the same cadence-window classification logic.
+
+**Rationale:** `docs/04_ARCHITECTURE_IMPLEMENTATION.md` treats the API as a lightweight, read-only-warehouse-querying process; importing the full pipeline package for date arithmetic over `DATA_MANIFEST.json` would meaningfully bloat its dependency footprint and startup cost for no functional benefit.
+
+**Consequences:** The two classifiers' rule tables (`_CADENCE_DAYS`, `_INTENTIONALLY_FIXED_VINTAGE`) must be kept in sync manually; both files carry a comment cross-referencing the other. A future refactor could extract just this pure-logic module into a shared, dependency-free `packages/` module if drift becomes a problem.
+
 ---
 
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

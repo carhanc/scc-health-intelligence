@@ -81,8 +81,10 @@ class SccSupervisorDistrictsAdapter:
         import geopandas as gpd
 
         gdf = gpd.read_file(artifact.local_path)
-        gdf = gdf.set_crs(CRS_WEB_WGS84, allow_override=True) if gdf.crs is None else gdf.to_crs(
-            CRS_WEB_WGS84
+        gdf = (
+            gdf.set_crs(CRS_WEB_WGS84, allow_override=True)
+            if gdf.crs is None
+            else gdf.to_crs(CRS_WEB_WGS84)
         )
         out = gdf[["DISTRICT", "SUPERVISOR", "ACRES", "SQ_MILES", "geometry"]].rename(
             columns={

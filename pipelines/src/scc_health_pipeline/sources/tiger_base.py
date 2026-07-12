@@ -37,9 +37,11 @@ class TigerZipAdapterMixin:
         if artifact.local_path is None or not artifact.local_path.exists():
             report.add_error("No local file recorded for a non-unavailable artifact.")
             return report
-        if artifact.content_type and "zip" not in artifact.content_type and not str(
-            artifact.local_path
-        ).endswith(".zip"):
+        if (
+            artifact.content_type
+            and "zip" not in artifact.content_type
+            and not str(artifact.local_path).endswith(".zip")
+        ):
             report.add_warning(
                 f"Unexpected content-type '{artifact.content_type}' for a Shapefile zip."
             )

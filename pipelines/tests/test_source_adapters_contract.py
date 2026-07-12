@@ -111,9 +111,7 @@ class TestCensusCountyCartographicAdapter:
         raw_dir = tmp_path / "data" / "raw"
         raw_dir.mkdir(parents=True)
         fixture_copy = raw_dir / "cb_2020_us_county_500k_sample.zip"
-        fixture_copy.write_bytes(
-            (FIXTURES_DIR / "cb_2020_us_county_500k_sample.zip").read_bytes()
-        )
+        fixture_copy.write_bytes((FIXTURES_DIR / "cb_2020_us_county_500k_sample.zip").read_bytes())
 
         artifact = _fixture_artifact(adapter.source_id, fixture_copy)
         outputs = adapter.normalize(artifact)
@@ -135,9 +133,7 @@ class TestCensusZctaCartographicAdapter:
         raw_dir = tmp_path / "data" / "raw"
         raw_dir.mkdir(parents=True)
         fixture_copy = raw_dir / "cb_2020_us_zcta520_500k_sample.zip"
-        fixture_copy.write_bytes(
-            (FIXTURES_DIR / "cb_2020_us_zcta520_500k_sample.zip").read_bytes()
-        )
+        fixture_copy.write_bytes((FIXTURES_DIR / "cb_2020_us_zcta520_500k_sample.zip").read_bytes())
 
         artifact = _fixture_artifact(adapter.source_id, fixture_copy)
         outputs = adapter.normalize(artifact)
@@ -216,9 +212,7 @@ class TestCensusZctaTractRelationshipAdapter:
         unassigned = pl.read_parquet(outputs[1])
 
         # Every crosswalk row must be a Santa Clara County tract.
-        assert crosswalk.filter(
-            ~pl.col("tract_geoid_2020").str.starts_with("06085")
-        ).height == 0
+        assert crosswalk.filter(~pl.col("tract_geoid_2020").str.starts_with("06085")).height == 0
         # The fixture includes an Alameda County (06001) row that must be
         # excluded entirely.
         assert crosswalk.height > 0

@@ -26,7 +26,9 @@ from scc_health_pipeline.sources.http_fetch import fetch_with_retry
 
 ADAPTER_VERSION = "1.0.0"
 
-_URL = "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_tract20_natl.txt"
+_URL = (
+    "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_tract20_natl.txt"
+)
 
 _SCHEMA = {
     "OID_ZCTA5_20": pl.Utf8,
@@ -96,9 +98,7 @@ class CensusZctaTractRelationshipAdapter:
         )
 
         # Field-based filter (never substring match -- see module docstring).
-        scc_rows = df.filter(
-            pl.col("GEOID_TRACT_20").str.slice(0, 5) == COUNTY_GEOID_SANTA_CLARA
-        )
+        scc_rows = df.filter(pl.col("GEOID_TRACT_20").str.slice(0, 5) == COUNTY_GEOID_SANTA_CLARA)
         scc_rows_with_zcta = scc_rows.filter(pl.col("GEOID_ZCTA5_20").is_not_null())
 
         relevant_zctas = scc_rows_with_zcta["GEOID_ZCTA5_20"].unique().to_list()

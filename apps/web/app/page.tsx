@@ -22,12 +22,18 @@ export default function OverviewPage() {
           starting Phase 5 — see <code>PLAN.md</code> and{" "}
           <code>TASKS.md</code>.
         </p>
-        <p className="mt-4">
+        <p className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
           <Link
             href="/explore"
             className="text-sm font-medium text-[var(--color-interactive)] underline underline-offset-2"
           >
             Try the Phase 2 geography search →
+          </Link>
+          <Link
+            href="/data"
+            className="text-sm font-medium text-[var(--color-interactive)] underline underline-offset-2"
+          >
+            Browse Phase 3 data sources →
           </Link>
         </p>
         <div className="mt-8">

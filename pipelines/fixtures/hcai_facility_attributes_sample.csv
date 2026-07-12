@@ -1,0 +1,5 @@
+facility_desc,site_address1,site_address2,site_city,site_zip,site_x_coordinate,site_y_coordinate,oshpd_id,license_type_desc,license_category_desc,license_number,facility_level_desc,er_service_level_desc,licensed_beds,facility_status_desc
+"PADRE PIO'S HOME HEALTH CARE SERVICES, INC.",7880 WREN AVE,STE C-134,GILROY,95020,-121.585741,37.009828,406432059,Home Health Agency/Hospice,Home Health Agency,550005103,Parent Facility,Not Specified,"",Open
+ROOTS COMMUNITY HEALTH CENTER,1898 THE ALAMEDA,"",SAN JOSE,95126,-121.922467,37.340868,306430529,Clinic,Community Clinic,550004774,Parent Facility,Not Specified,"",Open
+ANX HOME HEALTHCARE,828 S BASCOM AVE,STE 240,SAN JOSE,95128,-121.931185,37.312216,406432660,Home Health Agency/Hospice,Home Health Agency,550000921,Branch,Not Specified,"",Open
+FRESENIUS KIDNEY CARE NORTH FONTANA,16423 SIERRA LAKES PKWY,"",FONTANA,92336,-117.447585,34.136973,306360511,Clinic,Chronic Dialysis Clinic,550005197,Parent Facility,Not Specified,"",Open
