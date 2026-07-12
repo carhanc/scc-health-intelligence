@@ -34,7 +34,7 @@ from typing import Any
 from scc_health_pipeline.audits.geography_audits import AuditReport
 from scc_health_pipeline.sources.manifest import load_manifest
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 # Declared cadence (days) per source_id -- how often the *publisher*
 # refreshes this dataset, used as the staleness-window unit. Sources

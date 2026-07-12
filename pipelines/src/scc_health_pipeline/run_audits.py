@@ -8,6 +8,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from scc_health_pipeline.audits.analytics_audits import run_analytics_audits
 from scc_health_pipeline.audits.core_sources_audits import run_core_sources_audits
 from scc_health_pipeline.audits.geography_audits import run_geography_audits
 from scc_health_pipeline.audits.vintage_audits import run_vintage_audits
@@ -29,7 +30,16 @@ def main() -> int:
     vintage_report = run_vintage_audits()
     vintage_report.print_summary()
 
-    all_passed = geography_report.passed and core_report.passed and vintage_report.passed
+    print("\nRunning analytics (Phase 4) audits...")
+    analytics_report = run_analytics_audits(WAREHOUSE_PATH)
+    analytics_report.print_summary()
+
+    all_passed = (
+        geography_report.passed
+        and core_report.passed
+        and vintage_report.passed
+        and analytics_report.passed
+    )
     if not all_passed:
         print("\nOne or more audit suites FAILED.")
         return 1

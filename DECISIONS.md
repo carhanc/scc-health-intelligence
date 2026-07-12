@@ -254,6 +254,136 @@ Each record: context, decision, rationale, alternatives considered, and conseque
 
 **Consequences:** The two classifiers' rule tables (`_CADENCE_DAYS`, `_INTENTIONALLY_FIXED_VINTAGE`) must be kept in sync manually; both files carry a comment cross-referencing the other. A future refactor could extract just this pure-logic module into a shared, dependency-free `packages/` module if drift becomes a problem.
 
+### DEC-023 — Phase 4 domain scope: 5 tract-level scored domains; ED utilization pressure is not built as a tract-level domain
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §4 lists 7 candidate domains including "ED utilization pressure." HCAI's ED patient-county data (Phase 3) is native to *patient county of residence*, not tract, and Santa Clara County is the only county present in this dataset — there is no real tract-level allocation basis for it (a ZIP-to-tract crosswalk exists, but HCAI's patient-county file is aggregated by county, not ZIP, so the crosswalk cannot be applied here).
+
+**Decision:** Phase 4 builds 5 tract-level scored domains (health_burden, access_barriers, environmental_burden, resource_accessibility, workforce_shortage) plus the cross-cutting data_confidence domain computed alongside every score. ED utilization pressure is **not** built as a scored domain; HCAI county-level ED data is instead used exclusively as an independent convergent/criterion-validation input candidate (see DEC-033).
+
+**Rationale:** Fabricating a tract-level ED-pressure value from a single county total would require either inventing an allocation with no defensible basis or silently treating the county total as if it applied uniformly to every tract — both violate CLAUDE.md's prohibition on fabricating or backfilling unavailable data. A genuine tract-level utilization metric requires the ZIP-level patient-origin data (`utilization.hcai_patient_origin`) crosswalked through the Phase 2 ZCTA-tract relationship, which is explicitly reserved for Phase 7 (Utilization Lab), the phase docs/07 assigns this exact "native-geography display with allocated-tract-estimate labeling and crosswalk-uncertainty disclosure" work to.
+
+**Consequences:** Scenario weight configs in `config/scenarios.yml` reference only the 5 available domains; docs/03 §7.2's suggested scenarios that lean on "ED pressure" are adapted with a `notes` field explaining the substitution. `MODEL_CARD.md` and `DATA_DICTIONARY.md` record this gap explicitly rather than silently.
+
+### DEC-024 — `resource_accessibility` and `workforce_shortage` domains use straight-line distance, not network travel time
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §12.3 requires network travel time (OSM/OSMnx routing) as the preferred method, explicitly permitting straight-line distance only as a clearly-labeled fallback. Full network routing requires an OSM road-network graph and routing engine, which is `docs/07_BUILD_PHASES.md` Phase 6 (Access Lab) scope, not yet built.
+
+**Decision:** `pipelines/src/scc_health_pipeline/routing/straight_line.py` implements haversine great-circle distance as the Phase 4 baseline for both `resource_accessibility` (nearest clinical-care site) and `workforce_shortage` (HPSA proximity) metrics, and for the location-allocation optimizer's demand-to-site coverage matrix. Every value/result produced through this module carries `method="straight_line_screening"`, propagated into the metric registry's `interpretation` field, the optimizer's `assumptions` list, and the data-confidence `geography_quality_component` (scored 0.7 vs. 1.0 for native/direct metrics).
+
+**Rationale:** Matches docs' explicit fallback-labeling requirement exactly ("If only straight-line distance is available, label it explicitly") rather than either fabricating network results or leaving these domains unbuilt until Phase 6.
+
+**Consequences:** Every explainability/recommendation response surfaces this limitation verbatim so a user never mistakes a straight-line proxy for a real travel time. Phase 6 will add true network routing and can then either replace these metrics or add a second, more accurate metric alongside them (a versioning decision to be made then, per `MODEL_CARD.md`'s "Update process").
+
+### DEC-025 — HRSA MUA/P workforce-shortage assignment uses a direct tract-code join via the source's own `census_tract_raw` field, not a distance proxy
+
+**Context:** Unlike HPSA records, HRSA's national `MUA_DET.csv` carries a `census_tract_raw` field (format e.g. `"5043.21"`) for each Santa Clara County MUA/P designation. Converting this to the standard 6-digit TIGER tract code (`"504321"`, via `str.replace(".", "") + zero-pad`) and joining against `geo.tracts.tract_code` matched 46 of 48 Santa Clara County MUA/P records to a real, current 2020 tract.
+
+**Decision:** `metrics/precomputed_geospatial.py::compute_workforce_shortage_inputs` uses this direct join (not a straight-line proximity proxy) for the `mua_designated_flag` metric. The 2 unmatched records (`5044.17`, `5016.00` — likely referencing a since-renumbered or non-current tract) are excluded and logged in `WorkforceShortageDiagnostics`, not silently dropped.
+
+**Rationale:** A genuine source-provided tract identifier is strictly more accurate than any distance-based proxy this platform could construct; using it where available, and being honest about the 2 unmatched records, is more defensible than applying a uniform straight-line method to every workforce-shortage input regardless of whether better data exists.
+
+**Consequences:** `workforce_shortage`'s two component metrics use two different methods (`mua_designated_flag`: direct match; `hpsa_proximity_score`: straight-line proxy, DEC-026) — both documented individually in `config/metrics.yml`'s `interpretation` field so neither is silently assumed to share the other's accuracy characteristics.
+
+### DEC-026 — HPSA-based workforce-shortage signal limited to "Designated," coordinate-bearing (facility-anchored) records only
+
+**Context:** Of 148 Santa Clara County HPSA records in `resources.hrsa_hpsa` (Phase 3), only 39 are both status="Designated" (currently active) and carry real point coordinates (facility-anchored auto-HPSA designations, e.g. a specific clinic). The remaining 109 are either area-based designations without point geometry (which would require HPSA polygon boundaries this platform does not ingest) or are Withdrawn/Proposed-for-Withdrawal (no longer active).
+
+**Decision:** `hpsa_proximity_score` sums `hpsa_score / (1 + distance_miles)` over only these 39 Designated, coordinate-bearing records within a 10-mile radius of each tract's internal point. The excluded 109 records remain fully visible in the raw `resources.hrsa_hpsa` table (Phase 3) and in the API's `/api/v1/data-explorer` — they are absent only from this specific derived tract-level score.
+
+**Rationale:** Including inactive (Withdrawn) designations would overstate current shortage; including area-based designations without their real polygon geometry would require guessing a boundary, which CLAUDE.md prohibits. Restricting to verified-active, verified-located records is the honest subset.
+
+**Consequences:** `hpsa_proximity_score` understates total HPSA-documented shortage (109 records excluded) — disclosed in the metric's `limitations` field. A true polygon-based HPSA-to-tract overlay is a documented future improvement, not attempted here without the underlying boundary data.
+
+### DEC-027 — `access_barriers` has no `language_navigation` subdomain in Phase 4 (documented gap, not a silent one)
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §4.2 lists "limited English proficiency" and a "language/navigation" subdomain among access_barriers' candidate components. No ACS language-isolation table (e.g. C16002) was ingested in Phase 3 (DEC-020's narrowed 3-table ACS scope), and no PLACES measure covers language proficiency.
+
+**Decision:** `access_barriers` is scored across 4 subdomains only (affordability_coverage, mobility, functional_access, material_hardship) — the domain-coverage-threshold mechanism (`scoring/domain_scores.py`, docs §6.2) correctly treats this as a permanently-absent 5th subdomain for every tract, not a per-tract missing value, and every `access_barriers` score's coverage_fraction and explainability response discloses exactly which subdomains contributed.
+
+**Rationale:** CLAUDE.md prohibits fabricating a value for a genuinely unavailable measure; the correct response to missing source data is an honest, documented gap, which the coverage-threshold mechanism already models correctly without new code.
+
+**Consequences:** Adding a language-isolation ACS table (e.g. C16002) in a future session would only require registering new metrics under a `language_navigation` subdomain in `config/metrics.yml` — no scoring-engine change, since equal-subdomain-weighting and coverage-threshold handling are already generic.
+
+### DEC-028 — The "utilization-first" sensitivity preset is renamed "systemic-pressure-first"
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §9.1 names 5 standard sensitivity presets including "utilization-first," implicitly assuming a tract-level ED-utilization domain to weight heavily. DEC-023 establishes that no such domain exists in Phase 4.
+
+**Decision:** `config/scenarios.yml`'s 5th named preset is `systemic_pressure_first`, weighting `resource_accessibility` and `workforce_shortage` most heavily (0.30 each) as the closest available proxies for systemic care-seeking friction, with a `notes` field cross-referencing this decision.
+
+**Rationale:** Silently repurposing the "utilization-first" label for a preset that doesn't actually weight utilization would be misleading; renaming it to describe what it actually weights is more honest. The preset can be renamed back (or a true utilization-first preset added alongside it) once Phase 7 builds a real tract-level utilization metric.
+
+**Consequences:** `MODEL_CARD.md`'s sensitivity section documents this substitution explicitly so a future reviewer does not mistake it for docs' literal utilization-first preset.
+
+### DEC-029 — Monte Carlo and Dirichlet weight-sensitivity reproducibility relies on a single global seed plus deterministic sorted iteration order, not per-cell hashed seeds
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §8.3 requires "a deterministic seed" such that repeated runs produce identical output (verified directly in `pipelines/tests/test_monte_carlo.py::test_monte_carlo_reproducible_under_fixed_seed`).
+
+**Decision:** `uncertainty/monte_carlo.py` and `scoring/sensitivity.py` each construct one `numpy.random.default_rng(seed)` generator per call and consume it sequentially, iterating tracts and metrics in a fixed sorted order (`sorted(all_tract_geoids)`, metric-registry declaration order) — never Python's built-in `hash()` (which is randomized per-process via `PYTHONHASHSEED` unless explicitly disabled) and never a per-cell seed derived from tract/metric identity.
+
+**Rationale:** A single sequentially-consumed generator with deterministic iteration order is simpler than per-cell hashed seeding and is sufficient to guarantee bit-identical output for a fixed (seed, input-data) pair, which is the actual requirement — the draws for different tracts/metrics are not required to be mutually independent across re-runs, only for the *whole simulation* to be reproducible end to end.
+
+**Consequences:** Changing the order metrics are registered in `config/metrics.yml`, or the seed itself, changes the exact simulated values (though not their statistical properties) — `analytics.monte_carlo_results` and `analytics.weight_sensitivity_results` both persist `seed` and `n_draws` per row precisely so this is always inspectable, matching docs §18's reproducibility-metadata requirement.
+
+### DEC-030 — The API reads precomputed `analytics.*` warehouse tables rather than re-deriving scoring/explainability logic
+
+**Context:** Unlike Phase 3's freshness classifier (DEC-022, simple date arithmetic, safely duplicable), Phase 4's scoring/explainability/recommendation logic (equal-subdomain-weighting cascade, coverage-threshold suppression, Monte Carlo propagation, Dirichlet sensitivity, tautology-guarded correlation) is intricate enough that reimplementing it independently in the API would risk drift and silent inconsistency between what the pipeline computes and what the API reports.
+
+**Decision:** `run_analytics_pipeline.py` persists every score, explanation component, confidence breakdown, uncertainty interval, sensitivity result, and recommendation-supporting metric contribution into `analytics.*` warehouse tables. `apps/api/src/scc_health_api/routes/analytics.py` only queries and assembles these tables (joins, formatting) — it contains no scoring formulas, percentile logic, or weighting math of its own.
+
+**Rationale:** This is a stronger, not weaker, form of DEC-022's principle: instead of choosing between "duplicate the logic" and "import the heavy pipeline package," precomputing and persisting the *output* of that logic lets the API stay dependency-light while guaranteeing every number it serves was produced by the exact same tested code path (`pipelines/tests/test_domain_scores.py`, `test_scenario_scores.py`, `test_explainability.py`, etc.) — directly satisfying CLAUDE.md's "every numeric answer from the copilot [and, by the same logic, the API] must come from tested analytics tools... not freehand model arithmetic."
+
+**Consequences:** `analytics.metric_contributions` (66,504 rows for 7 scenarios × 408 tracts × ~5-10 relevant metrics each) is materialized in full rather than computed on demand — a real storage/pipeline-runtime cost, accepted because it eliminates an entire class of API/pipeline drift bugs. `pipelines/src/scc_health_pipeline/audits/analytics_audits.py::_audit_contributions_sum_to_scenario_score` cross-checks this identity against the live warehouse on every `make audit` run, and `apps/api/tests/test_analytics_routes.py::test_explain_score_for_top_ranked_tract` re-verifies it through the live API response.
+
+### DEC-031 — ACS `acs_disability_rate`'s combined margin of error across its 12-line sum is not computed (uncertainty_type: none, not a fabricated approximation)
+
+**Context:** `acs_disability_rate` (ACS table B18101) sums 12 separate "with a disability" lines across age/sex breakdowns, each individually carrying its own ACS margin of error in `social.acs_observations`. Correctly propagating a combined MOE across a 12-term sum requires the Census Bureau's documented sum-of-estimates MOE formula (root-sum-of-squares of component MOEs, with an adjustment when more than one component's MOE is not significant relative to its estimate) applied consistently across all 12 lines.
+
+**Decision:** `metrics/registry.py::_evaluate_acs_sum_ratio` computes the point estimate (the sum-then-ratio) but explicitly marks this metric `uncertainty_type: "none"` in `config/metrics.yml`, rather than approximating the combined MOE incorrectly (e.g. by naively reusing the single-ratio propagation formula built for `acs_ratio`, which is not valid for a 12-term sum).
+
+**Rationale:** `metrics/registry.py::_evaluate_acs_ratio` already documents (per docs §8.1) that its two-term ratio MOE is "an approximation... recorded" — extending that same approximation to a 12-term sum without verifying it against the Census Bureau's actual sum-of-estimates formula would risk silently reporting a materially wrong uncertainty figure, which is worse than honestly reporting none.
+
+**Consequences:** `acs_disability_rate` is excluded from Monte Carlo perturbation (no standard_error to sample from) and does not contribute to the `precision_component` of `data_confidence` for scenarios that use it. This is recorded as a real, disclosed limitation in the metric's own `limitations` field, not silently absorbed into the domain score's apparent precision. A future session implementing the Census Bureau's exact sum-of-estimates MOE formula can flip this to `acs_moe` without any other code change.
+
+### DEC-032 — CalEnviroScreen's statewide percentile is used only as a raw input value, then re-ranked county-relative like every other metric
+
+**Context:** CalEnviroScreen 5.0's `PollutionP`/`PopCharP` fields are *statewide* percentiles (rank among all California tracts). `docs/03_ANALYTICS_METHODS.md` §2.3/§5.4 explicitly warns: "Never mix county and state percentiles without labeling."
+
+**Decision:** `ces_pollution_burden`/`ces_population_vulnerability` metrics treat the CES statewide percentile as this metric's *raw value* (like any other metric's raw value), which then goes through the same `county_relative_percentile()` re-ranking as every other metric in the registry — producing a Santa-Clara-County-relative percentile, never displayed as-is alongside a literal county percentile without the distinction being labeled.
+
+**Rationale:** Keeps every domain score's internal percentile semantics uniform (always "rank among the 408 Santa Clara County tracts") rather than having environmental_burden silently mean something different ("rank among all of California") from every other domain — the exact confusion docs §5.4 warns against.
+
+**Consequences:** A tract's `environmental_burden` domain score reflects its pollution/vulnerability burden *relative to other Santa Clara County tracts*, not relative to all of California — documented in each metric's `interpretation` field in `config/metrics.yml` and surfaced through the explainability API's per-metric detail.
+
+### DEC-033 — Phase 4 correlation diagnostics use CDC/ATSDR SVI as a convergent-validity check; a criterion-validity check against HCAI ED utilization is not computed
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §15.2 lists both "external established indices... as convergent validity" (e.g. SVI) and "HCAI ED utilization... independent outcome" as valid independent-criteria categories. Santa Clara County is the *only* county present in `utilization.hcai_ed_patient_county` (Phase 3) — there is exactly one county-level data point, which makes a Spearman/Pearson correlation (which requires N>1 independent observations) statistically undefined, not merely imprecise.
+
+**Decision:** `run_analytics_pipeline.py` computes and persists a convergent-validity correlation (Spearman + bootstrap 95% CI, guarded by `validation/tautology_guard.py`) between every scenario's score and CDC/ATSDR SVI's overall percentile (`RPL_THEMES`, n=408 tracts) for all 7 scenarios. No criterion-validity check against HCAI ED data is attempted or fabricated with an invented multi-point comparison.
+
+**Rationale:** Attempting a "correlation" against a single county-level data point would either silently fail or require inventing a fake multi-point series — both violate CLAUDE.md's data-integrity rules. SVI is a genuine, real, tract-level (n=408) independent index never used as a metric-registry input (confirmed by the tautology guard on every run), making it a statistically valid and honest choice for Phase 4's diagnostic.
+
+**Consequences:** A true criterion-validity check against ED utilization requires a genuine tract-level utilization metric, which DEC-023 defers to Phase 7 (via the ZIP-level `utilization.hcai_patient_origin` crosswalked through the ZCTA-tract relationship). `RISK_REGISTER.md` records this as an open item, not a completed validation.
+
+### DEC-034 — Location-allocation optimizer candidate sites are VTA high-frequency transit stops, not community centers/libraries
+
+**Context:** `docs/03_ANALYTICS_METHODS.md` §13.2 lists community centers, libraries, public clinics, transit hubs, and schools as valid mobile-clinic candidate-site categories. This platform has not ingested a community-center or library point layer (not in the Phase 3 source registry); VTA GTFS stops (`resources.transit_stop_frequency_summary`, Phase 3) are real, available, and explicitly named as a valid category ("transit hubs").
+
+**Decision:** `run_analytics_pipeline.py`'s location-allocation demonstration run uses the top 50 VTA stops by `distinct_trips_serving_stop` (a real ridership-frequency proxy) as candidate sites, `health_burden` domain score (÷100) as the per-tract need weight, and ACS `B01003` total population as the demand weight.
+
+**Rationale:** Using a real, available, explicitly-sanctioned candidate category is preferable to fabricating a community-center/library dataset or leaving the optimizer entirely unexercised against real Santa Clara County geography.
+
+**Consequences:** `optimization/location_allocation.py`'s `assumptions` field explicitly discloses the candidate-site limitation on every result. `analytics.optimization_runs` persists 3 real solved scenarios (k=5/2mi: OPTIMAL; k=10/2mi: OPTIMAL; k=10/1mi: correctly INFEASIBLE given the 50%-high-need equity constraint at that tighter radius) — the INFEASIBLE result is retained and surfaced, not hidden, since a transparent infeasibility is itself meaningful decision-support information.
+
+### DEC-035 — Phase 4 `analytics.*` tables exist only in the live warehouse; no offline demo snapshot yet
+
+**Context:** `make demo` (Phase 2's offline geography snapshot mechanism, DEC-015/DEC-016) has not been extended to cover Phase 3 or Phase 4 tables (a gap already disclosed for Phase 3 in `TASKS.md`).
+
+**Decision:** `apps/api/src/scc_health_api/routes/analytics.py` returns a truthful 503 with an explicit explanatory message when `analytics.*` tables are absent from whichever warehouse is resolved, distinct from the generic "no warehouse at all" 503 — rather than silently falling back to a partial or fabricated response.
+
+**Rationale:** Consistent with the same honest-unavailable-state principle applied throughout this build; extending `make demo` to freeze a full analytics snapshot (25 metrics × 7 scenarios × 408 tracts, including Monte Carlo/sensitivity draws) is a nontrivial scope addition better scheduled deliberately than squeezed into Phase 4's already-large surface.
+
+**Consequences:** `RISK_REGISTER.md` records this as an open, disclosed gap. A future session extending `make demo` should freeze the `analytics.*` tables the same way `data/demo/geography/*.parquet` freezes Phase 2 output (DEC-016's pattern).
+
 ---
 
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

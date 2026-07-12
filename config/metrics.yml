@@ -1,3 +1,527 @@
-# Metric registry — drives every score and UI label (PLAN.md §10).
-# Schema per docs/03_ANALYTICS_METHODS.md §3. Populated starting Phase 4.
-metrics: []
+# Metric registry — drives every score and UI label (PLAN.md §10,
+# docs/03_ANALYTICS_METHODS.md §3). No formula is duplicated elsewhere:
+# pipelines/src/scc_health_pipeline/scoring/* and the API both read
+# metric metadata from here.
+#
+# Field reference (see metrics/registry.py::MetricDefinition):
+#   transform: "none" (direct column read) | "acs_ratio" (numerator/
+#     denominator ACS lines) | "acs_sum_ratio" (sum of several ACS lines
+#     over a denominator line) | "precomputed" (reads a table already
+#     built by an earlier pipeline stage, e.g. a geospatial join).
+#   uncertainty_type: "places_ci" (95% CI bounds present) | "acs_moe"
+#     (standard_error present, derived from a 90% MOE) | "none" (source
+#     provides no usable uncertainty field for this specific metric).
+#
+# Domain/subdomain mapping decisions and data-availability gaps (e.g. no
+# language/navigation subdomain — no ACS language-isolation table was
+# ingested in Phase 3, DEC-020) are recorded in DECISIONS.md.
+
+metrics:
+  # ============================================================
+  # health_burden (source: CDC PLACES 2025, health.places_observations)
+  # ============================================================
+  - metric_id: places_diabetes_prevalence
+    label: "Diabetes prevalence"
+    domain: health_burden
+    subdomain: cardiometabolic
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: DIABETES}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who report having been told by a health professional that they have diabetes."
+    interpretation: "A modeled small-area estimate from CDC PLACES (BRFSS 2022-2023), not a direct tract-level survey — see limitations."
+    limitations: "Model-based small-area estimate; subject to modeled-estimate uncertainty; not a tract census."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_high_blood_pressure
+    label: "High blood pressure prevalence"
+    domain: health_burden
+    subdomain: cardiometabolic
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: BPHIGH}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who report having been told they have high blood pressure."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; not a tract census."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_coronary_heart_disease
+    label: "Coronary heart disease prevalence"
+    domain: health_burden
+    subdomain: cardiometabolic
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: CHD}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who report having been told they have coronary heart disease."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; not a tract census."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_stroke
+    label: "Stroke prevalence"
+    domain: health_burden
+    subdomain: cardiometabolic
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: STROKE}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who report having had a stroke."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; not a tract census."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_obesity
+    label: "Obesity prevalence"
+    domain: health_burden
+    subdomain: cardiometabolic
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: OBESITY}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults with a body mass index classified as obese."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; not a tract census; BMI-based, does not capture body composition."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_high_cholesterol
+    label: "High cholesterol prevalence"
+    domain: health_burden
+    subdomain: cardiometabolic
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: HIGHCHOL}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults screened who report having been told they have high cholesterol."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; among adults ever screened, not the full adult population."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_depression
+    label: "Depression prevalence"
+    domain: health_burden
+    subdomain: mental_health
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: DEPRESSION}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who report having been told they have a depressive disorder."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported diagnosis, not a clinical screen."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_frequent_mental_distress
+    label: "Frequent mental distress"
+    domain: health_burden
+    subdomain: mental_health
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: MHLTH}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting 14+ days of poor mental health in the past 30 days."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_frequent_physical_distress
+    label: "Frequent physical distress"
+    domain: health_burden
+    subdomain: functional_physical
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: PHLTH}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting 14+ days of poor physical health in the past 30 days."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_general_health_fair_or_poor
+    label: "Fair or poor self-rated health"
+    domain: health_burden
+    subdomain: functional_physical
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: GHLTH}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who rate their general health as fair or poor."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported and subjective."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_any_disability
+    label: "Any disability prevalence"
+    domain: health_burden
+    subdomain: functional_physical
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: DISABILITY}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting any disability (BRFSS self-report)."
+    interpretation: "Modeled small-area estimate from CDC PLACES; a health-burden framing of disability, distinct from the ACS population-count-based access_barriers disability metric (docs/03 §4.1 and §4.2 both list disability as a candidate, from different measurement approaches)."
+    limitations: "Model-based small-area estimate; self-reported; BRFSS adult (18+) population only, unlike the ACS all-ages count."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_current_smoking
+    label: "Current cigarette smoking"
+    domain: health_burden
+    subdomain: behavior_risk
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: CSMOKING}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults who currently smoke cigarettes."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_physical_inactivity
+    label: "Physical inactivity"
+    domain: health_burden
+    subdomain: behavior_risk
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: LPA}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting no leisure-time physical activity."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported; leisure-time only, does not capture occupational activity."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_binge_drinking
+    label: "Binge drinking"
+    domain: health_burden
+    subdomain: behavior_risk
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: BINGE}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting binge drinking in the past 30 days."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  # ============================================================
+  # access_barriers (sources: CDC PLACES social-needs/prevention
+  # measures + ACS 2020-2024 5-year)
+  # ============================================================
+  - metric_id: places_uninsured
+    label: "Lack of health insurance"
+    domain: access_barriers
+    subdomain: affordability_coverage
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: ACCESS2}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults aged 18-64 currently lacking health insurance."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; working-age adults only (18-64), does not cover children or seniors."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: acs_poverty_rate
+    label: "Poverty rate"
+    domain: access_barriers
+    subdomain: affordability_coverage
+    source_id: acs_5year_b17001
+    source_table: social.acs_observations
+    unit: "%"
+    direction: concern_high
+    transform: acs_ratio
+    numerator_variable: B17001_E002
+    denominator_variable: B17001_E001
+    uncertainty_type: acs_moe
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    population_denominator: "B17001_E001 (population for whom poverty status is determined)"
+    plain_language_definition: "Share of the population with income in the past 12 months below the federal poverty level."
+    interpretation: "Direct ACS 5-year survey estimate (2020-2024), not a model — but subject to sampling margin of error at the tract level."
+    limitations: "5-year rolling estimate, not a single-year snapshot; small-tract estimates carry wider margins of error."
+    citation: "U.S. Census Bureau ACS 2020-2024 5-year, table B17001. DATA_MANIFEST.json source_id=acs_5year_b17001."
+
+  - metric_id: places_transportation_barriers
+    label: "Transportation barriers"
+    domain: access_barriers
+    subdomain: mobility
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: LACKTRPT}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting lack of reliable transportation as a barrier to daily activities or medical care."
+    interpretation: "Modeled small-area estimate from CDC PLACES; used as the mobility-barrier proxy in place of an ACS no-vehicle-household count, which was not ingested in Phase 3 (DEC-020)."
+    limitations: "Model-based small-area estimate; self-reported; broader than 'no vehicle in household' (also captures transit/access barriers)."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: acs_disability_rate
+    label: "Disability rate (all ages, ACS)"
+    domain: access_barriers
+    subdomain: functional_access
+    source_id: acs_5year_b18101
+    source_table: social.acs_observations
+    unit: "%"
+    direction: concern_high
+    transform: acs_sum_ratio
+    numerator_variables:
+      - B18101_E004
+      - B18101_E007
+      - B18101_E010
+      - B18101_E013
+      - B18101_E016
+      - B18101_E019
+      - B18101_E023
+      - B18101_E026
+      - B18101_E029
+      - B18101_E032
+      - B18101_E035
+      - B18101_E038
+    denominator_variable_sum: B18101_E001
+    uncertainty_type: none
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    population_denominator: "B18101_E001 (total population for whom disability status is determined)"
+    plain_language_definition: "Share of the total population (all ages) reporting a disability, summed across every age/sex breakdown in ACS table B18101."
+    interpretation: "Direct ACS 5-year survey estimate (2020-2024), population-count-based and all-ages, distinct from the BRFSS-based adult self-report in places_any_disability."
+    limitations: "Margin-of-error propagation across a 12-line sum is not implemented (uncertainty_type: none) -- the underlying ACS lines each carry a MOE in social.acs_observations, but this derived sum's combined uncertainty is not yet computed; treat the point estimate with appropriate caution for small tracts."
+    citation: "U.S. Census Bureau ACS 2020-2024 5-year, table B18101. DATA_MANIFEST.json source_id=acs_5year_b18101."
+
+  - metric_id: places_housing_insecurity
+    label: "Housing insecurity"
+    domain: access_barriers
+    subdomain: material_hardship
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: HOUSINSECU}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting housing insecurity (worry about losing housing) in the past 12 months."
+    interpretation: "Modeled small-area estimate from CDC PLACES; used in place of an ACS housing-cost-burden metric, which was not ingested in Phase 3 (DEC-020)."
+    limitations: "Model-based small-area estimate; self-reported; captures worry/insecurity, not a specific cost-burden threshold."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  - metric_id: places_food_insecurity
+    label: "Food insecurity"
+    domain: access_barriers
+    subdomain: material_hardship
+    source_id: cdc_places_tract_2025
+    source_table: health.places_observations
+    source_field: data_value
+    source_filter: {measure_id: FOODINSECU}
+    unit: "%"
+    direction: concern_high
+    transform: none
+    uncertainty_type: places_ci
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Share of adults reporting food insecurity (worry about running out of food) in the past 12 months."
+    interpretation: "Modeled small-area estimate from CDC PLACES."
+    limitations: "Model-based small-area estimate; self-reported."
+    citation: "CDC PLACES, 2025 release, tract-level. DATA_MANIFEST.json source_id=cdc_places_tract_2025."
+
+  # ============================================================
+  # environmental_burden (source: CalEnviroScreen 5.0)
+  # Percentile fields re-percentiled county-relative below (docs/03
+  # §2.3/§5.4: never mix a statewide percentile with a county-relative
+  # one without labeling -- here the CES statewide percentile is used
+  # only as this metric's *raw value*, then re-ranked among Santa Clara
+  # County's 408 tracts like every other metric, never displayed as-is
+  # alongside a county percentile).
+  # ============================================================
+  - metric_id: ces_pollution_burden
+    label: "Pollution burden (CalEnviroScreen)"
+    domain: environmental_burden
+    subdomain: pollution_burden
+    source_id: calenviroscreen_5_0
+    source_table: context.calenviroscreen
+    source_field: PollutionP
+    unit: "statewide percentile (0-100)"
+    direction: concern_high
+    transform: none
+    uncertainty_type: none
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "CalEnviroScreen 5.0's combined pollution-burden score (statewide percentile), covering exposures (ozone, PM2.5, diesel, pesticides, toxic releases, traffic) and environmental effects (cleanups, groundwater threats, hazardous waste, impaired waters, solid waste sites)."
+    interpretation: "This is CalEnviroScreen's own statewide percentile, used here only as a raw input value that this platform re-ranks county-relative (see metric_id note above) -- never displayed as a statewide percentile alongside a county percentile without labeling."
+    limitations: "Statewide percentile as sourced; re-ranking it county-relative changes its meaning from 'burden relative to all of California' to 'burden relative to Santa Clara County' -- both are disclosed via the explainability API's source/vintage field."
+    citation: "CalEnviroScreen 5.0 (final), OEHHA/CalEPA. DATA_MANIFEST.json source_id=calenviroscreen_5_0."
+
+  - metric_id: ces_population_vulnerability
+    label: "Population vulnerability (CalEnviroScreen)"
+    domain: environmental_burden
+    subdomain: population_vulnerability
+    source_id: calenviroscreen_5_0
+    source_table: context.calenviroscreen
+    source_field: PopCharP
+    unit: "statewide percentile (0-100)"
+    direction: concern_high
+    transform: none
+    uncertainty_type: none
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "CalEnviroScreen 5.0's combined population-characteristics score (statewide percentile), covering sensitive populations (asthma, low birth weight, cardiovascular disease, diabetes) and socioeconomic factors (education, linguistic isolation, poverty, unemployment, housing burden)."
+    interpretation: "Statewide CalEnviroScreen percentile, re-ranked county-relative in this platform's domain scoring (see ces_pollution_burden note)."
+    limitations: "Some component indicators (poverty, linguistic isolation) overlap conceptually with access_barriers metrics from other sources -- CalEnviroScreen's own methodology separates pollution burden from population vulnerability, which this platform preserves as two distinct subdomains rather than re-deriving its own weighting."
+    citation: "CalEnviroScreen 5.0 (final), OEHHA/CalEPA. DATA_MANIFEST.json source_id=calenviroscreen_5_0."
+
+  # ============================================================
+  # resource_accessibility (precomputed straight-line screening --
+  # DEC-024. Full network-routing version is Phase 6 scope.)
+  # ============================================================
+  - metric_id: nearest_clinical_care_distance
+    label: "Distance to nearest clinical-care site (straight-line)"
+    domain: resource_accessibility
+    subdomain: clinical_care_access
+    source_id: derived_resource_accessibility_inputs
+    source_table: analytics.resource_accessibility_inputs
+    source_field: nearest_clinical_care_distance_miles
+    unit: "miles"
+    direction: concern_high
+    transform: precomputed
+    uncertainty_type: none
+    minimum_coverage: 0.9
+    allowed_geographies: [tract]
+    plain_language_definition: "Straight-line distance from the tract's internal point to the nearest clinical-care site (HCAI-licensed general acute care hospital, community/free/surgical clinic, or chronic dialysis clinic; or an active HRSA health center site)."
+    interpretation: "A screening-only proxy for access, computed as straight-line ('as the crow flies') distance, NOT a network walking/driving/transit travel time. Every value carries method=straight_line_screening."
+    limitations: "Straight-line distance systematically understates real travel time/distance, especially where road networks are indirect; candidate facilities are not deduplicated across HCAI and HRSA source tables (Phase 6 will add both network routing and facility deduplication)."
+    citation: "Derived from resources.hcai_facilities (HCAI, CC-BY) and resources.hrsa_health_center_sites (HRSA, public domain); tract anchor from geo.tracts internal point (TIGER/Line 2020)."
+
+  # ============================================================
+  # workforce_shortage (precomputed -- DEC-025 direct MUA tract join,
+  # DEC-026 HPSA point-based straight-line proximity for Designated,
+  # coordinate-bearing HPSA records only)
+  # ============================================================
+  - metric_id: mua_designated_flag
+    label: "Medically Underserved Area/Population designation present"
+    domain: workforce_shortage
+    subdomain: shortage_designation
+    source_id: derived_workforce_shortage_inputs
+    source_table: analytics.workforce_shortage_inputs
+    source_field: mua_designated
+    unit: "binary (0/1)"
+    direction: concern_high
+    transform: precomputed
+    uncertainty_type: none
+    minimum_coverage: 1.0
+    allowed_geographies: [tract]
+    plain_language_definition: "Whether this tract contains at least one currently-Designated HRSA Medically Underserved Area/Population (MUA/P) area, matched directly via the source data's own census-tract field."
+    interpretation: "A direct designation match (not a distance proxy) -- HRSA's MUA_DET.csv carries a real census-tract identifier for each MUA/P record, joined here via a verified tract-code format match (46 of 48 Santa Clara County MUA/P records matched; 2 did not match any current 2020 tract and are excluded, logged in the pipeline run output, not silently dropped)."
+    limitations: "Binary presence/absence, not a graded intensity; 2 of 48 source MUA/P records could not be matched to a current tract boundary."
+    citation: "HRSA MUA_DET.csv. DATA_MANIFEST.json source_id=hrsa_mua_p."
+
+  - metric_id: hpsa_proximity_score
+    label: "Nearby Health Professional Shortage Area intensity (straight-line)"
+    domain: workforce_shortage
+    subdomain: shortage_intensity
+    source_id: derived_workforce_shortage_inputs
+    source_table: analytics.workforce_shortage_inputs
+    source_field: hpsa_proximity_score
+    unit: "inverse-distance-weighted HPSA score sum"
+    direction: concern_high
+    transform: precomputed
+    uncertainty_type: none
+    minimum_coverage: 1.0
+    allowed_geographies: [tract]
+    plain_language_definition: "Sum of nearby (within 10 miles), currently-Designated, facility-anchored HPSA scores, each weighted by 1/(1+distance in miles) from the tract's internal point."
+    interpretation: "A screening-only straight-line proximity proxy (method=straight_line_screening), not a network-distance or area-overlap-based HPSA assignment. Only facility-anchored HPSA records with real point coordinates and 'Designated' (active) status are included (39 of 148 Santa Clara County HPSA records) -- area-based HPSA records without point geometry, and Withdrawn/Proposed-for-Withdrawal records, are excluded from this score and remain visible only in the raw resources.hrsa_hpsa table."
+    limitations: "Excludes the majority of HPSA records (109 of 148) that lack usable point geometry or active status; not a substitute for a true polygon-based HPSA-to-tract overlay, which would require HPSA boundary geometry this platform does not currently ingest."
+    citation: "HRSA BCD_HPSA_FCT_DET_PC/DH/MH.csv. DATA_MANIFEST.json source_id=hrsa_hpsa_primary_care/dental/mental_health."

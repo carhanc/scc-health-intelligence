@@ -1,6 +1,6 @@
 # DATA_DICTIONARY.md
 
-**Status: geography dimension tables complete (Phase 2); raw source tables loaded (Phase 3); derived metric/domain-score tables pending Phase 4.** This document is populated incrementally as each source adapter and metric is implemented. It is the human-readable companion to `config/metrics.yml` (machine-readable, authoritative for scoring/UI) and `DATA_MANIFEST.json` (machine-readable, authoritative for provenance). No metric may appear in the product before it has an entry here.
+**Status: geography dimension tables complete (Phase 2); raw source tables loaded (Phase 3); derived metric/domain-score/scenario/uncertainty/sensitivity/optimization tables loaded (Phase 4).** This document is populated incrementally as each source adapter and metric is implemented. It is the human-readable companion to `config/metrics.yml` (machine-readable, authoritative for scoring/UI) and `DATA_MANIFEST.json` (machine-readable, authoritative for provenance). No metric may appear in the product before it has an entry here.
 
 Phase 3 loaded the *raw/staged source tables* listed in "Source tables (Phase 3 — implemented)" below — these are normalized, tract/facility/stop-level tables straight from each source adapter, not yet the derived, weighted, uncertainty-propagated domain-score metrics Phase 4 will build on top of them. A Phase 3 table appearing here does not mean its values are already scored into a composite index.
 
@@ -8,31 +8,85 @@ Phase 3 loaded the *raw/staged source tables* listed in "Source tables (Phase 3 
 
 Each metric entry will contain: canonical metric ID, plain-language label, definition, domain/subdomain, numerator/denominator, unit, directionality (concern_high / concern_low / neutral), source ID (linking to `DATA_MANIFEST.json` and `docs/data/source-verification.md`), geography level(s) it is valid at, vintage, uncertainty field(s) present, transformation applied, minimum coverage threshold, known limitations, and citation string.
 
-## Structure (to be populated per domain)
+## Structure (per domain — implemented Phase 4)
 
-### 1. Health burden
-_Metrics pending Phase 3–4 implementation: diabetes prevalence, obesity, hypertension, coronary heart disease, stroke, COPD, depression, frequent mental/physical distress, physical inactivity, smoking, routine checkup, uninsured (if not duplicated by ACS), food insecurity/health-related social needs, disability, self-rated health — all from CDC PLACES 2025 release. See `docs/03_ANALYTICS_METHODS.md` §4.1 for subdomain grouping (cardiometabolic, mental health, functional/physical health, behavior/risk)._
+Full per-metric detail (definition, transform, uncertainty type, limitations, citation) lives in `config/metrics.yml`; this section summarizes what is implemented per domain. See `MODEL_CARD.md` "Scoring method" for the aggregation formula and `analytics.metric_scores`/`analytics.metric_contributions` below for the persisted computed values.
 
-### 2. Access and socioeconomic barriers
-_Metrics pending: uninsured, poverty, limited English proficiency, no-vehicle households, disability, older adults, broadband access, housing cost burden, overcrowding, public coverage/Medi-Cal proxy — from ACS 2020–2024 5-year estimates. See `docs/03_ANALYTICS_METHODS.md` §4.2._
+### 1. Health burden — 16 metrics, source: CDC PLACES 2025
+Subdomains: **cardiometabolic** (diabetes, high blood pressure, coronary heart disease, stroke, obesity, high cholesterol), **mental_health** (depression, frequent mental distress), **functional_physical** (frequent physical distress, fair/poor self-rated health, any disability), **behavior_risk** (current smoking, physical inactivity, binge drinking). See `docs/03_ANALYTICS_METHODS.md` §4.1.
 
-### 3. Resource accessibility
-_Metrics pending: travel time to clinical care/FQHC/hospital/pharmacy/behavioral health/food resource, transit service frequency, resources within 15/30/45 minutes, E2SFCA score — computed in Phase 6 from HRSA/HCAI facility data + VTA GTFS + OSM network routing._
+### 2. Access and socioeconomic barriers — 7 metrics, sources: CDC PLACES + ACS 2020-2024 5-year
+Subdomains: **affordability_coverage** (PLACES uninsured rate, ACS poverty rate), **mobility** (PLACES transportation barriers), **functional_access** (ACS all-ages disability rate), **material_hardship** (PLACES housing insecurity, food insecurity). No `language_navigation` subdomain (DEC-027 — no ACS language-isolation table ingested). See `docs/03_ANALYTICS_METHODS.md` §4.2.
 
-### 4. Environmental/contextual burden
-_Metrics pending: CalEnviroScreen 5.0 component indicators (pollution burden, population vulnerability, including the two new 5.0 indicators: Diabetes Prevalence, Small Air Toxic Sites)._
+### 3. Resource accessibility — 1 metric (straight-line screening, DEC-024)
+Subdomain **clinical_care_access**: straight-line distance from each tract's internal point to the nearest clinical-care site (HCAI general acute care/community/free/surgical/dialysis clinic, or active HRSA health center). Full network-routing version (walking/driving/transit) is Phase 6 scope. See `docs/03_ANALYTICS_METHODS.md` §4.3.
 
-### 5. ED utilization pressure
-_Metrics pending: ED visits per 1,000, admissions through ED, ambulatory-care-sensitive diagnosis rate, uninsured/self-pay share, Medi-Cal share, out-of-county flow — from HCAI ED encounters + patient-origin/market-share data, Phase 7._
+### 4. Environmental/contextual burden — 2 metrics, source: CalEnviroScreen 5.0
+Subdomains **pollution_burden** (`PollutionP`) and **population_vulnerability** (`PopCharP`), each CalEnviroScreen's own statewide percentile re-ranked county-relative (DEC-032). Includes the two new-in-5.0 indicator families (Diabetes Prevalence, Small Air Toxic Sites) within CalEnviroScreen's own composite, though not broken out as separate metrics in Phase 4's registry.
 
-### 6. Workforce shortage
-_Metrics pending: HPSA designation/score, MUA/P designation, provider density (NPPES, labeled administrative only), FQHC/health-center availability — Phase 3/6._
+### 5. ED utilization pressure — not built as a tract-level domain (DEC-023)
+HCAI ED patient-county data (Phase 3) is native to county of residence; Santa Clara is the only county present, so no defensible tract-level allocation exists without fabrication. Used instead as a Phase 4 correlation-diagnostic candidate (blocked by n=1, see `analytics.correlation_diagnostics` and RISK-015); a genuine tract-level utilization metric is reserved for Phase 7.
 
-### 7. Data confidence
-_Composite domain (not "need"): source freshness, estimate precision, geography quality (native vs. crosswalked), source tier, suppression, sample/model limitations, rank stability — computed alongside every domain/scenario score, Phase 4. See `docs/03_ANALYTICS_METHODS.md` §4.7._
+### 6. Workforce shortage — 2 metrics (precomputed geospatial joins)
+Subdomain **shortage_designation**: `mua_designated_flag`, a direct tract-code join against HRSA's own `census_tract_raw` field (DEC-025, 46/48 matched). Subdomain **shortage_intensity**: `hpsa_proximity_score`, straight-line inverse-distance-weighted sum over 39 Designated, coordinate-bearing HPSA records (DEC-026).
+
+### 7. Data confidence — computed per (tract, scenario), not a domain score
+`confidence = 0.35·coverage + 0.30·precision + 0.20·geography_quality + 0.15·freshness_source` (docs §8.4), implemented in `scoring/data_confidence.py`, persisted in `analytics.data_confidence`. Never treated as need; annotates every score rather than gating it.
 
 ### 8. Contextual/benchmark indices (not scored into composites)
-_CDC/ATSDR SVI 2022 and California Healthy Places Index 3.0 — used as independent comparison benchmarks, not folded into domain scores to avoid double-counting (per `docs/02_DATA_SOURCE_REGISTRY.md` §7.1, §7.3)._
+CDC/ATSDR SVI 2022 (`context.svi`) — used as the Phase 4 convergent-validity benchmark (DEC-033), never a metric-registry input (confirmed by the tautology guard on every pipeline run). California Healthy Places Index 3.0 — documented-blocked, no data (DEC-018).
+
+## Analytics tables (Phase 4 — implemented)
+
+All tables live in `warehouse/scc_health.duckdb`, schema `analytics`, loaded by
+`pipelines/src/scc_health_pipeline/run_analytics_pipeline.py`. Row counts are
+from the live Phase 4 build (2026-07-12). **No offline demo snapshot exists
+yet for this schema** (DEC-035/RISK-019) — every `analytics.*` table requires
+`make data` (live mode).
+
+### `analytics.workforce_shortage_inputs` / `analytics.resource_accessibility_inputs` — 408 rows each
+Precomputed geospatial join outputs (DEC-024/025/026) feeding the `workforce_shortage`/`resource_accessibility` metrics. Fields include `method = "straight_line_screening"` on every row.
+
+### `analytics.metric_scores` — 10,200 rows (25 metrics × 408 tracts)
+Per-metric, per-tract: `raw_value`, `concern_value` (direction-aligned), `percentile` (county-relative, 0-100), `standard_error`/`low_confidence_limit`/`high_confidence_limit` where the source provides them.
+
+### `analytics.domain_scores` — 2,040 rows (5 domains × 408 tracts)
+Per-domain, per-tract: `score` (`NULL`, never 0, if below the 70% subdomain-coverage threshold), `coverage_fraction`, `subdomains_present`/`subdomains_missing` (semicolon-delimited), `below_coverage_threshold`.
+
+### `analytics.scenario_scores` — 2,856 rows (7 scenarios × 408 tracts)
+Per-scenario, per-tract: `score`, `coverage_fraction` (share of configured domain weight actually present), `domains_missing`.
+
+### `analytics.metric_contributions` — 66,504 rows
+The full explainability decomposition, one row per (scenario, tract, contributing metric): `effective_weight` (cascaded equal-weighting), `contribution` (`effective_weight × percentile`), plus raw value/unit/direction/uncertainty/source/citation/limitations. Summing `contribution` for a given (tract, scenario) reproduces `analytics.scenario_scores.score` exactly (audited on every `make audit` run).
+
+### `analytics.data_confidence` — 2,856 rows
+Per-scenario, per-tract confidence score and its 4 components (see domain 7 above).
+
+### `analytics.monte_carlo_results` — 2,856 rows
+Per-scenario, per-tract: `median_score`, `ci_lower`/`ci_upper` (10th-90th percentile), `median_rank`, `rank_ci_lower`/`rank_ci_upper`, `probability_top_decile`/`probability_top_quartile`, `n_draws` (500), `seed` (42).
+
+### `analytics.weight_sensitivity_results` — 2,856 rows
+Per-scenario, per-tract Dirichlet random-weight sensitivity: `median_rank`, `rank_ci_lower`/`rank_ci_upper`, `rank_std`, `probability_top_decile`/`probability_top_quartile`, `most_influential_domain`, `n_draws` (1,000), `seed` (42).
+
+### `analytics.stability_labels` — 2,856 rows
+Per-scenario, per-tract: one of `Robust`/`Moderately stable`/`Assumption-sensitive`/`Data-limited` (see `MODEL_CARD.md` "Sensitivity").
+
+### `analytics.preset_scenario_scores` — 2,040 rows (5 presets × 408 tracts)
+Scenario-independent preset-sensitivity scores (see `MODEL_CARD.md` "Sensitivity" — `systemic_pressure_first` replaces docs' "utilization-first," DEC-028).
+
+### `analytics.correlation_diagnostics` — 7 rows (one per scenario)
+Convergent-validity Spearman/Pearson correlation + bootstrap 95% CI vs. CDC/ATSDR SVI `RPL_THEMES` (DEC-033). Every row has `is_tautological = false` (enforced by the tautology guard before computation, not merely flagged after).
+
+### `analytics.optimization_runs` — 3 rows
+Location-allocation optimizer results (mobile-clinic siting scenario, DEC-034): k=5/2mi and k=10/2mi solved OPTIMAL; k=10/1mi correctly INFEASIBLE given the 50%-high-need equity constraint at that tighter radius. Fields include `selected_sites`, `population_covered`, `high_need_population_covered`, `unserved_high_need_tracts`, `marginal_gain_per_site` is available via the underlying `OptimizationResult` dataclass (not persisted as a separate column; recomputable from `covering_sites` if needed).
+
+### Not yet implemented (deferred, documented)
+
+- A genuine tract-level `ed_utilization_pressure` domain and its criterion-validity check (Phase 7, DEC-023/DEC-033, RISK-015).
+- Network-routing versions of `resource_accessibility`/`workforce_shortage` (Phase 6, DEC-024, RISK-016).
+- `acs_disability_rate`'s combined 12-line-sum margin of error (DEC-031, RISK-018).
+- An offline demo snapshot of `analytics.*` (DEC-035, RISK-019).
+- A `language_navigation` access_barriers subdomain (DEC-027).
 
 ## Geography dimension tables (Phase 2 — implemented and audited)
 

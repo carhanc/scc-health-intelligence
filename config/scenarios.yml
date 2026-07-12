@@ -1,3 +1,185 @@
-# Named policy-lens scenario configurations (PLAN.md §10, §6.2 of
-# docs/01_UX_UI_SPEC.md). Populated starting Phase 4.
-scenarios: []
+# Named policy-lens scenario configurations (PLAN.md §10,
+# docs/03_ANALYTICS_METHODS.md §7). Each scenario is a versioned weighted
+# combination of the 5 domains built in Phase 4 (health_burden,
+# access_barriers, environmental_burden, resource_accessibility,
+# workforce_shortage). Weights sum to 1.0 within each scenario.
+#
+# docs/03 §7.2's suggested scenario list references domains this platform
+# does not yet score at tract level (e.g. a tract-level "ed_utilization_
+# pressure" domain -- HCAI ED data is native to patient county of
+# residence, not tract; see DECISIONS.md DEC-023). Each scenario below is
+# adapted to the 5 domains actually available, with the adaptation noted
+# in its `notes` field where it diverges from the doc's suggested list.
+#
+# required_metrics reference real metric_id values from config/metrics.yml
+# -- validated at load time (a scenario referencing an unregistered
+# metric_id fails the audit, per docs/03 §20 "a scenario references
+# missing metrics").
+
+scenarios:
+  - scenario_id: default_integrated_screen_v1
+    label: "Default integrated screen"
+    description: "An equally-weighted combination of all 5 domains, offered as a starting point -- the UI must still show these weights and let users choose an issue-specific scenario instead (docs/03 §7.1)."
+    weights:
+      health_burden: 0.20
+      access_barriers: 0.20
+      environmental_burden: 0.20
+      resource_accessibility: 0.20
+      workforce_shortage: 0.20
+    required_metrics: []
+    constraints:
+      minimum_confidence: 0.50
+    notes: "Equal weighting across all 5 available domains; not a claim that these are the only relevant factors."
+
+  - scenario_id: diabetes_prevention_v1
+    label: "Diabetes prevention"
+    description: "Prioritizes cardiometabolic burden together with the access and resource barriers that make prevention/management harder."
+    weights:
+      health_burden: 0.45
+      access_barriers: 0.30
+      resource_accessibility: 0.15
+      workforce_shortage: 0.10
+    required_metrics:
+      - places_diabetes_prevalence
+      - places_obesity
+      - places_physical_inactivity
+      - acs_poverty_rate
+      - places_uninsured
+    constraints:
+      minimum_confidence: 0.55
+    notes: "docs/03 §7.2 also lists 'ACS/PLACES confidence' as a domain component -- represented here via the data_confidence side-computation (docs §4.7/§8.4), not folded into the weighted score itself, per the doc's explicit instruction that confidence 'must not be treated as need.'"
+
+  - scenario_id: mobile_transit_care_v1
+    label: "Mobile or transit-linked care"
+    description: "Prioritizes health burden combined with mobility barriers and resource/workforce gaps that mobile or transit-linked outreach could help close."
+    weights:
+      health_burden: 0.30
+      access_barriers: 0.25
+      resource_accessibility: 0.25
+      workforce_shortage: 0.20
+    required_metrics:
+      - places_transportation_barriers
+      - nearest_clinical_care_distance
+      - places_diabetes_prevalence
+    constraints:
+      minimum_confidence: 0.50
+    notes: "docs/03 §7.2 also lists 'network travel time to care,' 'transit frequency,' and 'ED pressure' -- network travel time is Phase 6 scope (this scenario currently uses the straight-line resource_accessibility proxy, DEC-024); transit frequency and a tract-level ED-pressure domain are not yet built (DEC-023)."
+
+  - scenario_id: coverage_navigation_v1
+    label: "Coverage navigation"
+    description: "Prioritizes uninsured/poverty context and coverage-navigation-relevant access barriers."
+    weights:
+      access_barriers: 0.55
+      health_burden: 0.15
+      resource_accessibility: 0.15
+      workforce_shortage: 0.15
+    required_metrics:
+      - places_uninsured
+      - acs_poverty_rate
+    constraints:
+      minimum_confidence: 0.50
+    notes: "docs/03 §7.2 also lists 'ED payer mix' and 'proximity to enrollment/navigation resources' -- ED payer mix is county-level only (DEC-023), and no enrollment/navigation-resource point layer is ingested yet."
+
+  - scenario_id: older_adult_support_v1
+    label: "Older-adult support"
+    description: "Prioritizes chronic-disease burden together with mobility and resource/workforce access barriers relevant to older adults."
+    weights:
+      health_burden: 0.30
+      access_barriers: 0.25
+      resource_accessibility: 0.25
+      workforce_shortage: 0.20
+    required_metrics:
+      - places_high_blood_pressure
+      - places_any_disability
+      - places_transportation_barriers
+      - nearest_clinical_care_distance
+    constraints:
+      minimum_confidence: 0.50
+    notes: "docs/03 §7.2 lists 'age 65+' as an explicit component -- an ACS age-65+ population-share metric was not ingested in Phase 3 (DEC-020) and is not yet in the registry; this scenario currently uses chronic-burden and access-barrier proxies instead. Recorded as a scenario-accuracy limitation, not a silent substitution."
+
+  - scenario_id: behavioral_health_access_v1
+    label: "Behavioral-health access"
+    description: "Prioritizes mental-health burden together with workforce shortage and access/coverage barriers."
+    weights:
+      health_burden: 0.35
+      workforce_shortage: 0.30
+      access_barriers: 0.25
+      resource_accessibility: 0.10
+    required_metrics:
+      - places_depression
+      - places_frequent_mental_distress
+      - hpsa_proximity_score
+    constraints:
+      minimum_confidence: 0.50
+    notes: "docs/03 §7.2 lists 'mental-health HPSA/workforce' specifically -- hpsa_proximity_score and mua_designated_flag are discipline-agnostic in this platform's workforce_shortage domain (HRSA HPSA discipline is preserved in resources.hrsa_hpsa but not yet split into per-discipline scenario weights)."
+
+  - scenario_id: food_access_v1
+    label: "Food access"
+    description: "Prioritizes food insecurity and diabetes/obesity burden together with resource and mobility barriers."
+    weights:
+      health_burden: 0.35
+      access_barriers: 0.30
+      resource_accessibility: 0.25
+      environmental_burden: 0.10
+    required_metrics:
+      - places_food_insecurity
+      - places_diabetes_prevalence
+      - places_obesity
+      - places_transportation_barriers
+    constraints:
+      minimum_confidence: 0.50
+    notes: "docs/03 §7.2 lists 'SNAP retailer and grocery access' specifically -- resources.snap_retailers is loaded (Phase 3) but not yet joined into a tract-level distance metric in the Phase 4 registry (only clinical-care sites are, via nearest_clinical_care_distance); resource_accessibility here uses the clinical-care proxy as a general resource-gap stand-in, not a food-specific one. Flagged as a Phase 4+ improvement, not a silent substitution."
+
+# Five named sensitivity presets (docs/03 §9.1), evaluated for every
+# scenario during sensitivity analysis. "utilization_first" is redefined
+# as "systemic_pressure_first" (DEC-028): no tract-level ED-utilization
+# domain exists to weight directly (DEC-023), so this preset instead
+# emphasizes the two domains most related to systemic care-seeking
+# friction (resource_accessibility, workforce_shortage) until Phase 7
+# builds a genuine tract-level utilization metric.
+sensitivity_presets:
+  - preset_id: balanced
+    label: "Balanced"
+    weights:
+      health_burden: 0.20
+      access_barriers: 0.20
+      environmental_burden: 0.20
+      resource_accessibility: 0.20
+      workforce_shortage: 0.20
+
+  - preset_id: need_first
+    label: "Need-first"
+    weights:
+      health_burden: 0.45
+      access_barriers: 0.25
+      environmental_burden: 0.10
+      resource_accessibility: 0.10
+      workforce_shortage: 0.10
+
+  - preset_id: access_first
+    label: "Access-first"
+    weights:
+      health_burden: 0.15
+      access_barriers: 0.45
+      environmental_burden: 0.10
+      resource_accessibility: 0.15
+      workforce_shortage: 0.15
+
+  - preset_id: resource_first
+    label: "Resource-first"
+    weights:
+      health_burden: 0.15
+      access_barriers: 0.15
+      environmental_burden: 0.10
+      resource_accessibility: 0.45
+      workforce_shortage: 0.15
+
+  - preset_id: systemic_pressure_first
+    label: "Systemic pressure-first"
+    weights:
+      health_burden: 0.15
+      access_barriers: 0.15
+      environmental_burden: 0.10
+      resource_accessibility: 0.30
+      workforce_shortage: 0.30
+    notes: "Renamed from docs/03 §9.1's 'utilization-first' -- see DEC-028."

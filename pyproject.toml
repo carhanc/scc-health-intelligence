@@ -53,6 +53,27 @@ exclude = ["data/", "warehouse/", "\\.venv/"]
 module = ["geopandas.*", "pyogrio.*", "shapely.*", "fiona.*", "pandas.*", "openpyxl.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# scipy ships incomplete stubs for mypy --strict; ortools' cp_model uses a
+# C++-generated Python API (ortools.sat.python.cp_model) with no stubs at
+# all -- both are standard practice exclusions for mypy --strict projects.
+# pyyaml's upstream stub package (types-PyYAML) is not installed as a
+# dev dependency; ignored the same way rather than adding a stub-only
+# package for one `yaml.safe_load`/`yaml.safe_dump` call site.
+module = ["scipy.*", "ortools.*", "yaml.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# ortools ships a py.typed marker but its pybind11-generated CpModel/
+# CpSolver classes (ortools.sat.python.cp_model) do not expose their
+# real methods (NewBoolVar, Add, Maximize, ...) to mypy's static
+# analysis -- ignore_missing_imports above does not suppress these
+# attr-defined errors because the module import itself succeeds with
+# partial types. Disabled only for this one file, which is entirely
+# CP-SAT model-building code.
+module = ["scc_health_pipeline.optimization.location_allocation"]
+disable_error_code = ["attr-defined"]
+
 [tool.pytest.ini_options]
 # importlib import mode avoids a module-name collision between the two
 # same-named "tests" packages in this monorepo (apps/api/tests and

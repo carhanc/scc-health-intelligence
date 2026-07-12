@@ -146,4 +146,54 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-015 — No tract-level ED utilization pressure domain; a criterion-validity check against HCAI ED data is not yet possible
+
+**Category:** Analytical completeness / validation coverage. **Likelihood:** Confirmed (DEC-023, DEC-033). **Impact:** Medium — docs/03's suggested "ED utilization pressure" domain and HCAI-ED-based criterion-validity check are both unavailable until Phase 7.
+
+**Mitigation:** HCAI ED patient-county data is native to county of residence with Santa Clara as the only county present (n=1, statistically undefined for correlation) — DEC-023 documents why a tract-level allocation was not fabricated, and DEC-033 documents the substitute convergent-validity check (CDC/ATSDR SVI, n=408) used instead for Phase 4. Every one of the 7 scenario's correlation diagnostics against SVI is persisted in `analytics.correlation_diagnostics` and is confirmed non-tautological by the tautology guard on every `make audit` run.
+
+**Status:** `open` — a real tract-level utilization metric requires crosswalking `utilization.hcai_patient_origin` (ZIP-level, Phase 3) through the Phase 2 ZCTA-tract relationship, explicitly reserved for Phase 7 (Utilization/Validation Lab) per `docs/07_BUILD_PHASES.md`.
+
+---
+
+## RISK-016 — `resource_accessibility` and `workforce_shortage` domains rely on straight-line distance, not network travel time
+
+**Category:** Analytical accuracy. **Likelihood:** Confirmed (DEC-024, by design — Phase 6 scope not yet built). **Impact:** Medium — straight-line distance systematically understates real travel distance/time, especially in areas with indirect road networks; could overstate a tract's resource accessibility relative to its true accessibility.
+
+**Mitigation:** Every value produced through `routing/straight_line.py` carries `method="straight_line_screening"` end to end: in the metric registry's `interpretation` field, the optimizer's `assumptions` list, the data-confidence `geography_quality_component` (penalized 0.7 vs. 1.0), and every explainability/recommendation API response. No UI or API surface presents a straight-line result as if it were a network travel time.
+
+**Status:** `open` — accepted for Phase 4 per this session's explicit "resource optimization framework" request being pulled forward from its normal Phase 6 slot; full network-routing replacement is Phase 6 (Access Lab) scope, which will add OSMnx/networkx road-network graphs and VTA GTFS-based transit routing.
+
+---
+
+## RISK-017 — `hpsa_proximity_score` excludes 109 of 148 Santa Clara County HPSA records (no usable point geometry or inactive status)
+
+**Category:** Analytical completeness. **Likelihood:** Confirmed (DEC-026). **Impact:** Low-medium — `workforce_shortage`'s HPSA-derived component understates total documented shortage; the excluded records remain visible in the raw `resources.hrsa_hpsa` table and the Phase 3 Data explorer, just not folded into this specific derived score.
+
+**Mitigation:** Only "Designated" (active), coordinate-bearing (facility-anchored) HPSA records are used, per DEC-026's rationale (no polygon boundary data exists for area-based HPSA designations, and fabricating one is prohibited). `mua_designated_flag`, the domain's other component metric, uses a more complete direct tract-code join (DEC-025, 46 of 48 records) as a partial offset.
+
+**Status:** `open` — a true polygon-based HPSA-to-tract overlay requires HPSA boundary geometry this platform does not currently ingest; tracked as a Phase 6+ improvement.
+
+---
+
+## RISK-018 — `acs_disability_rate`'s combined margin of error is not computed
+
+**Category:** Uncertainty completeness. **Likelihood:** Confirmed (DEC-031, deliberate scope decision). **Impact:** Low — the point estimate is real and correctly derived; this metric is simply excluded from Monte Carlo perturbation and the `data_confidence` precision component for scenarios that use it (`access_barriers`-weighted scenarios), rather than being assigned an unverified/approximate uncertainty figure.
+
+**Mitigation:** `uncertainty_type: "none"` is set explicitly in `config/metrics.yml` rather than silently reusing the two-term `acs_ratio` MOE-propagation formula (invalid for a 12-term sum) — an audit (`analytics_audits.py`) and DEC-031 both document this choice.
+
+**Status:** `open` — implementing the Census Bureau's documented sum-of-estimates MOE formula (root-sum-of-squares with a significance adjustment) is a scoped, well-understood follow-on task, not attempted this phase to avoid reporting an unverified figure.
+
+---
+
+## RISK-019 — Phase 4 `analytics.*` tables have no offline demo snapshot
+
+**Category:** Product completeness / demo-mode parity. **Likelihood:** Confirmed (DEC-035). **Impact:** Medium — `make demo` (offline, zero-network mode) does not yet expose scenario scores, explainability, recommendations, or optimization results; these currently require the live warehouse (`make data`).
+
+**Mitigation:** Every Phase 4 API route returns a truthful, explicit 503 (not fabricated or partial data) when `analytics.*` tables are absent, distinct from the generic "no warehouse at all" 503 (`routes/analytics.py::_ANALYTICS_UNAVAILABLE_DETAIL`).
+
+**Status:** `open` — extending `make demo` to freeze a full analytics snapshot (25 metrics × 7 scenarios × 408 tracts, ~90,000+ rows including Monte Carlo/sensitivity draws) is a real scope addition; tracked as Phase 5+ follow-on work, matching the same disclosed gap pattern already recorded for Phase 3 (`TASKS.md`).
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

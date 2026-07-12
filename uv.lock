@@ -838,6 +838,7 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -848,6 +849,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "pydantic", specifier = ">=2.13.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
 ]
 
@@ -894,6 +896,7 @@ dependencies = [
     { name = "geopandas" },
     { name = "httpx" },
     { name = "libpysal" },
+    { name = "numpy" },
     { name = "openpyxl" },
     { name = "ortools" },
     { name = "pandas" },
@@ -903,6 +906,7 @@ dependencies = [
     { name = "pyproj" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "shapely" },
 ]
 
@@ -913,6 +917,7 @@ requires-dist = [
     { name = "geopandas", specifier = ">=1.0.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "libpysal", specifier = ">=4.12.0" },
+    { name = "numpy", specifier = ">=2.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "ortools", specifier = ">=9.11.0" },
     { name = "pandas", specifier = ">=2.2.0" },
@@ -922,6 +927,7 @@ requires-dist = [
     { name = "pyproj", specifier = ">=3.7.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "scikit-learn", specifier = ">=1.5.0" },
+    { name = "scipy", specifier = ">=1.14.0" },
     { name = "shapely", specifier = ">=2.0.0" },
 ]
 

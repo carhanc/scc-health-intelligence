@@ -15,9 +15,10 @@ bootstrap:
 data:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_geography_pipeline
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_core_sources_pipeline
-	@echo "make data: geography spine (Phase 2) + core health/social/resource/utilization"
-	@echo "sources (Phase 3) implemented. See TASKS.md for scope and DECISIONS.md for the"
-	@echo "documented-blocked HPI source and the ACS/SCC-GIS scope narrowing decisions."
+	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_analytics_pipeline
+	@echo "make data: geography spine (Phase 2) + core sources (Phase 3) + analytics/"
+	@echo "scoring/uncertainty/optimization (Phase 4) implemented. See TASKS.md for scope"
+	@echo "and DECISIONS.md for documented scope-narrowing decisions."
 
 demo:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_demo_pipeline
@@ -49,9 +50,10 @@ test-e2e:
 audit:
 	uv run python scripts/check_clean_room.py
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_audits
-	@echo "make audit: geography, core-source data-quality, and freshness/vintage audits"
-	@echo "(Phases 2-3) implemented. Analytics-output audits (scores, uncertainty,"
-	@echo "validation tautology guard) are added starting Phase 4. See TASKS.md."
+	@echo "make audit: geography, core-source data-quality, freshness/vintage, and"
+	@echo "analytics-output audits (score bounds, coverage suppression, uncertainty"
+	@echo "presence, tautology guard, contribution-sum identity) all implemented"
+	@echo "(Phases 2-4). See TASKS.md."
 
 export-demo:
 	@echo "make export-demo: sample advocacy brief/evidence packet generation — implemented starting Phase 9."
