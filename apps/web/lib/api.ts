@@ -74,6 +74,28 @@ export interface PlaceProfile {
   name_long: string;
   area_land_sqm: number;
   area_water_sqm: number;
+  tract_count: number;
+  data_mode: DataMode;
+}
+
+export interface TopConcernTract {
+  tract_geoid_2020: string;
+  name_long: string;
+  score: number;
+  coverage_fraction: number;
+}
+
+export interface PlaceTopConcernTractsResponse {
+  place_geoid: string;
+  scenario_id: string | null;
+  tracts: TopConcernTract[];
+  data_mode: DataMode;
+}
+
+export interface DistrictTopConcernTractsResponse {
+  district_number: number;
+  scenario_id: string | null;
+  tracts: TopConcernTract[];
   data_mode: DataMode;
 }
 
@@ -595,10 +617,26 @@ export const api = {
     apiGet<TractProfile>(`/api/v1/geographies/tract/${encodeURIComponent(tractGeoid)}`),
   getPlaceProfile: (placeGeoid: string) =>
     apiGet<PlaceProfile>(`/api/v1/geographies/place/${encodeURIComponent(placeGeoid)}`),
+  getPlaceTopConcernTracts: (placeGeoid: string, scenarioId?: string, limit = 5) => {
+    const params = new URLSearchParams();
+    if (scenarioId) params.set("scenario_id", scenarioId);
+    params.set("limit", String(limit));
+    return apiGet<PlaceTopConcernTractsResponse>(
+      `/api/v1/geographies/place/${encodeURIComponent(placeGeoid)}/top-concern-tracts?${params.toString()}`,
+    );
+  },
   getSupervisorDistrictProfile: (districtNumber: number) =>
     apiGet<SupervisorDistrictProfile>(
       `/api/v1/geographies/supervisor_district/${districtNumber}`,
     ),
+  getDistrictTopConcernTracts: (districtNumber: number, scenarioId?: string, limit = 5) => {
+    const params = new URLSearchParams();
+    if (scenarioId) params.set("scenario_id", scenarioId);
+    params.set("limit", String(limit));
+    return apiGet<DistrictTopConcernTractsResponse>(
+      `/api/v1/geographies/supervisor_district/${districtNumber}/top-concern-tracts?${params.toString()}`,
+    );
+  },
   getGeographyBoundary: (geographyType: GeographyType, geographyId: string) =>
     apiGet<GeographyBoundaryResponse>(
       `/api/v1/geographies/${geographyType}/${encodeURIComponent(geographyId)}/boundary`,

@@ -6,6 +6,8 @@ Responsibilities (PLAN.md §4-5, docs/03_ANALYTICS_METHODS.md §2):
   County (the source layers are statewide/national);
 - assign each tract to a supervisor district using a documented,
   majority-area-overlap method, with explicit boundary-crossing disclosure;
+- assign each tract to an incorporated place using the same method
+  (Phase 6.5 -- powers city-level drill-down in Explore/Access Lab);
 - never silently drop a boundary-crossing geography -- record the overlap
   fractions instead.
 
@@ -41,6 +43,7 @@ class HarmonizeResult:
     place_count: int = 0
     zcta_count: int = 0
     boundary_crossing_tract_count: int = 0
+    unincorporated_tract_count: int = 0
 
 
 def _read_staged(staged_root: Path, source_id: str, filename: str) -> gpd.GeoDataFrame:
@@ -149,6 +152,46 @@ def harmonize_geography(staged_root: Path, curated_root: Path) -> HarmonizeResul
     assignment_path = curated_root / "tract_supervisor_district_assignment.parquet"
     assignment.to_parquet(assignment_path)
     result.curated_paths["tract_supervisor_district_assignment"] = assignment_path
+
+    # --- Tract-to-place assignment: same majority-land-area-overlap method
+    # as tract-to-district above (Phase 6.5, powers city-level drill-down).
+    # A tract with no place overlap at all (unincorporated county land) is
+    # a real, expected outcome -- left unassigned, not forced onto the
+    # nearest place. ---
+    places_albers = places_touching.to_crs(CRS_CALIFORNIA_ALBERS)
+    place_overlap_rows: list[dict[str, object]] = []
+    unincorporated_tract_count = 0
+    for _, tract_row in tracts_albers.iterrows():
+        tract_geom = tract_row.geometry
+        tract_area = tract_geom.area
+        if tract_area == 0:
+            continue
+        shares = []
+        for _, place_row in places_albers.iterrows():
+            intersection_area = tract_geom.intersection(place_row.geometry).area
+            if intersection_area > 0:
+                shares.append((place_row["place_geoid"], intersection_area / tract_area))
+        if not shares:
+            unincorporated_tract_count += 1
+            continue
+        shares.sort(key=lambda s: s[1], reverse=True)
+        primary_place, primary_share = shares[0]
+        is_clean = primary_share >= CLEAN_ASSIGNMENT_THRESHOLD
+        place_overlap_rows.append(
+            {
+                "tract_geoid_2020": tract_row["tract_geoid_2020"],
+                "place_geoid": primary_place,
+                "primary_place_share": round(primary_share, 6),
+                "is_clean_assignment": is_clean,
+                "all_place_shares": ";".join(f"{p}:{round(s, 4)}" for p, s in shares),
+            }
+        )
+    result.unincorporated_tract_count = unincorporated_tract_count
+
+    place_assignment = pd.DataFrame(place_overlap_rows)
+    place_assignment_path = curated_root / "tract_place_assignment.parquet"
+    place_assignment.to_parquet(place_assignment_path)
+    result.curated_paths["tract_place_assignment"] = place_assignment_path
 
     # --- Final tracts / county / districts pass-through (already canonical
     # from their own adapters; re-written here so all curated geography

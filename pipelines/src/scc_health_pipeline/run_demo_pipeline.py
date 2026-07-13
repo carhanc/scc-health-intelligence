@@ -40,6 +40,7 @@ _TABLE_FILES = {
     "county": "county.parquet",
     "supervisor_districts": "supervisor_districts.parquet",
     "tract_supervisor_district_assignment": "tract_supervisor_district_assignment.parquet",
+    "tract_place_assignment": "tract_place_assignment.parquet",
     "crosswalk_zip_tract": "zcta_tract_crosswalk.parquet",
     "crosswalk_unassigned_tract_land": "unassigned_tract_land.parquet",
 }

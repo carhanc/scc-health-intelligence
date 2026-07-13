@@ -71,12 +71,36 @@ test.describe("Access Lab -- tract search, tabs, and real access data", () => {
     expect(bodyText.toLowerCase()).not.toContain("patients served");
   });
 
-  test("selecting a non-tract geography shows guidance instead of a broken state", async ({ page }) => {
+  test("selecting a city offers a real tract drill-down, not a dead end (Phase 6.5)", async ({ page }) => {
     await page.goto("/access-lab");
     await page.getByLabel("Find a place").fill("Sunnyvale");
     await page.getByRole("button", { name: "Search" }).click();
 
     const result = page.getByRole("button", { name: /Sunnyvale/ });
+    await expect(result).toBeVisible({ timeout: 10_000 });
+    await result.click();
+
+    const guidance = page.getByText("Select a tract in", { exact: false });
+    await expect(guidance).toBeVisible({ timeout: 10_000 });
+    await expect(guidance).toContainText("Sunnyvale city");
+    await expect(guidance).not.toContainText("0677000");
+
+    const tractButton = page.getByRole("button", { name: /Census Tract \d/ }).first();
+    await expect(tractButton).toBeVisible({ timeout: 10_000 });
+    await tractButton.click();
+
+    await expect(page).toHaveURL(/geography=tract&id=06085\d{6}/, { timeout: 10_000 });
+    await expect(page.getByText("Nearest clinical care", { exact: false })).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("selecting a ZIP code (no drill-down data available) shows plain guidance, not a broken state", async ({
+    page,
+  }) => {
+    await page.goto("/access-lab");
+    await page.getByLabel("Find a place").fill("94086");
+    await page.getByRole("button", { name: "Search" }).click();
+
+    const result = page.getByRole("button", { name: /ZIP Code Tabulation Area 94086/ });
     await expect(result).toBeVisible({ timeout: 10_000 });
     await result.click();
 

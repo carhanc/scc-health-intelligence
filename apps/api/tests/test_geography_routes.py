@@ -59,6 +59,59 @@ def test_search_finds_place_by_name(client: TestClient) -> None:
     assert any(r["geography_type"] == "place" for r in body["results"])
 
 
+def test_search_city_name_is_not_crowded_out_by_tract_matches(client: TestClient) -> None:
+    """Phase 6.5: an earlier version fetched up to `limit` tracts before
+    ever looking at places/zctas/districts, so a common query could
+    return only tracts. A city name must appear, and appear near the top,
+    not be silently absent."""
+    response = client.get("/api/v1/geographies/search", params={"q": "san jose"})
+    body = response.json()
+    types_in_order = [r["geography_type"] for r in body["results"]]
+    assert "place" in types_in_order
+    assert types_in_order.index("place") == 0
+
+
+def test_search_finds_zip_code(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/search", params={"q": "95128"})
+    assert response.status_code == 200
+    body = response.json()
+    zcta_ids = {r["geography_id"] for r in body["results"] if r["geography_type"] == "zcta"}
+    assert "95128" in zcta_ids
+
+
+def test_search_finds_supervisor_district_by_words_not_just_the_bare_number(
+    client: TestClient,
+) -> None:
+    """A real bug found during Phase 6.5 verification: an early version's
+    SQL WHERE clause pre-filtered rows before the Python-side synthetic
+    "district N" candidate ever had a chance to match, so "district 3"
+    returned zero results even though a plain "3" did."""
+    response = client.get("/api/v1/geographies/search", params={"q": "district 3"})
+    assert response.status_code == 200
+    body = response.json()
+    assert any(
+        r["geography_type"] == "supervisor_district" and r["geography_id"] == "3"
+        for r in body["results"]
+    )
+
+
+def test_search_tract_geoid_still_works_and_is_not_deprioritized(client: TestClient) -> None:
+    """Tracts remain fully searchable by GEOID -- deprioritized relative
+    to other types only for name-shaped queries, never excluded, and a
+    query that is itself shaped like a tract GEOID promotes tracts back
+    to the front (a user who already has a specific tract number)."""
+    response = client.get("/api/v1/geographies/search", params={"q": "06085500100"})
+    body = response.json()
+    assert body["results"][0]["geography_type"] == "tract"
+    assert body["results"][0]["geography_id"] == "06085500100"
+
+
+def test_search_empty_query_returns_no_results_not_an_error(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/search", params={"q": " "})
+    assert response.status_code == 200
+    assert response.json()["results"] == []
+
+
 def test_get_tract_profile_includes_district_assignment(client: TestClient) -> None:
     response = client.get("/api/v1/geographies/tract/06085500100")
     assert response.status_code == 200
@@ -122,6 +175,55 @@ def test_get_supervisor_district_profile(client: TestClient) -> None:
     assert body["district_number"] == 1
     assert body["supervisor_name"]
     assert body["tract_count"] > 0
+
+
+def test_district_top_concern_tracts_without_a_scenario_is_an_empty_list_not_fabricated(
+    client: TestClient,
+) -> None:
+    response = client.get("/api/v1/geographies/supervisor_district/1/top-concern-tracts")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tracts"] == []
+    assert body["scenario_id"] is None
+
+
+def test_district_top_concern_tracts_404_for_unknown_district(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/supervisor_district/99/top-concern-tracts")
+    assert response.status_code == 404
+
+
+def test_get_place_profile_includes_real_tract_count(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/place/0668000")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "San Jose"
+    # San Jose is by far the county's largest city -- a real, specific,
+    # live-verified count, not a placeholder.
+    assert body["tract_count"] > 100
+
+
+def test_get_place_profile_404_for_unknown_geoid(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/place/9999999")
+    assert response.status_code == 404
+
+
+def test_top_concern_tracts_without_a_scenario_is_an_empty_list_not_fabricated(
+    client: TestClient,
+) -> None:
+    """The demo warehouse has no analytics.scenario_scores table (Phase 4
+    analytics are live-only, DEC-035/RISK-019) -- top-concern-tracts must
+    disclose that absence as an empty list, never guess at a default
+    scenario or fabricate scored tracts."""
+    response = client.get("/api/v1/geographies/place/0668000/top-concern-tracts")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tracts"] == []
+    assert body["scenario_id"] is None
+
+
+def test_top_concern_tracts_404_for_unknown_place(client: TestClient) -> None:
+    response = client.get("/api/v1/geographies/place/9999999/top-concern-tracts")
+    assert response.status_code == 404
 
 
 def test_get_tract_boundary_returns_geojson_polygon(client: TestClient) -> None:
@@ -194,5 +296,61 @@ def test_geography_endpoints_return_503_when_no_warehouse_at_all() -> None:
         client = TestClient(app)
         response = client.get("/api/v1/geographies/search", params={"q": "san jose"})
         assert response.status_code == 503
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.skipif(
+    not LIVE_WAREHOUSE_PATH.exists(),
+    reason="warehouse/scc_health.duckdb not built -- run `make data` first",
+)
+def test_top_concern_tracts_with_a_real_scenario_returns_real_ranked_tracts() -> None:
+    def _live_settings() -> Settings:
+        return Settings(scc_health_warehouse_path=LIVE_WAREHOUSE_PATH)
+
+    app.dependency_overrides[get_settings] = _live_settings
+    try:
+        client = TestClient(app)
+        response = client.get(
+            "/api/v1/geographies/place/0668000/top-concern-tracts",
+            params={"scenario_id": "default_integrated_screen_v1", "limit": 5},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["scenario_id"] == "default_integrated_screen_v1"
+        assert len(body["tracts"]) == 5
+        scores = [t["score"] for t in body["tracts"]]
+        assert scores == sorted(scores, reverse=True)
+        for t in body["tracts"]:
+            assert t["tract_geoid_2020"].startswith("06085")
+            assert 0.0 <= t["score"] <= 100.0
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.skipif(
+    not LIVE_WAREHOUSE_PATH.exists(),
+    reason="warehouse/scc_health.duckdb not built -- run `make data` first",
+)
+def test_district_top_concern_tracts_with_a_real_scenario_returns_real_ranked_tracts() -> None:
+    def _live_settings() -> Settings:
+        return Settings(scc_health_warehouse_path=LIVE_WAREHOUSE_PATH)
+
+    app.dependency_overrides[get_settings] = _live_settings
+    try:
+        client = TestClient(app)
+        response = client.get(
+            "/api/v1/geographies/supervisor_district/3/top-concern-tracts",
+            params={"scenario_id": "default_integrated_screen_v1", "limit": 5},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["scenario_id"] == "default_integrated_screen_v1"
+        assert len(body["tracts"]) == 5
+        scores = [t["score"] for t in body["tracts"]]
+        assert scores == sorted(scores, reverse=True)
+        for t in body["tracts"]:
+            assert t["tract_geoid_2020"].startswith("06085")
+            assert 0.0 <= t["score"] <= 100.0
     finally:
         app.dependency_overrides.clear()

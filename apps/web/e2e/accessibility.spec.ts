@@ -50,6 +50,28 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
+  test("Explore with a city selected (highest-concern-tract drill-down) has no serious or critical violations", async ({
+    page,
+  }) => {
+    await page.goto("/explore?geography=place&id=0668000");
+    await expect(page.getByText("Highest-concern areas in San Jose", { exact: false })).toBeVisible({
+      timeout: 10_000,
+    });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Access Lab with a city selected (drill-down list) has no serious or critical violations", async ({
+    page,
+  }) => {
+    await page.goto("/access-lab?geography=place&id=0668000");
+    await expect(page.getByText("Select a tract in", { exact: false })).toBeVisible({ timeout: 10_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
   test("Data page has no serious or critical violations", async ({ page }) => {
     await page.goto("/data");
     await expect(page.getByRole("heading", { name: "Sources" })).toBeVisible({ timeout: 10_000 });

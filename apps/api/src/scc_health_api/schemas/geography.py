@@ -53,6 +53,21 @@ class PlaceProfile(BaseModel):
     name_long: str
     area_land_sqm: float
     area_water_sqm: float
+    tract_count: int
+    data_mode: DataMode
+
+
+class TopConcernTract(BaseModel):
+    tract_geoid_2020: str
+    name_long: str
+    score: float
+    coverage_fraction: float
+
+
+class PlaceTopConcernTractsResponse(BaseModel):
+    place_geoid: str
+    scenario_id: str | None
+    tracts: list[TopConcernTract]
     data_mode: DataMode
 
 
@@ -62,6 +77,13 @@ class SupervisorDistrictProfile(BaseModel):
     supervisor_name: str
     area_sq_miles: float
     tract_count: int
+    data_mode: DataMode
+
+
+class DistrictTopConcernTractsResponse(BaseModel):
+    district_number: int
+    scenario_id: str | None
+    tracts: list[TopConcernTract]
     data_mode: DataMode
 
 

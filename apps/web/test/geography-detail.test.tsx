@@ -92,6 +92,7 @@ describe("GeographyDetail (tract, missing data)", () => {
         scenarioId="default_integrated_screen_v1"
         onCompare={() => {}}
         onClearSelection={() => {}}
+        onSelect={() => {}}
       />,
     );
 
@@ -111,6 +112,7 @@ describe("GeographyDetail (tract, missing data)", () => {
         scenarioId="default_integrated_screen_v1"
         onCompare={() => {}}
         onClearSelection={() => {}}
+        onSelect={() => {}}
       />,
     );
 

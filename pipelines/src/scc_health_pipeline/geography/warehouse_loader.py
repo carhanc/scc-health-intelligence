@@ -73,6 +73,10 @@ def load_geography_tables(
             "tract_supervisor_district_assignment",
             curated_paths["tract_supervisor_district_assignment"],
         )
+        load_geoparquet(
+            "tract_place_assignment",
+            curated_paths["tract_place_assignment"],
+        )
         load_geoparquet("crosswalk_zip_tract", crosswalk_path)
         load_geoparquet("crosswalk_unassigned_tract_land", unassigned_land_path)
 

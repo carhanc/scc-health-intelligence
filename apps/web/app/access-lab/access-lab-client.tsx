@@ -9,6 +9,7 @@ import { AccessSummaryPanel } from "./access-summary-panel";
 import { ResourceBrowser } from "./resource-browser";
 import { GapPanel } from "./gap-panel";
 import { OptimizerScenarios } from "./optimizer-scenarios";
+import { CityDrillDown } from "./city-drill-down";
 
 type Mode = "walk" | "drive";
 type TabId = "summary" | "resources" | "gaps" | "scenarios";
@@ -79,10 +80,7 @@ export function AccessLabClient() {
         <div className="order-2 lg:order-1">
           <SearchPanel selected={selected} onSelect={handleGeographySelect} />
           {selected && selected.geographyType !== "tract" && (
-            <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-              Access Lab currently shows results by census tract. Search for a tract number, or pick a place and
-              then a tract within it from Explore.
-            </p>
+            <CityDrillDown selected={selected} onSelect={handleGeographySelect} />
           )}
         </div>
 

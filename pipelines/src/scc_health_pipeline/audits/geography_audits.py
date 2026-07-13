@@ -91,6 +91,7 @@ def run_geography_audits(warehouse_path: Path) -> AuditReport:
         _audit_crosswalk_weight_sums(conn, report)
         _audit_orphan_geographies(conn, report)
         _audit_spatial_join_coverage(conn, report)
+        _audit_place_assignment(conn, report)
         _audit_hand_verified_examples(conn, report)
     finally:
         conn.close()
@@ -257,6 +258,61 @@ def _audit_spatial_join_coverage(conn: duckdb.DuckDBPyConnection, report: AuditR
         True,  # informational, not a failure condition
         f"{boundary_crossing} tract(s) are boundary-crossing (majority district share < 95%); "
         "all district shares are retained in all_district_shares, not silently dropped.",
+    )
+
+
+def _audit_place_assignment(conn: duckdb.DuckDBPyConnection, report: AuditReport) -> None:
+    """Phase 6.5: tract-to-place assignment (powers Explore/Access Lab
+    city drill-down). Unlike district assignment, not every tract is
+    expected to have a place assignment -- unincorporated county land is
+    a real, legitimate outcome, so no minimum-coverage threshold is
+    enforced here, only orphan-row and disclosure checks."""
+    (orphan_place_assignment,) = _fetchone(
+        conn,
+        """
+        SELECT COUNT(*) FROM geo.tract_place_assignment a
+        LEFT JOIN geo.tracts t ON a.tract_geoid_2020 = t.tract_geoid_2020
+        WHERE t.tract_geoid_2020 IS NULL
+        """,
+    )
+    report.add(
+        "no_orphan_place_assignments",
+        orphan_place_assignment == 0,
+        f"{orphan_place_assignment} place-assignment row(s) reference an unknown tract GEOID.",
+    )
+    (orphan_place_ref,) = _fetchone(
+        conn,
+        """
+        SELECT COUNT(*) FROM geo.tract_place_assignment a
+        LEFT JOIN geo.places p ON a.place_geoid = p.place_geoid
+        WHERE p.place_geoid IS NULL
+        """,
+    )
+    report.add(
+        "no_orphan_place_references",
+        orphan_place_ref == 0,
+        f"{orphan_place_ref} place-assignment row(s) reference a place GEOID absent from "
+        "geo.places.",
+    )
+    (total_tracts,) = _fetchone(conn, "SELECT COUNT(*) FROM geo.tracts")
+    (assigned_tracts,) = _fetchone(
+        conn, "SELECT COUNT(DISTINCT tract_geoid_2020) FROM geo.tract_place_assignment"
+    )
+    unassigned = total_tracts - assigned_tracts
+    report.add(
+        "place_assignment_coverage_disclosed",
+        True,  # informational -- unincorporated tracts are a real, expected outcome
+        f"{assigned_tracts}/{total_tracts} tracts are assigned to an incorporated place; "
+        f"{unassigned} are unincorporated county land (a real, expected outcome, not a gap).",
+    )
+    (boundary_crossing,) = _fetchone(
+        conn, "SELECT COUNT(*) FROM geo.tract_place_assignment WHERE is_clean_assignment = false"
+    )
+    report.add(
+        "place_boundary_crossing_tracts_disclosed",
+        True,  # informational, not a failure condition
+        f"{boundary_crossing} tract(s) are boundary-crossing between places (majority place "
+        "share < 95%); all place shares are retained in all_place_shares, not silently dropped.",
     )
 
 

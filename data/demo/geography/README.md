@@ -2,7 +2,7 @@
 
 **This is real data, not fabricated.** These Parquet files are a frozen,
 point-in-time copy of the live Phase 2 geography pipeline output, generated
-by `scripts/build_demo_geography_snapshot.py` on 2026-07-11T23:52:53.558612+00:00.
+by `scripts/build_demo_geography_snapshot.py` on 2026-07-13T05:17:13.193592+00:00.
 
 Sources (see `docs/data/source-verification.md` for full provenance):
 

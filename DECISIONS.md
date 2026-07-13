@@ -584,4 +584,36 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-052 — Geography search ranked and widened to every native type (place/ZCTA/district/tract), with tract results deprioritized rather than removed
+
+**Context:** Phase 5's `search_geographies()` queried tracts, places, and supervisor districts each with their own `LIMIT` and concatenated the results before a final truncation -- a query matching many tracts could fill the entire result budget before places/districts were ever considered, and there was no ZCTA (ZIP code) search at all. Users should never need to already know a census tract ID to find a place.
+
+**Decision:** Rewrote `search_geographies()` (`apps/api/src/scc_health_api/repositories/geography.py`) to fetch the full contents of every geography table (tract 408, place 30, zcta 70, supervisor_district 5) and rank candidates in Python: exact match, then starts-with, then substring, each tier further ordered by a geography-type priority that puts place/zcta/supervisor_district ahead of tract -- unless the query itself is shaped like an 11-digit tract GEOID, in which case tracts are promoted back to the front (a user who already has a tract number must not have it buried). ZCTA search was added as a new category. A real bug was found and fixed during this work: an earlier draft pre-filtered candidates via a SQL `LIKE` clause before Python-side ranking, which silently dropped queries that only matched a *synthetic* candidate string (e.g. "district 3" against the Python-only candidate `f"district {number}"`, never a real column value) -- fetching every candidate row removes this entire class of bug.
+
+**Rationale:** Tracts remain fully searchable (never removed, matching the spec's own requirement that tract IDs stay available), just no longer able to crowd out every other geography type for a typical city/ZIP/district-shaped query.
+
+**Consequences:** `search_geographies()` now does a full Python-side ranking pass over ~513 rows per query instead of a database-side `LIKE` filter -- negligible at this data volume, revisit if the candidate pool grows by an order of magnitude. Search UI in both Explore and Access Lab (which share the same `SearchPanel` component and this same API endpoint) inherited the fix automatically.
+
+### DEC-053 — Tract-to-place assignment uses the same audited majority-land-area-overlap method as tract-to-supervisor-district assignment
+
+**Context:** Building city-level drill-down (highest-concern tracts within a selected place) required a way to determine which tracts belong to which city. An initial implementation used `ST_Contains(place.geometry, tract.internal_point)` (point-in-polygon against the tract's representative point) as a lighter-weight alternative to a full persisted crosswalk table.
+
+**Decision:** Built `geo.tract_place_assignment` (`pipelines/src/scc_health_pipeline/geography/harmonize.py`) using the identical method already established for `geo.tract_supervisor_district_assignment`: reproject to EPSG:3310 (equal-area), compute each tract's land-area intersection with every place it touches, assign the majority-share place as primary, and flag `is_clean_assignment=false` when that share is below 95% (retaining every overlapping place's share in `all_place_shares`, never silently dropped). The API layer (`get_place_profile`/`get_place_top_concern_tracts`) was switched from the point-in-polygon join to this table.
+
+**Rationale:** Live-verified the two methods actually disagree for 35 of 408 tracts -- a real, non-trivial difference, not a cosmetic one. Using one consistent, audited method for both city and district assignment (rather than a rigorous method for one relationship and a casual one for the analogous relationship) avoids a real class of confusion: a tract could otherwise show as "in San Jose" by one method and a different city by the other, depending on which part of the UI computed it.
+
+**Consequences:** Every place gained a `tract_count` field and a live-auditable assignment table (`audits/geography_audits.py::_audit_place_assignment`, 4 new checks, all passing: no orphan tract/place references, disclosed coverage, disclosed boundary-crossing count). Live result: 408/408 tracts assigned to a place (Santa Clara County has no tract with zero place overlap at all, though many tracts have only a marginal overlap with their assigned "primary" place -- 106 tracts are boundary-crossing at the <95% threshold, honestly disclosed via `is_clean_assignment`, not hidden). The demo warehouse snapshot (`data/demo/geography/`, `scripts/build_demo_geography_snapshot.py`, `run_demo_pipeline.py`) was updated to include this new table so demo-mode tests and `make demo` stay in sync with `make data`.
+
+### DEC-054 — City/district selection resolves its display name from the profile API, never from `SelectedGeography.displayName` after a URL round-trip
+
+**Context:** While verifying Phase 6.5's city drill-down feature, a real, systematic (not edge-case) defect was found: `SelectedGeography.displayName` is only ever a genuine name for the single render immediately following an in-app search click. Every selection is re-derived from URL search params on render (`parseSelectedGeographyFromParams`), which has no name available and falls back to the raw GEOID -- meaning the Explore map's "The dashed outline shows {name}" caption, and the new Access Lab drill-down guidance text, showed a raw place GEOID (e.g. "0668000") instead of "San Jose city" on essentially every place/district selection, not just URL-shared links. This is exactly the kind of defect CLAUDE.md requires fixing before declaring a phase complete, not deferring.
+
+**Decision:** `explore-map.tsx`'s outline caption and `access-lab/city-drill-down.tsx` now resolve the real name via a dedicated query against `api.getPlaceProfile`/`api.getSupervisorDistrictProfile` (the same profile endpoints `PlaceDetail`/`DistrictDetail` already call for their own content), falling back to `selected.displayName` only while that query is loading or for geography types with no profile endpoint (ZCTA, county).
+
+**Rationale:** This is the same pattern `PlaceDetail`/`DistrictDetail`/`TractDetail` already use for their own primary content (they never trusted `selected.displayName` either) -- extending it to every remaining consumer of the field closes the gap with no change to the URL/selection model itself, which does not carry a name by design (only `geography` + `id`).
+
+**Consequences:** Verified live across reload, browser back, and browser forward navigation: the resolved name persists correctly in all cases (`e2e/explore-core.spec.ts`'s new Phase 6.5 regression test asserts this exactly, including that the raw GEOID string never appears in the caption). `SelectedGeography.displayName` itself is unchanged and still legitimately reflects a fresh in-app selection's label for the one render where it's accurate (e.g. `aria-current` highlighting in `SearchPanel`) -- this decision does not deprecate the field, only stops relying on it past its one accurate frame.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

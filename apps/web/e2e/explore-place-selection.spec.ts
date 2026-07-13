@@ -26,8 +26,11 @@ test.describe("Explore -- selecting a place pans the map to it", () => {
 
     // The profile panel must be honest that this is a place, not a
     // scored tract, and must point at exactly the next action available.
-    await expect(page.getByRole("heading", { name: /Sunnyvale/ })).toBeVisible();
-    await expect(page.getByText(/Scores are calculated per census tract/)).toBeVisible();
+    // Phase 6.5: the panel now also surfaces a real highest-concern-tract
+    // drill-down, so "Sunnyvale" legitimately matches two headings --
+    // the place title itself and the drill-down section title.
+    await expect(page.getByRole("heading", { name: "Sunnyvale city", exact: true })).toBeVisible();
+    await expect(page.getByText(/Highest-concern areas in Sunnyvale/)).toBeVisible();
 
     // Now the user can click a tract inside the outlined city -- this is
     // the actual resolution path for "identify its leading concerns."

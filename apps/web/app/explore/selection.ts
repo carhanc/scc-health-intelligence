@@ -9,7 +9,7 @@ import type { GeographyType } from "@/lib/api";
  * "Phase 5 hotfix: map tract selection" for the full root-cause writeup.
  * Every selection entry point must build one of these and nothing else.
  */
-export type SelectionSource = "map" | "table" | "search" | "comparison" | "url";
+export type SelectionSource = "map" | "table" | "search" | "comparison" | "url" | "drill_down";
 
 export interface SelectedGeography {
   geographyType: GeographyType;

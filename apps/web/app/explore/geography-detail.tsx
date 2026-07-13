@@ -28,11 +28,16 @@ export function GeographyDetail({
   scenarioId,
   onCompare,
   onClearSelection,
+  onSelect,
 }: {
   selected: SelectedGeography | null;
   scenarioId: string;
   onCompare: () => void;
   onClearSelection: () => void;
+  /** Lets a city/district summary's "highest-concern tracts" list drill
+   * down into an individual tract, reusing the same canonical selection
+   * entry point as the map/table/search (Phase 6.5). */
+  onSelect: (selection: SelectedGeography) => void;
 }) {
   if (!selected) {
     return (
@@ -53,10 +58,24 @@ export function GeographyDetail({
     );
   }
   if (selected.geographyType === "place") {
-    return <PlaceDetail placeGeoid={selected.geoid} onClearSelection={onClearSelection} />;
+    return (
+      <PlaceDetail
+        placeGeoid={selected.geoid}
+        scenarioId={scenarioId}
+        onClearSelection={onClearSelection}
+        onSelect={onSelect}
+      />
+    );
   }
   if (selected.geographyType === "supervisor_district") {
-    return <DistrictDetail districtNumber={Number(selected.geoid)} onClearSelection={onClearSelection} />;
+    return (
+      <DistrictDetail
+        districtNumber={Number(selected.geoid)}
+        scenarioId={scenarioId}
+        onClearSelection={onClearSelection}
+        onSelect={onSelect}
+      />
+    );
   }
   return (
     <EmptyState
@@ -382,10 +401,25 @@ function EvidenceContent({ explanation }: { explanation: ScoreExplanationRespons
   );
 }
 
-function PlaceDetail({ placeGeoid, onClearSelection }: { placeGeoid: string; onClearSelection: () => void }) {
+function PlaceDetail({
+  placeGeoid,
+  scenarioId,
+  onClearSelection,
+  onSelect,
+}: {
+  placeGeoid: string;
+  scenarioId: string;
+  onClearSelection: () => void;
+  onSelect: (selection: SelectedGeography) => void;
+}) {
   const query = useQuery({
     queryKey: ["place-profile", placeGeoid],
     queryFn: () => api.getPlaceProfile(placeGeoid),
+    retry: 1,
+  });
+  const topTractsQuery = useQuery({
+    queryKey: ["place-top-concern-tracts", placeGeoid, scenarioId],
+    queryFn: () => api.getPlaceTopConcernTracts(placeGeoid, scenarioId, 5),
     retry: 1,
   });
   if (query.isLoading) {
@@ -418,25 +452,85 @@ function PlaceDetail({ placeGeoid, onClearSelection }: { placeGeoid: string; onC
           <dt className="text-xs text-[var(--color-text-secondary)]">Land area</dt>
           <dd>{(profile.area_land_sqm / 1_000_000).toFixed(2)} km²</dd>
         </div>
+        <div>
+          <dt className="text-xs text-[var(--color-text-secondary)]">Census tracts inside this city</dt>
+          <dd>{profile.tract_count}</dd>
+        </div>
       </dl>
-      <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
-        Scores are calculated per census tract, not for a whole city at once. Search for a tract inside{" "}
-        {profile.name_long}, or click a tract on the map within this area, to see its combined score and drivers.
-      </p>
+
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Highest-concern areas in {profile.name_long}
+        </h3>
+        {topTractsQuery.isLoading && (
+          <LoadingRegion label="Loading highest-concern tracts">
+            <SkeletonText lines={3} />
+          </LoadingRegion>
+        )}
+        {topTractsQuery.isError && (
+          <p role="alert" className="mt-2 text-sm text-[var(--color-alert)]">
+            Couldn&apos;t load the highest-concern tracts for this city.
+          </p>
+        )}
+        {topTractsQuery.data && topTractsQuery.data.tracts.length === 0 && (
+          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            No scored tracts are available for the current priorities yet.
+          </p>
+        )}
+        {topTractsQuery.data && topTractsQuery.data.tracts.length > 0 && (
+          <ul className="mt-2 divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+            {topTractsQuery.data.tracts.map((t, i) => (
+              <li key={t.tract_geoid_2020}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSelect({
+                      geographyType: "tract",
+                      geoid: t.tract_geoid_2020,
+                      displayName: t.name_long,
+                      source: "drill_down",
+                    })
+                  }
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-sunken)] focus-visible:bg-[var(--color-surface-sunken)]"
+                >
+                  <span>
+                    <span className="tabular-nums text-[var(--color-text-tertiary)]">#{i + 1}</span>{" "}
+                    {t.name_long}
+                  </span>
+                  <span className="font-semibold text-[var(--color-text-primary)]">{Math.round(t.score)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+          Ranked by combined concern score under the current priorities (higher = more concern). Select a tract
+          above for its full score breakdown, or search for any other tract inside {profile.name_long} directly.
+        </p>
+      </div>
     </div>
   );
 }
 
 function DistrictDetail({
   districtNumber,
+  scenarioId,
   onClearSelection,
+  onSelect,
 }: {
   districtNumber: number;
+  scenarioId: string;
   onClearSelection: () => void;
+  onSelect: (selection: SelectedGeography) => void;
 }) {
   const query = useQuery({
     queryKey: ["district-profile", districtNumber],
     queryFn: () => api.getSupervisorDistrictProfile(districtNumber),
+    retry: 1,
+  });
+  const topTractsQuery = useQuery({
+    queryKey: ["district-top-concern-tracts", districtNumber, scenarioId],
+    queryFn: () => api.getDistrictTopConcernTracts(districtNumber, scenarioId, 5),
     retry: 1,
   });
   if (query.isLoading) {
@@ -476,10 +570,57 @@ function DistrictDetail({
           <dd>{profile.tract_count}</dd>
         </div>
       </dl>
-      <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
-        Scores are calculated per census tract, not for a whole district at once. Search for a tract inside this
-        district, or click a tract on the map within this area, to see its combined score and drivers.
-      </p>
+
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Highest-concern areas in District {profile.district_number}
+        </h3>
+        {topTractsQuery.isLoading && (
+          <LoadingRegion label="Loading highest-concern tracts">
+            <SkeletonText lines={3} />
+          </LoadingRegion>
+        )}
+        {topTractsQuery.isError && (
+          <p role="alert" className="mt-2 text-sm text-[var(--color-alert)]">
+            Couldn&apos;t load the highest-concern tracts for this district.
+          </p>
+        )}
+        {topTractsQuery.data && topTractsQuery.data.tracts.length === 0 && (
+          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            No scored tracts are available for the current priorities yet.
+          </p>
+        )}
+        {topTractsQuery.data && topTractsQuery.data.tracts.length > 0 && (
+          <ul className="mt-2 divide-y divide-[var(--color-border)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+            {topTractsQuery.data.tracts.map((t, i) => (
+              <li key={t.tract_geoid_2020}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSelect({
+                      geographyType: "tract",
+                      geoid: t.tract_geoid_2020,
+                      displayName: t.name_long,
+                      source: "drill_down",
+                    })
+                  }
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-sunken)] focus-visible:bg-[var(--color-surface-sunken)]"
+                >
+                  <span>
+                    <span className="tabular-nums text-[var(--color-text-tertiary)]">#{i + 1}</span>{" "}
+                    {t.name_long}
+                  </span>
+                  <span className="font-semibold text-[var(--color-text-primary)]">{Math.round(t.score)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+          Ranked by combined concern score under the current priorities (higher = more concern). Select a tract
+          above for its full score breakdown, or search for any other tract inside this district directly.
+        </p>
+      </div>
     </div>
   );
 }

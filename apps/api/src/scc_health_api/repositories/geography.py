@@ -8,62 +8,175 @@ docs/04_ARCHITECTURE_IMPLEMENTATION.md §6.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import duckdb
+
+_TRACT_GEOID_RE = re.compile(r"^\d{11}$")
+
+# A tract is "in" a place by the same majority-land-area-overlap method
+# already used for the audited, persisted tract-to-supervisor-district
+# assignment (geo.tract_supervisor_district_assignment) -- this table,
+# geo.tract_place_assignment, is built the same way (Phase 6.5,
+# pipelines/src/scc_health_pipeline/geography/harmonize.py) so "which
+# city is this tract in" answers consistently across the whole platform,
+# rather than one relationship using full-polygon overlap and another
+# using looser internal-point containment. Live-verified during Phase 6.5
+# build: the two methods disagree for 35 of 408 tracts (the same
+# boundary-ambiguous tracts majority-overlap already discloses via
+# is_clean_assignment=false), confirming this was a real methodology
+# choice, not an inconsequential one.
+_TRACT_IN_PLACE_JOIN = """
+    JOIN geo.tract_place_assignment tpa ON tpa.tract_geoid_2020 = t.tract_geoid_2020
+    JOIN geo.places p ON p.place_geoid = tpa.place_geoid
+"""
+
+# A result's geography_type gets this base priority added to its
+# match-quality rank before sorting -- lower sorts first. Tracts default
+# to the lowest priority (highest number) so a name/city/ZIP search is
+# never crowded out by 11-digit tract GEOIDs matching as a loose
+# substring; a query that looks like an actual tract GEOID overrides this
+# via _type_priority_for_query() below (Phase 6.5, "users should never
+# need to know census tract IDs" -- but a tract ID, once known, must
+# still work as a search term).
+_DEFAULT_TYPE_PRIORITY: dict[str, int] = {
+    "place": 0,
+    "zcta": 0,
+    "supervisor_district": 0,
+    "tract": 1,
+}
+
+
+def _type_priority_for_query(query: str) -> dict[str, int]:
+    """If the query is unambiguously shaped like a tract GEOID, promote
+    tracts to the front -- a user who already has a specific tract number
+    (e.g. from a report or a prior search) must not have it buried behind
+    unrelated city/ZIP/district matches."""
+    if _TRACT_GEOID_RE.match(query):
+        return {"place": 1, "zcta": 1, "supervisor_district": 1, "tract": 0}
+    return _DEFAULT_TYPE_PRIORITY
+
+
+def _match_rank(query_lower: str, *candidates: str | None) -> int | None:
+    """0 = exact match, 1 = starts-with, 2 = substring, None = no match,
+    checked against every candidate string for a row (e.g. both a short
+    name and a long name) and returns the best (lowest) rank found."""
+    best: int | None = None
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate_lower = candidate.lower()
+        if candidate_lower == query_lower:
+            rank = 0
+        elif candidate_lower.startswith(query_lower):
+            rank = 1
+        elif query_lower in candidate_lower:
+            rank = 2
+        else:
+            continue
+        if best is None or rank < best:
+            best = rank
+    return best
 
 
 def search_geographies(
     conn: duckdb.DuckDBPyConnection, query: str, limit: int = 20
 ) -> list[dict[str, Any]]:
-    """Search tracts (by GEOID or name), places (by name), and supervisor
-    districts (by number or supervisor name). Case-insensitive substring
-    match -- Phase 5 will add a proper ranked/fuzzy search index."""
-    like_query = f"%{query.lower()}%"
-    results: list[dict[str, Any]] = []
+    """Ranked search across every native geography type a user might
+    reasonably type: a city/place name, a ZIP code (ZCTA), a supervisor
+    district (number or supervisor name), a neighborhood-shaped name
+    match against tract long names, or a raw tract GEOID. Never requires
+    a user to already know a tract ID (Phase 6.5) -- tracts remain
+    searchable but are deprioritized relative to the other types unless
+    the query itself is shaped like a tract GEOID.
+
+    Ranking: exact match first, then starts-with, then substring, each
+    tier further ordered by geography-type priority (see
+    `_type_priority_for_query`) so, at equal match quality, a city/ZIP/
+    district result sorts ahead of a tract. A generous per-type candidate
+    pool is the full contents of each geography table (tract 408, place
+    30, zcta 70, supervisor_district 5 -- ~513 rows total in the current
+    warehouse), fetched unconditionally and ranked/filtered entirely in
+    Python. This is deliberate, not merely "small enough to be lazy
+    about": an early version filtered candidates via a SQL `LIKE` clause
+    before Python-side ranking ran, which meant a query matching only a
+    *synthetic* candidate string (e.g. "district 3" against the
+    Python-only candidate `f"district {number}"`, never a real column
+    value) was silently dropped before ranking ever saw it -- the SQL
+    WHERE clause and the Python match-candidate list must never diverge,
+    and fetching everything removes that entire class of bug rather than
+    requiring the two to be kept in sync by hand.
+    """
+    query_lower = query.lower().strip()
+    if not query_lower:
+        return []
+    type_priority = _type_priority_for_query(query.strip())
+
+    candidates: list[dict[str, Any]] = []
 
     tract_rows = conn.execute(
-        """
-        SELECT tract_geoid_2020, name_long FROM geo.tracts
-        WHERE LOWER(tract_geoid_2020) LIKE ? OR LOWER(name_long) LIKE ?
-        ORDER BY tract_geoid_2020 LIMIT ?
-        """,
-        [like_query, like_query, limit],
+        "SELECT tract_geoid_2020, name, name_long FROM geo.tracts"
     ).fetchall()
-    results.extend(
-        {"geography_type": "tract", "geography_id": r[0], "label": r[1]} for r in tract_rows
-    )
+    for geoid, name, name_long in tract_rows:
+        rank = _match_rank(query_lower, geoid, name, name_long)
+        if rank is not None:
+            candidates.append(
+                {
+                    "geography_type": "tract",
+                    "geography_id": geoid,
+                    "label": name_long,
+                    "_rank": rank,
+                }
+            )
 
-    place_rows = conn.execute(
-        """
-        SELECT place_geoid, name_long FROM geo.places
-        WHERE LOWER(name) LIKE ? OR LOWER(name_long) LIKE ?
-        ORDER BY name LIMIT ?
-        """,
-        [like_query, like_query, limit],
-    ).fetchall()
-    results.extend(
-        {"geography_type": "place", "geography_id": r[0], "label": r[1]} for r in place_rows
-    )
+    place_rows = conn.execute("SELECT place_geoid, name, name_long FROM geo.places").fetchall()
+    for geoid, name, name_long in place_rows:
+        rank = _match_rank(query_lower, name, name_long)
+        if rank is not None:
+            candidates.append(
+                {
+                    "geography_type": "place",
+                    "geography_id": geoid,
+                    "label": name_long,
+                    "_rank": rank,
+                }
+            )
+
+    zcta_rows = conn.execute("SELECT zcta_geoid FROM geo.zctas").fetchall()
+    for (geoid,) in zcta_rows:
+        rank = _match_rank(query_lower, geoid, f"zip {geoid}", f"zip code {geoid}")
+        if rank is not None:
+            candidates.append(
+                {
+                    "geography_type": "zcta",
+                    "geography_id": geoid,
+                    "label": f"ZIP Code Tabulation Area {geoid}",
+                    "_rank": rank,
+                }
+            )
 
     district_rows = conn.execute(
-        """
-        SELECT CAST(district_number AS VARCHAR), supervisor_name FROM geo.supervisor_districts
-        WHERE LOWER(supervisor_name) LIKE ? OR LOWER(CAST(district_number AS VARCHAR)) LIKE ?
-        ORDER BY district_number LIMIT ?
-        """,
-        [like_query, like_query, limit],
+        "SELECT CAST(district_number AS VARCHAR), supervisor_name FROM geo.supervisor_districts"
     ).fetchall()
-    results.extend(
-        {
-            "geography_type": "supervisor_district",
-            "geography_id": r[0],
-            "label": f"District {r[0]} ({r[1]})",
-        }
-        for r in district_rows
-    )
+    for number, supervisor_name in district_rows:
+        rank = _match_rank(query_lower, number, f"district {number}", supervisor_name)
+        if rank is not None:
+            candidates.append(
+                {
+                    "geography_type": "supervisor_district",
+                    "geography_id": number,
+                    "label": f"District {number} ({supervisor_name})",
+                    "_rank": rank,
+                }
+            )
 
-    return results[:limit]
+    candidates.sort(
+        key=lambda c: (c["_rank"], type_priority.get(c["geography_type"], 2), c["label"])
+    )
+    for c in candidates:
+        del c["_rank"]
+    return candidates[:limit]
 
 
 def get_tract_profile(conn: duckdb.DuckDBPyConnection, tract_geoid: str) -> dict[str, Any] | None:
@@ -102,13 +215,62 @@ def get_place_profile(conn: duckdb.DuckDBPyConnection, place_geoid: str) -> dict
     ).fetchone()
     if row is None:
         return None
+    tract_count_row = conn.execute(
+        f"""
+        SELECT COUNT(*) FROM geo.tracts t
+        {_TRACT_IN_PLACE_JOIN}
+        WHERE p.place_geoid = ?
+        """,
+        [place_geoid],
+    ).fetchone()
     return {
         "place_geoid": row[0],
         "name": row[1],
         "name_long": row[2],
         "area_land_sqm": row[3],
         "area_water_sqm": row[4],
+        "tract_count": tract_count_row[0] if tract_count_row else 0,
     }
+
+
+def get_place_top_concern_tracts(
+    conn: duckdb.DuckDBPyConnection, place_geoid: str, scenario_id: str | None, limit: int = 5
+) -> list[dict[str, Any]]:
+    """The `limit` highest-scoring (highest-concern) tracts assigned to
+    this place by majority land-area overlap (Phase 6.5,
+    geo.tract_place_assignment) -- the same audited method already used
+    for tract-to-supervisor-district assignment.
+
+    Returns an empty list (not fabricated tracts, not zero-scored ones)
+    when `scenario_id` is not supplied or `analytics.scenario_scores`
+    does not exist -- a city summary with no scenario active has no
+    "highest concern" to report yet, and that absence must be visible in
+    the UI, not silently guessed at with a default scenario.
+    """
+    if not scenario_id or not _table_exists(conn, "analytics", "scenario_scores"):
+        return []
+    rows = conn.execute(
+        f"""
+        SELECT t.tract_geoid_2020, t.name_long, s.score, s.coverage_fraction
+        FROM geo.tracts t
+        {_TRACT_IN_PLACE_JOIN}
+        JOIN analytics.scenario_scores s
+          ON t.tract_geoid_2020 = s.tract_geoid_2020 AND s.scenario_id = ?
+        WHERE p.place_geoid = ? AND s.score IS NOT NULL
+        ORDER BY s.score DESC
+        LIMIT ?
+        """,
+        [scenario_id, place_geoid, limit],
+    ).fetchall()
+    return [
+        {
+            "tract_geoid_2020": r[0],
+            "name_long": r[1],
+            "score": r[2],
+            "coverage_fraction": r[3],
+        }
+        for r in rows
+    ]
 
 
 def get_supervisor_district_profile(
@@ -133,6 +295,40 @@ def get_supervisor_district_profile(
         "area_sq_miles": row[2],
         "tract_count": tract_count,
     }
+
+
+def get_district_top_concern_tracts(
+    conn: duckdb.DuckDBPyConnection, district_number: int, scenario_id: str | None, limit: int = 5
+) -> list[dict[str, Any]]:
+    """The `limit` highest-scoring tracts assigned to this supervisor
+    district by majority land-area overlap (geo.tract_supervisor_district_assignment),
+    mirroring `get_place_top_concern_tracts` -- same drill-down pattern,
+    same empty-list-not-fabricated behavior when no scenario is active."""
+    if not scenario_id or not _table_exists(conn, "analytics", "scenario_scores"):
+        return []
+    rows = conn.execute(
+        """
+        SELECT t.tract_geoid_2020, t.name_long, s.score, s.coverage_fraction
+        FROM geo.tracts t
+        JOIN geo.tract_supervisor_district_assignment a
+          ON a.tract_geoid_2020 = t.tract_geoid_2020
+        JOIN analytics.scenario_scores s
+          ON t.tract_geoid_2020 = s.tract_geoid_2020 AND s.scenario_id = ?
+        WHERE a.supervisor_district = ? AND s.score IS NOT NULL
+        ORDER BY s.score DESC
+        LIMIT ?
+        """,
+        [scenario_id, district_number, limit],
+    ).fetchall()
+    return [
+        {
+            "tract_geoid_2020": r[0],
+            "name_long": r[1],
+            "score": r[2],
+            "coverage_fraction": r[3],
+        }
+        for r in rows
+    ]
 
 
 _BOUNDARY_TABLES: dict[str, tuple[str, str]] = {

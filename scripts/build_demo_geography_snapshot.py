@@ -32,6 +32,7 @@ _CURATED_FILES = [
     "county.parquet",
     "supervisor_districts.parquet",
     "tract_supervisor_district_assignment.parquet",
+    "tract_place_assignment.parquet",
 ]
 _CROSSWALK_FILES = [
     "zcta_tract_crosswalk.parquet",

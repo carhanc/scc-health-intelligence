@@ -138,6 +138,7 @@ export function ExploreClient() {
             scenarioId={scenarioId}
             onCompare={() => updateParams({ compare: "1" })}
             onClearSelection={handleClearSelection}
+            onSelect={handleGeographySelect}
           />
           {comparing && selected?.geographyType === "tract" && (
             <div className="mt-4">

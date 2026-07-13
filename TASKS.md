@@ -149,6 +149,22 @@ Architecture decisions recorded before implementation (DEC-043 through DEC-045, 
 
 ---
 
+## Phase 6.5 — Geography search UX (city/ZIP/district-first search, city drill-down) — CLOSED
+
+A UX improvement discovered during manual review before starting Phase 7: users should never need to know census tract IDs to find a place.
+
+- [x] Ranked geography search across every native type (place, ZCTA, supervisor district, tract), tracts deprioritized (never removed) so a city/ZIP/district query is never crowded out. New ZCTA search support. Real bug found and fixed: an early draft's SQL pre-filter silently dropped queries matching only a Python-synthesized candidate string (e.g. "district 3"). DEC-052.
+- [x] Tract-to-place spatial assignment (`geo.tract_place_assignment`), using the same audited majority-land-area-overlap method as the existing tract-to-supervisor-district assignment, not a lighter-weight point-in-polygon check -- consistent methodology across both relationships. 4 new geography audits, all passing. Live result: 408/408 tracts assigned, 106 disclosed as boundary-crossing (<95% majority share). DEC-053.
+- [x] City and supervisor-district profiles show a real highest-concern-tracts drill-down (`GET /api/v1/geographies/place/{id}/top-concern-tracts` and the equivalent `/supervisor_district/{n}/top-concern-tracts`), letting a user go from "found the city" to "selected a specific scored tract" without needing to already know a tract number. Empty list (never fabricated tracts) when no scenario is active.
+- [x] Access Lab's non-tract-selection guidance replaced with the same real drill-down (`city-drill-down.tsx`) for place/district selections, reusing the canonical tract IDs the drill-down returns; ZCTA/county selections (no drill-down data available) keep the plain guidance message.
+- [x] Real, systematic display-name bug found and fixed (DEC-054): `SelectedGeography.displayName` is only accurate for the single render right after an in-app search click -- every selection is actually re-derived from URL params, which have no name, so the Explore map's outline caption and the new Access Lab drill-down both showed a raw place GEOID (e.g. "0668000") instead of "San Jose city" on essentially every selection, not just shared links. Fixed by resolving the real name from the same profile endpoints `PlaceDetail`/`DistrictDetail` already call. Verified live across reload, browser back, and browser forward.
+- [x] SelectedGeography model and canonical selection entry point preserved and extended (new `"drill_down"` `SelectionSource`), not reinvented.
+- [x] Demo warehouse snapshot (`data/demo/geography/`, `scripts/build_demo_geography_snapshot.py`, `run_demo_pipeline.py`) updated to include the new `tract_place_assignment` table so `make demo` and demo-mode tests stay in sync with `make data`.
+
+**Gate 6.5 evidence:** `make lint`/`typecheck`/`test`/`audit`/`build` all pass. Backend: 314 pytest (up from 301), 0 failures. Frontend: 39 vitest unit tests, 0 failures. e2e: 77 passed / 1 honest skip on both desktop and mobile viewports (up from 74, with 2 new Phase 6.5 regression tests plus fixes to 2 pre-existing tests whose selectors became ambiguous due to genuinely new UI content, not app defects). Accessibility: 16 axe scans (up from 14), zero serious/critical violations, including new scans of the city-selected drill-down states in both Explore and Access Lab. Live browser verification covered: Sunnyvale/San Jose in Explore, Sunnyvale in Access Lab (including a full drill-down click through to a real 11-character tract GEOID), District 3, ZIP 94086, a full tract GEOID, and page reload / browser back / browser forward -- the resolved city/district name persisted correctly in every case, with the raw GEOID appearing only in URLs and canonical identifiers, never in place of a human-readable name.
+
+---
+
 ## Phase 7 — Utilization Lab and independent validation
 
 - [ ] HCAI normalization: ED encounters, facility profiles, patient-origin/market-share, payer, language, diagnosis groups, masking/suppression preserved. AC-ref §11.

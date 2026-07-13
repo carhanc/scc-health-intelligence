@@ -158,7 +158,8 @@ def main() -> int:
     print(
         f"  tracts={harmonize_result.tract_count} places={harmonize_result.place_count} "
         f"zctas={harmonize_result.zcta_count} "
-        f"boundary_crossing_tracts={harmonize_result.boundary_crossing_tract_count}"
+        f"boundary_crossing_tracts={harmonize_result.boundary_crossing_tract_count} "
+        f"unincorporated_tracts={harmonize_result.unincorporated_tract_count}"
     )
 
     print("\nLoading DuckDB warehouse...")

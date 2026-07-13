@@ -4,18 +4,19 @@ Explore is where you find a specific place — a city, a supervisor district, a 
 
 ## Finding a place
 
-Type into "Find a place." You can search:
+Type into "Find a place." You do not need to know a census tract number to get started — search:
 - A city or town name ("Sunnyvale," "San Jose")
-- A supervisor district ("District 3")
-- A census tract number, the 11-digit identifier the U.S. Census Bureau assigns to each tract (e.g. "06085500100")
+- A ZIP code ("95128") — matched to its ZIP Code Tabulation Area (ZCTA), the Census Bureau's own approximation of that ZIP code's boundary, which is not always identical to the real ZIP code
+- A supervisor district, by number or supervisor name ("District 3," "Otto Lee")
+- A census tract number, the 11-digit identifier the U.S. Census Bureau assigns to each tract (e.g. "06085500100") — still fully searchable, just no longer first in line for a query that looks like a city, ZIP, or district
 
-Search results show the type of place and its name; for a tract result, the number is shown alongside the name so you can confirm you found the right one. Click a result to select it.
+Search results show the type of place and its name; for a tract result, the number is shown alongside the name so you can confirm you found the right one. City, ZIP, and district results are shown ahead of tract matches for the same search term, so a common city name is never buried behind a long list of tract numbers. Click a result to select it.
 
 ## The map and the table
 
 By default you see a map of the county, shaded by combined concern score under the current priorities — darker teal means higher concern, and tracts with no score for the current priorities are shown in a distinct neutral color, never left looking like a real low score. Click any tract to select it.
 
-If a city, district, or ZIP-code area is selected, the map pans to it and draws a dashed outline so you can see exactly where it is and click a tract inside it — scores are calculated per census tract, not for a whole city or district at once, since a city can contain tracts with very different pictures.
+If a city, district, or ZIP-code area is selected, the map pans to it and draws a dashed outline so you can see exactly where it is and click a tract inside it — scores are calculated per census tract, not for a whole city or district at once, since a city can contain tracts with very different pictures. The panel on the right also lists that city or district's highest-concern tracts directly, so you can jump straight to one without hunting on the map.
 
 Prefer not to use the map, or want every tract's numbers in one sortable list? Switch to Table using the control above the map. It's the same underlying data, sortable by any column, fully usable with a keyboard — click a column header to sort, click or press Enter on a row to select that tract.
 

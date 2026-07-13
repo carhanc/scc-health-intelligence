@@ -260,4 +260,14 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-026 — Access Lab's city/district tract drill-down ranks by Explore's default scenario, not an Access Lab-specific priority
+
+**Category:** Product completeness / UI scope. **Likelihood:** Confirmed by design (Phase 6.5). **Impact:** Low -- Access Lab has no scenario picker of its own (unlike Explore), so `city-drill-down.tsx` uses the fixed `default_integrated_screen_v1` scenario purely to identify which 5 tracts to surface as a starting point when a city or district is selected. This is disclosed directly in the UI ("Tracts shown are the highest estimated-concern areas under Explore's default balanced-priorities view, used here only to suggest a starting point") -- never presented as an access-specific ranking.
+
+**Mitigation:** The drill-down is explicitly a navigation aid ("suggest a starting point"), not an access-relevant ranking claim -- a user can search for any other tract in that city directly via the same search box, not only the 5 suggested ones.
+
+**Status:** `open` -- if Access Lab later gains its own scenario/priority concept (e.g. ranking by measured access rather than combined health-burden concern), the drill-down should be revisited to use it instead of borrowing Explore's default.
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

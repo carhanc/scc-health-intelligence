@@ -60,6 +60,34 @@ export function ExploreMap({
     staleTime: 5 * 60 * 1000,
   });
 
+  // `selected.displayName` is only ever a real name for the single render
+  // right after an in-app search click -- once the URL round-trips (which
+  // happens on every selection, since `selected` is always re-derived from
+  // URL params, not kept from the click event), `parseSelectedGeographyFromParams`
+  // has no name to fall back on except the raw GEOID. Resolving the real
+  // name here, from the same profile endpoints the detail panel already
+  // calls, fixes a real defect found during Phase 6.5 verification: the
+  // outline caption showed a raw place GEOID ("0668000") instead of "San
+  // Jose city" on every single place/district selection, not just
+  // URL-shared links.
+  const placeNameQuery = useQuery({
+    queryKey: ["geography-display-name", selected?.geographyType, selected?.geoid],
+    queryFn: async () => {
+      if (selected?.geographyType === "place") {
+        const profile = await api.getPlaceProfile(selected.geoid);
+        return profile.name_long;
+      }
+      if (selected?.geographyType === "supervisor_district") {
+        const profile = await api.getSupervisorDistrictProfile(Number(selected.geoid));
+        return `District ${profile.district_number} (${profile.supervisor_name})`;
+      }
+      return null;
+    },
+    enabled: !!selected && (selected.geographyType === "place" || selected.geographyType === "supervisor_district"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const resolvedSelectedName = placeNameQuery.data ?? selected?.displayName ?? "the selected area";
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
@@ -279,8 +307,8 @@ export function ExploreMap({
       )}
       {selected && selected.geographyType !== "tract" && (
         <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-          The dashed outline shows {selected.displayName || "the selected area"}. Click any tract inside it to see
-          that tract&rsquo;s score.
+          The dashed outline shows {resolvedSelectedName}. Click any tract inside it to see that tract&rsquo;s
+          score.
         </p>
       )}
       {hoverInfo && (

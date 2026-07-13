@@ -12,11 +12,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from scc_health_api.db import WarehouseUnavailableError, get_read_only_connection
 from scc_health_api.repositories import geography as geography_repo
 from scc_health_api.schemas.geography import (
+    DistrictTopConcernTractsResponse,
     GeographyBoundaryResponse,
     GeographySearchResponse,
     GeographySearchResult,
     PlaceProfile,
+    PlaceTopConcernTractsResponse,
     SupervisorDistrictProfile,
+    TopConcernTract,
     TractBoundaryCollectionResponse,
     TractProfile,
 )
@@ -105,6 +108,37 @@ def get_place(place_geoid: str, settings: Settings = Depends(get_settings)) -> P
     return PlaceProfile(data_mode=mode, **profile)
 
 
+@router.get("/place/{place_geoid}/top-concern-tracts", response_model=PlaceTopConcernTractsResponse)
+def get_place_top_concern_tracts(
+    place_geoid: str,
+    scenario_id: str | None = Query(
+        None,
+        description="If supplied, returns the highest-scoring tracts in this place under it.",
+    ),
+    limit: int = Query(5, ge=1, le=20),
+    settings: Settings = Depends(get_settings),
+) -> PlaceTopConcernTractsResponse:
+    """Phase 6.5: lets a city selection drill down into its own
+    highest-concern tracts, so a user never needs to already know a
+    tract number to get there. Returns an empty list (never fabricated
+    tracts) when no scenario is active or scoring data doesn't exist."""
+    try:
+        with get_read_only_connection(settings) as (conn, mode):
+            if geography_repo.get_place_profile(conn, place_geoid) is None:
+                raise _geography_not_found("place", place_geoid)
+            tracts = geography_repo.get_place_top_concern_tracts(
+                conn, place_geoid, scenario_id, limit
+            )
+    except WarehouseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return PlaceTopConcernTractsResponse(
+        place_geoid=place_geoid,
+        scenario_id=scenario_id,
+        tracts=[TopConcernTract(**t) for t in tracts],
+        data_mode=mode,
+    )
+
+
 @router.get(
     "/supervisor_district/{district_number}",
     response_model=SupervisorDistrictProfile,
@@ -120,6 +154,37 @@ def get_supervisor_district(
     if profile is None:
         raise _geography_not_found("supervisor_district", str(district_number))
     return SupervisorDistrictProfile(data_mode=mode, **profile)
+
+
+@router.get(
+    "/supervisor_district/{district_number}/top-concern-tracts",
+    response_model=DistrictTopConcernTractsResponse,
+)
+def get_district_top_concern_tracts(
+    district_number: int,
+    scenario_id: str | None = Query(
+        None,
+        description="If supplied, returns the highest-scoring tracts in this district under it.",
+    ),
+    limit: int = Query(5, ge=1, le=20),
+    settings: Settings = Depends(get_settings),
+) -> DistrictTopConcernTractsResponse:
+    """Phase 6.5: same drill-down pattern as the place/city endpoint above."""
+    try:
+        with get_read_only_connection(settings) as (conn, mode):
+            if geography_repo.get_supervisor_district_profile(conn, district_number) is None:
+                raise _geography_not_found("supervisor_district", str(district_number))
+            tracts = geography_repo.get_district_top_concern_tracts(
+                conn, district_number, scenario_id, limit
+            )
+    except WarehouseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return DistrictTopConcernTractsResponse(
+        district_number=district_number,
+        scenario_id=scenario_id,
+        tracts=[TopConcernTract(**t) for t in tracts],
+        data_mode=mode,
+    )
 
 
 @router.get("/{geography_type}/{geography_id}/boundary", response_model=GeographyBoundaryResponse)

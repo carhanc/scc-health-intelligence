@@ -39,6 +39,14 @@ In the Phase 2 build, 408 tracts were assigned with 100% coverage (no orphaned t
 
 Two candidate Santa Clara County supervisor-district boundary datasets were found on ArcGIS Online during Phase 2 (both published by `SCC.Planning.Office`). One (`Supervisorial_Districts_2021`) has only `OBJECTID`/`Shape__Area`/`Shape__Length` fields — no way to verify which `OBJECTID` corresponds to official District 1–5. The other (`PlanningOfficeDataService2` layer 5) carries explicit `DISTRICT` and `SUPERVISOR` fields matching current officeholders, and was more recently modified. The labeled source was used; the unlabeled one was evaluated and rejected (`DECISIONS.md` DEC-012). Guessing "OBJECTID 1 = District 1" would have been exactly the kind of unverified assumption CLAUDE.md prohibits.
 
+## 4.5. Place (city) assignment
+
+Phase 6.5 added `geo.tract_place_assignment`, built by the **identical** majority-land-area-overlap method as supervisor-district assignment above (§4) — reproject to EPSG:3310, compute each tract's intersection area with every incorporated place it touches, assign the majority-share place as `place_geoid`, and flag `is_clean_assignment = false` below the same 95% threshold, retaining every overlapping place's share in `all_place_shares`.
+
+This deliberately replaced an earlier, lighter-weight implementation that used `ST_Contains(place.geometry, tract.internal_point)` (point-in-polygon against the tract's single representative point) — a reasonable-looking shortcut that turned out to disagree with the majority-overlap result for 35 of 408 tracts once measured live, confirming it was a real methodological choice, not a cosmetic one (`DECISIONS.md` DEC-053). Using one consistent, audited method for both the city and district relationships avoids a tract appearing to belong to different cities depending on which part of the platform computed the answer.
+
+In the live build, all 408 tracts received a place assignment (Santa Clara County has no tract with zero overlap onto any incorporated place at all), though 106 tracts (26%) are boundary-crossing at the <95% threshold — some quite marginally (the lowest observed primary share was ~2%, a tract that is overwhelmingly unincorporated county land but technically clips a city boundary at its edge). This is disclosed via `is_clean_assignment`/`all_place_shares`, not smoothed over — a UI showing "this tract is in San Jose" should treat a low-confidence assignment differently from a clean one if that distinction matters to the use case.
+
 ## 5. ZIP/ZCTA-to-tract crosswalk
 
 The default (keyless) crosswalk is the Census 2020 ZCTA-to-tract area relationship file (`DECISIONS.md` DEC-005), not the HUD USPS crosswalk, because HUD's crosswalk now requires free account registration (discovered during Phase 0 source verification) — the spec's own documented fallback ordering was followed.

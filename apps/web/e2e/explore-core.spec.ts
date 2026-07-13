@@ -113,4 +113,59 @@ test.describe("Explore -- search, selection, and view switching", () => {
       timeout: 15_000,
     });
   });
+
+  test("selecting a city shows its human-readable name, never a raw place GEOID, including after reload and browser back/forward (Phase 6.5 regression)", async ({
+    page,
+  }) => {
+    await page.goto("/explore");
+    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
+    await page.getByLabel("Find a place").fill("San Jose");
+    await page.getByRole("button", { name: "Search" }).click();
+    const result = page.getByRole("button", { name: /San Jose/ });
+    await expect(result).toBeVisible({ timeout: 10_000 });
+    await result.click();
+
+    const caption = page.getByText("The dashed outline shows", { exact: false });
+    await expect(caption).toContainText("San Jose city", { timeout: 10_000 });
+    await expect(caption).not.toContainText("0668000");
+
+    // Selecting a geography is always URL-driven (the same code path a
+    // fresh page load or a bookmarked/shared link takes) -- a reload must
+    // not regress the resolved name back to the raw place GEOID.
+    await page.reload();
+    await expect(caption).toContainText("San Jose city", { timeout: 10_000 });
+    await expect(caption).not.toContainText("0668000");
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/explore$/);
+    await page.goForward();
+    await expect(caption).toContainText("San Jose city", { timeout: 10_000 });
+  });
+
+  test("supervisor district search and selection shows the district name, not just a bare number", async ({
+    page,
+  }) => {
+    await page.goto("/explore");
+    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
+    await page.getByLabel("Find a place").fill("district 3");
+    await page.getByRole("button", { name: "Search" }).click();
+
+    const result = page.getByRole("button", { name: /District 3/ });
+    await expect(result).toBeVisible({ timeout: 10_000 });
+    await result.click();
+
+    await expect(page).toHaveURL(/geography=supervisor_district&id=3/);
+    const caption = page.getByText("The dashed outline shows", { exact: false });
+    await expect(caption).toContainText("District 3", { timeout: 10_000 });
+    await expect(page.getByText("Highest-concern areas in District 3")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("ZIP code search finds the matching ZCTA", async ({ page }) => {
+    await page.goto("/explore");
+    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
+    await page.getByLabel("Find a place").fill("94086");
+    await page.getByRole("button", { name: "Search" }).click();
+
+    await expect(page.getByText("ZIP Code Tabulation Area 94086")).toBeVisible({ timeout: 10_000 });
+  });
 });
