@@ -1,6 +1,6 @@
 # Manual visual-review checklist
 
-Claude Preview remains blocked in this environment by a macOS TCC (Files and Folders) permission gap (`RISK_REGISTER.md` RISK-012) — the process hosting it cannot launch a dev server under `~/Desktop`. Everything *functional* has been verified with a real, automated Chromium browser via Playwright (62 end-to-end tests, 9 accessibility scans, 24 responsive checks, all passing — see `docs/design/usability-testing.md`). What's left is **genuinely visual judgment** that no automated tool can make: does it look good, is anything visually cramped or misaligned, does the map read clearly to a human eye.
+Claude Preview remains blocked in this environment by a macOS TCC (Files and Folders) permission gap (`RISK_REGISTER.md` RISK-012) — the process hosting it cannot launch a dev server under `~/Desktop`. Everything *functional* has been verified with a real, automated Chromium browser via Playwright (240+ end-to-end tests as of Phase 7, accessibility scans across every tab of every page, responsive checks at all 6 required widths, all passing — see `docs/design/usability-testing.md`). What's left is **genuinely visual judgment** that no automated tool can make: does it look good, is anything visually cramped or misaligned, does the map read clearly to a human eye.
 
 **Run `make dev` (or `pnpm --filter @scc-health/web dev` + the API), open `http://localhost:3000` in your own browser, and confirm the items below.** Nothing here re-tests functionality already covered automatically — only look, don't click through every workflow again.
 
@@ -32,6 +32,29 @@ Resize your browser window (or use your browser's device toolbar) to each width 
 - [ ] **768px** — same stacked layout; touch targets (buttons, search box) look large enough to tap comfortably.
 - [ ] **390px** — mobile layout; navigation is reachable via the menu button, nothing is cut off at the screen edge.
 - [ ] **320px** — smallest supported width; confirm the page is still usable, not just "technically not broken."
+
+## Prioritize (`/prioritize`)
+
+- [ ] The scenario cards and custom-weighting sliders look inviting to use, not like a raw settings panel.
+- [ ] Moving a slider updates the "Applied weights" percentages smoothly, with no visible flicker or layout jump.
+- [ ] The ranked-results table is easy to scan; the stability badge and "Show drivers" button are clearly distinguishable from plain text.
+- [ ] The "Why this ranked here" explanation card, once expanded, sits in an obviously-related position relative to the table (not orphaned far from what triggered it).
+- [ ] The decision memo in the Export tab looks genuinely printable — check the browser's print preview and confirm nothing is cut off or awkwardly paginated.
+- [ ] The Compare tab's three-column overlap view (both / only-left / only-right) reads clearly at a glance.
+
+## Utilization (`/utilization`)
+
+- [ ] The facility table and its expanded payer/disposition/language breakdown look organized, not like three unrelated lists stacked together.
+- [ ] The "Suppressed (small count)" badges in the Trends table are visually distinct from real numbers, not easy to misread as a value.
+- [ ] The "Unreliable estimate — do not use" badge on a flagged tract is visually prominent (not a pale, easy-to-miss footnote) given how important that distinction is.
+- [ ] Switching between the Disposition / Race group / Sex / Expected payer trend buttons feels responsive, with a clear active-state indicator.
+
+## Validate (`/validate`)
+
+- [ ] All six tabs are easy to tell apart and navigate between; the currently active tab is visually obvious.
+- [ ] The metric-registry disclosure list (Scoring methods tab) expands cleanly without shifting surrounding content awkwardly.
+- [ ] The convergent-validity and criterion-validity result cards (Validation tab) are easy to visually compare against each other.
+- [ ] The audit-status grid (Reproducibility tab) reads clearly as a real pass/fail summary, not a wall of undifferentiated text.
 
 ## Across all of the above, confirm
 

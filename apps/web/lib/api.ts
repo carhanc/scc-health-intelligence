@@ -554,6 +554,271 @@ export interface OptimizationScenariosResponse {
   scenarios: OptimizationScenario[];
 }
 
+// --- Phase 7: Utilization ---
+
+export type DataStatus = "observed" | "modeled" | "suppressed";
+
+export interface CountyTrendPoint {
+  breakdown_category: string;
+  category_value: string;
+  service_year: number;
+  encounters: number | null;
+  is_suppressed: boolean;
+  suppression_annotation_desc: string | null;
+  data_status: DataStatus;
+}
+
+export interface CountyTrendsResponse {
+  data_mode: DataMode;
+  geography_level: "county";
+  breakdown: string;
+  points: CountyTrendPoint[];
+}
+
+export interface UtilFacilitySummary {
+  oshpd_id: string;
+  facility_name: string;
+  city: string | null;
+  zip_code: string | null;
+  license_category: string | null;
+  trauma_center_level: string | null;
+  er_service_level: string | null;
+  is_rural: boolean | null;
+  is_teaching: boolean | null;
+  licensed_bed_band: string | null;
+  total_ed_encounters: number | null;
+  reporting_year: number;
+  data_status: DataStatus;
+}
+
+export interface FacilitySummaryListResponse {
+  data_mode: DataMode;
+  facilities: UtilFacilitySummary[];
+}
+
+export interface FacilityBreakdownDetail {
+  disposition: Record<string, number | null>;
+  payer_mix: Record<string, number | null>;
+  language: Record<string, number | null>;
+}
+
+export interface UtilFacilityDetailResponse {
+  data_mode: DataMode;
+  facility: UtilFacilitySummary;
+  breakdown: FacilityBreakdownDetail;
+}
+
+export interface ZipObservedEncounters {
+  patient_zip: string;
+  pattype_group: string;
+  encounters: number;
+  reporting_year: number;
+  data_status: DataStatus;
+}
+
+export interface ZipObservedListResponse {
+  data_mode: DataMode;
+  geography_level: "patient_zip";
+  total_observed_encounters: number;
+  zips: ZipObservedEncounters[];
+}
+
+export type RateReliability = "plausible_range" | "low_reliability";
+
+export interface TractUtilization {
+  tract_geoid_2020: string;
+  modeled_ed_encounters_combined: number | null;
+  total_population: number | null;
+  modeled_ed_rate_per_1000: number | null;
+  e2sfca_hospital_drive_access_score: number | null;
+  n_contributing_zips: number | null;
+  crosswalk_quality: string | null;
+  method: string | null;
+  rate_reliability: RateReliability | null;
+  rate_reliability_note: string | null;
+  data_status: DataStatus;
+}
+
+export interface TractUtilizationListResponse {
+  data_mode: DataMode;
+  geography_level: "tract";
+  tracts: TractUtilization[];
+}
+
+export interface TractUtilizationDetailResponse {
+  data_mode: DataMode;
+  tract: TractUtilization;
+}
+
+export interface CriterionValidityResult {
+  scenario_id: string;
+  outcome_label: string;
+  validity_type: string;
+  hypothesis: string;
+  is_tautological: boolean;
+  tautology_reason: string;
+  n_paired_observations: number;
+  n_missing: number;
+  spearman_r: number | null;
+  spearman_p_value: number | null;
+  pearson_r: number | null;
+  pearson_p_value: number | null;
+  bootstrap_ci_lower: number | null;
+  bootstrap_ci_upper: number | null;
+  n_bootstrap: number;
+  interpretation_note: string;
+}
+
+export interface CriterionValidityResponse {
+  data_mode: DataMode;
+  results: CriterionValidityResult[];
+}
+
+// --- Phase 7: Prioritize ---
+
+export interface CustomDomainContribution {
+  domain: string;
+  domain_score: number;
+  configured_weight: number;
+  normalized_weight: number;
+  contribution: number;
+}
+
+export interface CustomScoreTract {
+  tract_geoid_2020: string;
+  score: number | null;
+  coverage_fraction: number;
+  domains_missing: string[];
+  domain_contributions: CustomDomainContribution[];
+}
+
+export interface CustomScoreResponse {
+  data_mode: DataMode;
+  weights: Record<string, number>;
+  has_uncertainty_data: false;
+  uncertainty_note: string;
+  total_tracts: number;
+  tracts: CustomScoreTract[];
+}
+
+export interface MemoDomainLine {
+  domain: string;
+  label: string;
+  domain_score: number;
+  contribution: number;
+}
+
+export interface MemoTractEntry {
+  tract_geoid_2020: string;
+  rank: number;
+  score: number | null;
+  coverage_fraction: number;
+  top_domains: MemoDomainLine[];
+}
+
+export interface DecisionMemoResponse {
+  data_mode: DataMode;
+  generated_at: string;
+  scenario_label: string;
+  weights_used: Record<string, number>;
+  is_custom_weighting: boolean;
+  constraints_note: string;
+  top_tracts: MemoTractEntry[];
+  methodology_note: string;
+  limitations_note: string;
+  sources_note: string;
+}
+
+// --- Phase 7: Validate ---
+
+export interface StabilityLabelCount {
+  stability_label: string;
+  n_tracts: number;
+}
+
+export interface UncertaintySummary {
+  data_mode: DataMode;
+  scenario_id: string;
+  scenario_label: string;
+  n_tracts_scored: number;
+  n_tracts_data_limited: number;
+  stability_label_counts: StabilityLabelCount[];
+  median_ci_width: number | null;
+  mean_probability_top_decile_among_top_decile: number | null;
+  note: string;
+}
+
+export interface PresetComparisonRow {
+  preset_id: string;
+  preset_label: string;
+  spearman_rank_correlation_vs_named_scenario: number | null;
+  n_paired_tracts: number;
+}
+
+export interface SensitivitySummary {
+  data_mode: DataMode;
+  scenario_id: string;
+  scenario_label: string;
+  preset_comparisons: PresetComparisonRow[];
+  note: string;
+  optimizer_sensitivity_note: string;
+}
+
+export interface AuditCheckResult {
+  check_name: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface AuditSuiteResult {
+  suite: string;
+  n_checks: number;
+  n_passed: number;
+  n_failed: number;
+  checks: AuditCheckResult[];
+}
+
+export interface AuditStatusResponse {
+  data_mode: DataMode;
+  run_at: string | null;
+  all_passed: boolean;
+  suites: AuditSuiteResult[];
+}
+
+export interface KnownLimitation {
+  category: string;
+  statement: string;
+}
+
+export interface KnownLimitationsResponse {
+  limitations: KnownLimitation[];
+}
+
+export interface ScenarioHash {
+  scenario_id: string;
+  label: string;
+  weights_hash: string;
+}
+
+export interface BuildRecord {
+  build_id: string;
+  phase: string;
+  finished_at: string;
+  notes: string;
+}
+
+export interface ReproducibilityResponse {
+  data_mode: DataMode;
+  scenario_hashes: ScenarioHash[];
+  recent_builds: BuildRecord[];
+  data_manifest_source_count: number;
+  monte_carlo_seed: number;
+  monte_carlo_draws: number;
+  weight_sensitivity_seed: number;
+  weight_sensitivity_draws: number;
+  note: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -701,4 +966,84 @@ export const api = {
     ),
   getOptimizationScenarios: () =>
     apiGet<OptimizationScenariosResponse>("/api/v1/access/optimize/scenarios"),
+
+  // --- Phase 7: Utilization ---
+  getCountyTrends: (breakdown = "disposition") =>
+    apiGet<CountyTrendsResponse>(
+      `/api/v1/utilization/county-trends?breakdown=${encodeURIComponent(breakdown)}`,
+    ),
+  getUtilizationFacilities: () =>
+    apiGet<FacilitySummaryListResponse>("/api/v1/utilization/facilities"),
+  getUtilizationFacilityDetail: (oshpdId: string) =>
+    apiGet<UtilFacilityDetailResponse>(
+      `/api/v1/utilization/facilities/${encodeURIComponent(oshpdId)}`,
+    ),
+  getZipObserved: () => apiGet<ZipObservedListResponse>("/api/v1/utilization/zips"),
+  getTractUtilizationList: (options?: { order?: "rate_desc" | "rate_asc"; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.order) params.set("order", options.order);
+    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    const qs = params.toString();
+    return apiGet<TractUtilizationListResponse>(`/api/v1/utilization/tracts${qs ? `?${qs}` : ""}`);
+  },
+  getTractUtilization: (tractGeoid: string) =>
+    apiGet<TractUtilizationDetailResponse>(
+      `/api/v1/utilization/tracts/${encodeURIComponent(tractGeoid)}`,
+    ),
+  getUtilizationCriterionValidity: () =>
+    apiGet<CriterionValidityResponse>("/api/v1/utilization/criterion-validity"),
+
+  // --- Phase 7: Prioritize ---
+  computeCustomScore: async (weights: Record<string, number>): Promise<CustomScoreResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/prioritize/custom-score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ weights }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      let message = `Custom score request failed with status ${response.status}`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        if (body.detail) message = body.detail;
+      } catch {
+        // fall through with default message
+      }
+      throw new ApiError(message, response.status);
+    }
+    return (await response.json()) as CustomScoreResponse;
+  },
+  getPrioritizeExportCsvUrl: (
+    params: { scenarioId: string } | { weights: Record<string, number> },
+    limit = 408,
+  ) => {
+    const qs = new URLSearchParams();
+    if ("scenarioId" in params) qs.set("scenario_id", params.scenarioId);
+    else qs.set("weights", JSON.stringify(params.weights));
+    qs.set("limit", String(limit));
+    return `${API_BASE_URL}/api/v1/prioritize/export/csv?${qs.toString()}`;
+  },
+  getDecisionMemo: (
+    params: { scenarioId: string } | { weights: Record<string, number> },
+    topN = 10,
+  ) => {
+    const qs = new URLSearchParams();
+    if ("scenarioId" in params) qs.set("scenario_id", params.scenarioId);
+    else qs.set("weights", JSON.stringify(params.weights));
+    qs.set("top_n", String(topN));
+    return apiGet<DecisionMemoResponse>(`/api/v1/prioritize/export/memo?${qs.toString()}`);
+  },
+
+  // --- Phase 7: Validate ---
+  getUncertaintySummary: (scenarioId: string) =>
+    apiGet<UncertaintySummary>(
+      `/api/v1/validate/uncertainty-summary?scenario_id=${encodeURIComponent(scenarioId)}`,
+    ),
+  getSensitivitySummary: (scenarioId: string) =>
+    apiGet<SensitivitySummary>(
+      `/api/v1/validate/sensitivity-summary?scenario_id=${encodeURIComponent(scenarioId)}`,
+    ),
+  getAuditStatus: () => apiGet<AuditStatusResponse>("/api/v1/validate/audit-status"),
+  getKnownLimitations: () => apiGet<KnownLimitationsResponse>("/api/v1/validate/known-limitations"),
+  getReproducibility: () => apiGet<ReproducibilityResponse>("/api/v1/validate/reproducibility"),
 };

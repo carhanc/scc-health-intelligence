@@ -8,8 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from scc_health_api.routes.access import router as access_router
 from scc_health_api.routes.analytics import router as analytics_router
 from scc_health_api.routes.geography import router as geography_router
+from scc_health_api.routes.prioritize import router as prioritize_router
 from scc_health_api.routes.sources import router as sources_router
 from scc_health_api.routes.system import router as system_router
+from scc_health_api.routes.utilization import router as utilization_router
+from scc_health_api.routes.validate import router as validate_router
 
 app = FastAPI(
     title="Santa Clara Health Intelligence API",
@@ -37,3 +40,6 @@ app.include_router(geography_router)
 app.include_router(sources_router)
 app.include_router(analytics_router)
 app.include_router(access_router)
+app.include_router(utilization_router)
+app.include_router(prioritize_router)
+app.include_router(validate_router)

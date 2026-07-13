@@ -35,8 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Prioritize",
     href: "/prioritize",
     description: "Rank communities by a specific issue, with sensitivity and stability shown.",
-    status: "coming_soon",
-    phase: "Phase 6",
+    status: "available",
   },
   {
     id: "access-lab",
@@ -50,16 +49,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Utilization",
     href: "/utilization",
     description: "Emergency-department utilization and patient-flow evidence.",
-    status: "coming_soon",
-    phase: "Phase 7",
+    status: "available",
   },
   {
     id: "validate",
     label: "Validate",
     href: "/validate",
     description: "Methods, uncertainty, data quality, and independent validation.",
-    status: "coming_soon",
-    phase: "Phase 7",
+    status: "available",
   },
   {
     id: "advocate",

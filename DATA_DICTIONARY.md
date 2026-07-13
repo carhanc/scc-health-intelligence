@@ -242,6 +242,36 @@ E2SFCA catchment accessibility per population origin, mode, and category. Fields
 
 Mobile-clinic siting sensitivity sweep varying k_sites/distance_threshold/equity constraint, including one real `INFEASIBLE` result. See `docs/methods/optimization.md`.
 
+## Phase 7 tables (Utilization / Prioritize / Validate — implemented)
+
+### `analytics.utilization_ed_zip_observed` — 213 rows
+
+Real, observed 2024 ED-related encounters by patient ZIP code, for Santa Clara County residents only (`patient_county_name = 'SANTA CLARA'`), split by `pattype_group` (`ed_only` | `inpatient_from_ed`, never combined). Fields: `patient_zip`, `pattype_group`, `encounters`, `reporting_year`, `geography_level="patient_zip"`, `data_status="observed"`. Aggregated directly from `utilization.hcai_patient_origin` — native geography, not allocated.
+
+### `analytics.utilization_ed_tract_modeled` — 816 rows
+
+**Modeled**, not observed: `analytics.utilization_ed_zip_observed` allocated to tracts via the area-weighted `geo.crosswalk_zip_tract` (DEC-055). Fields: `tract_geoid_2020`, `pattype_group`, `modeled_encounters` (float, not an integer count — a fractional allocation), `n_contributing_zips`, `crosswalk_quality`, `method="zip_to_tract_area_weighted_allocation"`, `data_status="modeled"`. 2.3% of observed ZIP-level encounters could not be allocated (no crosswalk entry) — disclosed in pipeline diagnostics, not silently dropped from any total.
+
+### `analytics.utilization_ed_facility_summary` — 9 rows
+
+Real, observed 2024 ED characteristics per Santa Clara facility, reshaped from `utilization.hcai_ed_facility_profile`'s 179 wide columns. Fields include `oshpd_id`, `facility_name`, `city`, `zip_code` (zero-padded string), `license_category`, `trauma_center_level`, `er_service_level`, `licensed_bed_band` (a published band, e.g. "200-299", not an exact count), `total_ed_encounters` (COALESCEd across sex/payer/disposition breakdowns — whichever is unmasked first; verified all 9 facilities resolve), plus per-facility disposition/payer/language breakdown columns, `data_status="observed"`.
+
+### `analytics.utilization_ed_county_trends` — 796 rows
+
+Real Santa Clara County ED encounters by year, 2008-2024, reshaped from `utilization.hcai_ed_patient_county`'s 4 breakdowns. Fields: `breakdown_category`, `category_value`, `service_year`, `encounters` (null, never zero, when `is_suppressed`), `is_suppressed`, `suppression_annotation_desc`, `geography_level="county"`, `data_status` (`observed` | `suppressed`).
+
+### `analytics.utilization_access_vs_utilization` — 408 rows (one per tract)
+
+Tract-level join of `analytics.utilization_ed_tract_modeled` (both `pattype_group`s summed) against `health.places_observations`' population and `analytics.e2sfca_accessibility`'s drive-mode hospital access score. Fields: `modeled_ed_encounters_combined`, `total_population`, `modeled_ed_rate_per_1000`, `e2sfca_hospital_drive_access_score`, `rate_reliability` (`plausible_range` | `low_reliability`, DEC-056), `rate_reliability_note`, `method`, `data_status="modeled"`. 392 of 408 tracts (96.1%) are `plausible_range`; 16 are `low_reliability`.
+
+### `analytics.utilization_criterion_validity` — 8 rows (one per scenario)
+
+Criterion-validity correlation (Spearman + Pearson + 2,000-draw bootstrap CI) between each named scenario's score and `modeled_ed_rate_per_1000`, closing RISK-015 (DEC-055). Same shape and tautology-guard discipline as `analytics.correlation_diagnostics` (Phase 4). All 8 rows `is_tautological=false`, live-verified.
+
+### `meta.audit_runs` (row count varies by build — 258 rows as of the Phase 7 commit)
+
+Every `make audit` check's `(suite, check_name, passed, message)`, tagged with a single `run_at` timestamp per invocation (replaced, not appended, on each run — DEC-059). Powers `GET /api/v1/validate/audit-status` without the API importing the pipeline package.
+
 ## Versioning
 
 This file's structure is versioned alongside the metric registry (`config/metrics.yml`). Material changes to a metric's definition, source, or geography require a new metric ID version suffix and a changelog entry here, not a silent in-place edit — per `docs/09_SECURITY_PRIVACY_GOVERNANCE.md` "Governance for scores and models."

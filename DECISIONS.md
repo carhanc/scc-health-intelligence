@@ -616,4 +616,66 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-055 — ED-utilization tract-level allocation uses ZIP-to-tract area weighting, closing RISK-015 with a disclosed modeled quantity, never presented as observed
+
+**Context:** RISK-015 (open since Phase 4) recorded that no tract-level ED-utilization outcome existed to validate scenario scores against — HCAI's ED patient-county data is native to county of residence with Santa Clara as the only row (n=1), statistically ungrounded for correlation. Phase 7 needed a genuine, independent, tract-level outcome to finally run this check.
+
+**Decision:** `utilization/zip_to_tract_allocation.py` allocates real, observed ZIP-level ED-encounter counts (from `utilization.hcai_patient_origin`, filtered to Santa Clara County residents, `pattype IN ('ED Only', 'Inpatient from ED')`) down to tracts using the already-audited `geo.crosswalk_zip_tract` area weights (Phase 2, DEC-005) — never a new or invented crosswalk. Every result carries `method="zip_to_tract_area_weighted_allocation"` and the crosswalk's own `allocation_quality` label, and `analytics.utilization_ed_tract_modeled`/`utilization_access_vs_utilization` are separate tables from the real ZIP-level and county-level observed tables (`utilization_ed_zip_observed`, `utilization_ed_county_trends`), each carrying a `data_status` of `observed`, `modeled`, or `suppressed` — never merged or visually indistinguishable.
+
+**Rationale:** Reusing the existing, audited crosswalk rather than building a new one keeps a single source of truth for ZIP/ZCTA-to-tract allocation across the whole platform. Area-weighting is a real, disclosed approximation (assumes ED use is spread proportionally to land area within a ZIP) — the correct response per CLAUDE.md's data-integrity rules is disclosure, not fabricating a more precise-looking method this project has no population-weighted alternative for.
+
+**Consequences:** `run_utilization_pipeline.py::_build_criterion_validity` reuses the existing `validation/correlation_diagnostics.py::run_correlation_diagnostic` (Phase 4) and its tautology guard unchanged — RISK-015 is closed with a real, non-tautological, moderate positive correlation (Spearman r 0.27-0.37 across the 8 scenarios, n=408, live-verified) between modeled tract ED rate and each scenario's own priority score, consistent with what a defensible screening tool should show. 2.3% of observed ZIP-level encounters could not be allocated (ZIPs with no crosswalk entry) — disclosed via `AllocationDiagnostics.unmatched_zip_codes`, not silently dropped from totals. See DEC-056 for the outlier-tract reliability flag this allocation method required.
+
+### DEC-056 — Tract-level modeled ED rates above a plausibility ceiling are flagged `low_reliability`, not silently trusted
+
+**Context:** Live verification of DEC-055's allocation surfaced a real methodological artifact: a small number of large, sparsely-populated tracts (confirmed: tract 06085513500, holding a >=0.9 area-weight share of several ZCTAs whose real population and ED volume are concentrated elsewhere in the same ZCTA) produced nonsensical rates — one tract computed at 37,378 modeled ED visits per 1,000 residents, roughly 100x the real countywide rate (~320 per 1,000, computed directly from `total_observed_encounters / total_population`).
+
+**Decision:** `run_utilization_pipeline.py` flags any tract whose modeled rate exceeds `IMPLAUSIBLE_RATE_CEILING_PER_1000 = 1000` (a rate ceiling calibrated against the live distribution: median 235, 95th percentile 855, and generous headroom above real-world ED utilization ceilings) as `rate_reliability="low_reliability"` with an explanatory note, versus `"plausible_range"` for the remaining 392 of 408 tracts. Both the API (`/api/v1/utilization/tracts*`) and the Utilization UI surface this flag prominently (a red badge, not a footnote) rather than silently trusting or hiding the number.
+
+**Rationale:** CLAUDE.md prohibits fabricating or silently presenting a misleading number; a wildly implausible allocation artifact presented as an ordinary modeled value would violate that even though the underlying arithmetic is "correct" given the area-weighting assumption. Excluding these tracts from the table entirely would also violate "never conceal unavailable or unreachable results" — flagging, not hiding, is the correct middle path.
+
+**Consequences:** A new audit (`audits/utilization_audits.py::_audit_implausible_rates_are_flagged`) enforces that every rate above the ceiling carries the flag and note, live-verified passing. 16 of 408 tracts (3.9%) are currently flagged. This is a real, disclosed limitation of ZIP-to-tract area weighting for large/sparse tracts, recorded in RISK_REGISTER.md and surfaced on the Validate page's Known Limitations tab.
+
+### DEC-057 — Added a real "Environmental burden" scenario; "Language access" is shown as a genuinely unavailable option, not faked
+
+**Context:** The Phase 7 spec's requested Prioritize scenario list (Balanced overview, Chronic disease, Healthcare access, Food insecurity, Older adults, Language access, Environmental burden, Custom) does not match the 7 scenarios `config/scenarios.yml` actually scores — none of the 7 weighted `environmental_burden` above 0.20, and no tract-level language-barrier metric feeds any scored domain at all (DEC-027).
+
+**Decision:** Added `environmental_burden_priority_v1` (weights: environmental_burden 0.50, health_burden 0.25, access_barriers 0.25) to `config/scenarios.yml`, using the same already-scored `environmental_burden` domain (CalEnviroScreen-based) and the same aggregation engine as every other scenario — a legitimate new weighting preset, not a new metric or method. "Language access" was deliberately NOT built as a scenario, since doing so would require reweighting the same 5 generic domains under a label implying they measure language barriers, which they do not. The Prioritize UI shows it as a visible, explained "Not available yet" option instead.
+
+**Rationale:** CLAUDE.md's "never fabricate... in production outputs" rule applies to silently mislabeling a generic reweighting as something it is not, just as much as it applies to inventing data. A real gap disclosed with a documented reason is the required response, per "a failed source must produce a visible unavailable state, a logged reason, and a documented fallback."
+
+**Consequences:** `run_analytics_pipeline.py` was re-run in full to score the 8th scenario (Monte Carlo, weight sensitivity, correlation diagnostics, optimizer all regenerated) — live-verified non-tautological (`is_tautological=false`) against both CDC/ATSDR SVI and the new modeled-ED-rate criterion outcome. A real, incidental finding surfaced during this re-run and Phase 7's reproducibility-hash testing: `mobile_transit_care_v1` and `older_adult_support_v1` already shared an identical weight vector before this change (both scenarios' own `notes` fields disclose falling back to the same generic access/resource proxies) — recorded in RISK_REGISTER.md as a minor, pre-existing product-design note, not a Phase 7 defect.
+
+### DEC-058 — Custom domain-weighting in Prioritize reuses the Phase 4 aggregation formula via a dependency-isolated duplicate, following the DEC-022/DEC-051 pattern
+
+**Context:** Prioritize's "Custom scenario" requires computing a combined score for an arbitrary, user-supplied weight vector the batch pipeline never precomputes (it cannot enumerate every possible weighting in advance). The real aggregation formula (`scoring/scenario_scores.py::compute_scenario_score` — weighted mean of present domain scores, renormalized over present domains, `coverage_fraction` disclosed) lives in the pipeline package, which the API deliberately does not import (DEC-022).
+
+**Decision:** `apps/api/.../services/custom_scenario_scoring.py` is a small, dependency-free duplicate of the same formula, operating only on already-computed `analytics.domain_scores` rows (never raw metrics) — the same "small local copy, separately tested" pattern already established for `services/resource_gap.py` (DEC-051). `apps/api/tests/test_custom_scenario_scoring.py` asserts identical output to the pipeline's own hand-calculated cases in `pipelines/tests/test_scenario_scores.py`, and a live API integration test confirms a custom request using the exact "Balanced overview" weight vector reproduces that named scenario's real, precomputed ranking exactly.
+
+**Rationale:** Consistency with the already-established boundary is worth more than importing ~15 lines of aggregation logic — the same tradeoff DEC-051 already made for resource-gap classification.
+
+**Consequences:** If the real aggregation formula's methodology ever changes, both copies must be updated in the same commit (documented in both modules' docstrings, same as DEC-051's resource-gap pair) — a future drift would be caught by a test-result difference, not silently.
+
+### DEC-059 — Audit results are persisted to `meta.audit_runs` so the Validate page can show real audit status via a read-only query
+
+**Context:** The Phase 7 spec requires the Validate page to show "audit status" as part of reproducibility. `make audit`'s 8 suites (258 checks) previously only printed to the CLI — there was no way for the API to report current audit status without either re-running the full audit suite inside an HTTP request handler (which imports the full pipeline dependency chain, violating DEC-022) or shelling out to a CLI command from the API process.
+
+**Decision:** `run_audits.py` writes every check's `(suite, check_name, passed, message)` to a new `meta.audit_runs` table after all 8 suites complete, tagged with a single `run_at` timestamp per invocation (replacing the table on each run, not appending indefinitely). `GET /api/v1/validate/audit-status` reads this table read-only, the same pattern every other route in this project already follows.
+
+**Rationale:** Persisting the already-computed result of a batch job the API doesn't need to re-run itself is the same "precomputed, read-only" boundary DEC-030 already established for `analytics.*` — audit status is exactly the same kind of artifact.
+
+**Consequences:** Audit status on the Validate page reflects the most recent `make audit` run, not necessarily the current instant — acceptable, since the same is already true of every other precomputed analytics table this platform serves. Live-verified: 258/258 checks passing across all 8 suites as of the Phase 7 commit.
+
+### DEC-060 — Prioritize's "constraints" and "explainability" reuse Phase 6 optimizer scenarios and Explore's evidence drawer rather than rebuilding either
+
+**Context:** The Phase 7 spec's Prioritize page requires site/program constraints (site count, distance threshold, equity) and full explainability (why a place ranked highly, source data, uncertainty). Both already exist: Phase 6's `analytics.optimization_runs` (6 precomputed mobile-clinic sensitivity scenarios) and Explore's per-tract evidence drawer (`geography-detail.tsx`'s `EvidenceContent`, DEC-030-compliant, reading `/api/v1/scenarios/{id}/tracts/{tract}/explain`).
+
+**Decision:** Prioritize's "Site & program constraints" tab renders the existing `access-lab/optimizer-scenarios.tsx` component directly (literal reuse, not a rebuild) with an introductory paragraph framing it for the Prioritize context. Prioritize's results table shows a compact, inline "why this ranked here" (top 3 domain contributions, computed from the same data the results query already returned) plus a "View full sources & evidence in Explore" link that deep-links to the same tract/scenario in Explore's full drawer, rather than re-implementing that drawer's UI a second time.
+
+**Rationale:** CLAUDE.md's spec explicitly says "Do not expose live OR-Tools solving through the API... Precomputed, parameterized scenarios are acceptable when transparent" and "Reuse the Phase 4 scoring engine and Phase 6 optimization outputs. Do not create duplicate scoring logic in the frontend or API" — literal component/data reuse is the most direct compliance with both instructions.
+
+**Consequences:** A named-scenario tract's inline explanation in Prioritize is a lighter summary than Explore's full per-metric evidence view (domain-level, not metric-level) — intentional, not a gap: the deep link exists specifically so a user who wants the exhaustive per-metric citations one click away gets the identical, already-tested drawer, not a second, potentially-divergent implementation of it.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

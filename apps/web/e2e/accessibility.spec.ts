@@ -81,11 +81,60 @@ test.describe("Accessibility (axe-core)", () => {
   });
 
   test("a coming-soon shell page has no serious or critical violations", async ({ page }) => {
-    await page.goto("/prioritize");
-    await expect(page.getByRole("heading", { name: "Prioritize", level: 1 })).toBeVisible();
+    await page.goto("/advocate");
+    await expect(page.getByRole("heading", { name: "Advocate", level: 1 })).toBeVisible();
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Prioritize (custom scenario, drivers expanded) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/prioritize");
+    await page.getByRole("radio", { name: "Custom scenario" }).click();
+    await expect(page.getByText("Custom priority weighting")).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Show drivers" }).first().click();
+    await expect(page.getByText(/Why .* ranked here/)).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Prioritize export tab (decision memo rendered) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/prioritize?tab=export");
+    await expect(page.getByText("Priority recommendation memo", { exact: false })).toBeVisible({ timeout: 15_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Utilization facility view (facility selected) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/utilization");
+    await expect(page.getByText("STANFORD HEALTH CARE")).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("row", { name: /STANFORD HEALTH CARE/ }).click();
+    await expect(page.getByText("Payer mix")).toBeVisible({ timeout: 10_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Utilization geographic view has no serious or critical violations", async ({ page }) => {
+    await page.goto("/utilization?tab=geographic");
+    await expect(page.getByRole("heading", { name: /modeled by tract/ })).toBeVisible({ timeout: 15_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Validate (each tab) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/validate");
+    await expect(page.getByRole("heading", { name: "Validate" })).toBeVisible({ timeout: 15_000 });
+    for (const tab of ["Scoring methods", "Uncertainty & sensitivity", "Validation", "Known limitations", "Reproducibility"]) {
+      await page.getByRole("tab", { name: tab }).click();
+      await page.waitForTimeout(600);
+      const results = await new AxeBuilder({ page }).analyze();
+      const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+      expect(serious, `${tab}: ${JSON.stringify(serious, null, 2)}`).toEqual([]);
+    }
   });
 
   test("Access Lab (no tract selected) has no serious or critical violations", async ({ page }) => {

@@ -130,6 +130,20 @@ scenarios:
       minimum_confidence: 0.50
     notes: "docs/03 §7.2 lists 'SNAP retailer and grocery access' specifically -- resources.snap_retailers is loaded (Phase 3) but not yet joined into a tract-level distance metric in the Phase 4 registry (only clinical-care sites are, via nearest_clinical_care_distance); resource_accessibility here uses the clinical-care proxy as a general resource-gap stand-in, not a food-specific one. Flagged as a Phase 4+ improvement, not a silent substitution."
 
+  - scenario_id: environmental_burden_priority_v1
+    label: "Environmental burden"
+    description: "Prioritizes pollution and population-vulnerability burden (CalEnviroScreen), together with health and access context."
+    weights:
+      environmental_burden: 0.50
+      health_burden: 0.25
+      access_barriers: 0.25
+    required_metrics:
+      - ces_pollution_burden
+      - ces_population_vulnerability
+    constraints:
+      minimum_confidence: 0.50
+    notes: "Added in Phase 7 to fill a real gap in the Phase 4 scenario set (none of the original 7 scenarios weighted environmental_burden above 0.20) -- uses the same 5 already-scored domains and the same aggregation engine as every other scenario, not a new metric or scoring method."
+
 # Five named sensitivity presets (docs/03 §9.1), evaluated for every
 # scenario during sensitivity analysis. "utilization_first" is redefined
 # as "systemic_pressure_first" (DEC-028): no tract-level ED-utilization

@@ -100,5 +100,41 @@ for (const bp of BREAKPOINTS) {
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
     });
+
+    test("Prioritize: scenario selector, custom sliders, and ranked results remain usable", async ({ page }) => {
+      await page.goto("/prioritize");
+      await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeVisible({ timeout: 15_000 });
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Prioritize must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      await page.getByRole("radio", { name: "Custom scenario" }).click();
+      await expect(page.getByLabel("Health burden")).toBeVisible({ timeout: 10_000 });
+
+      const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);
+    });
+
+    test("Utilization: facility table and tab switching remain usable", async ({ page }) => {
+      await page.goto("/utilization");
+      await expect(page.getByText("STANFORD HEALTH CARE")).toBeVisible({ timeout: 15_000 });
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Utilization must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+    });
+
+    test("Validate: tabs remain reachable and content does not overflow", async ({ page }) => {
+      await page.goto("/validate");
+      await expect(page.getByRole("heading", { name: "Validate" })).toBeVisible({ timeout: 15_000 });
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Validate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      await page.getByRole("tab", { name: "Reproducibility" }).click();
+      await expect(page.getByText("Audit status")).toBeVisible({ timeout: 10_000 });
+    });
   });
 }

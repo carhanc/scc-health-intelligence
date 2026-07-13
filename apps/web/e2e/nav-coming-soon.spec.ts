@@ -1,13 +1,13 @@
 import { test, expect } from "@playwright/test";
 
-// Access Lab moved from "coming soon" to a real, built page in Phase 6 --
-// see e2e/access-lab-core.spec.ts for its own coverage, and
-// nav-coming-soon's own "nav marks unavailable destinations distinctly"
-// test below for the (still coming-soon) remainder.
+// Access Lab moved from "coming soon" to a real, built page in Phase 6,
+// and Prioritize/Utilization/Validate moved in Phase 7 -- see
+// e2e/access-lab-core.spec.ts, e2e/prioritize-core.spec.ts,
+// e2e/utilization-core.spec.ts, and e2e/validate-core.spec.ts for their
+// own coverage, and nav-coming-soon's own "nav marks unavailable
+// destinations distinctly" test below for the (still coming-soon)
+// remainder.
 const COMING_SOON_ROUTES = [
-  { path: "/prioritize", title: "Prioritize" },
-  { path: "/utilization", title: "Utilization" },
-  { path: "/validate", title: "Validate" },
   { path: "/advocate", title: "Advocate" },
   { path: "/copilot", title: "Copilot" },
 ];
@@ -40,7 +40,7 @@ test.describe("Coming-soon nav destinations are truthful, not broken", () => {
     }
 
     const nav = page.getByRole("navigation", { name: "Primary" }).first();
-    await expect(nav.getByRole("link", { name: "Prioritize Soon" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Advocate Soon" })).toBeVisible();
     await expect(nav.getByRole("link", { name: /^Explore$/ })).toBeVisible();
   });
 });

@@ -161,7 +161,7 @@ def test_correlation_diagnostics_are_never_tautological(client: TestClient) -> N
     response = client.get("/api/v1/validation/correlation-diagnostics")
     assert response.status_code == 200
     body = response.json()
-    assert len(body["diagnostics"]) == 7
+    assert len(body["diagnostics"]) == 8
     for d in body["diagnostics"]:
         assert d["is_tautological"] is False
         assert d["spearman_r"] is not None

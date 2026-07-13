@@ -92,3 +92,78 @@ const GAP_CLASSIFICATION_LABELS: Record<string, string> = {
 export function gapClassificationLabel(classification: string): string {
   return GAP_CLASSIFICATION_LABELS[classification] ?? humanize(classification);
 }
+
+// --- Phase 7 (Prioritize, Utilization, Validate) plain-language labels ---
+
+const PATTYPE_GROUP_LABELS: Record<string, string> = {
+  ed_only: "Seen in the ED, not admitted",
+  inpatient_from_ed: "Seen in the ED, then admitted",
+};
+
+export function pattypeGroupLabel(group: string): string {
+  return PATTYPE_GROUP_LABELS[group] ?? humanize(group);
+}
+
+const CROSSWALK_QUALITY_LABELS: Record<string, string> = {
+  high_confidence_crosswalk: "High-confidence area-based estimate",
+  moderate_confidence_crosswalk: "Moderate-confidence area-based estimate",
+  low_confidence_crosswalk: "Low-confidence area-based estimate",
+};
+
+export function crosswalkQualityLabel(quality: string): string {
+  return CROSSWALK_QUALITY_LABELS[quality] ?? humanize(quality);
+}
+
+const RATE_RELIABILITY_LABELS: Record<string, string> = {
+  plausible_range: "Within a plausible range",
+  low_reliability: "Unreliable estimate -- do not use",
+};
+
+export function rateReliabilityLabel(reliability: string): string {
+  return RATE_RELIABILITY_LABELS[reliability] ?? humanize(reliability);
+}
+
+const STABILITY_LABEL_DESCRIPTIONS: Record<string, string> = {
+  Robust: "Ranks similarly under most alternate weightings",
+  "Moderately stable": "Ranks somewhat differently under some alternate weightings",
+  "Assumption-sensitive": "Ranks quite differently depending on the weighting used",
+};
+
+export function stabilityLabelDescription(label: string): string {
+  return STABILITY_LABEL_DESCRIPTIONS[label] ?? label;
+}
+
+const DISPOSITION_KEY_LABELS: Record<string, string> = {
+  died: "Died",
+  routine_discharge: "Routine discharge",
+  psychiatric_care: "Transferred to psychiatric care",
+};
+
+export function dispositionKeyLabel(key: string): string {
+  return DISPOSITION_KEY_LABELS[key] ?? humanize(key);
+}
+
+const PAYER_KEY_LABELS: Record<string, string> = {
+  medi_cal: "Medi-Cal",
+  medicare: "Medicare",
+  private_health_insurance: "Private health insurance",
+  self_pay_or_uninsured: "Self-pay or uninsured",
+  other_government: "Other government payer",
+  all_other_payers: "All other payers",
+  other_unknown: "Other / unknown",
+};
+
+export function payerKeyLabel(key: string): string {
+  return PAYER_KEY_LABELS[key] ?? humanize(key);
+}
+
+const LANGUAGE_KEY_LABELS: Record<string, string> = {
+  english: "English",
+  spanish: "Spanish",
+  all_other_languages: "All other languages",
+  other_unknown: "Other / unknown",
+};
+
+export function languageKeyLabel(key: string): string {
+  return LANGUAGE_KEY_LABELS[key] ?? humanize(key);
+}

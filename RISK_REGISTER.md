@@ -156,7 +156,7 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Mitigation:** HCAI ED patient-county data is native to county of residence with Santa Clara as the only county present (n=1, statistically undefined for correlation) — DEC-023 documents why a tract-level allocation was not fabricated, and DEC-033 documents the substitute convergent-validity check (CDC/ATSDR SVI, n=408) used instead for Phase 4. Every one of the 7 scenario's correlation diagnostics against SVI is persisted in `analytics.correlation_diagnostics` and is confirmed non-tautological by the tautology guard on every `make audit` run.
 
-**Status:** `open` — a real tract-level utilization metric requires crosswalking `utilization.hcai_patient_origin` (ZIP-level, Phase 3) through the Phase 2 ZCTA-tract relationship, explicitly reserved for Phase 7 (Utilization/Validation Lab) per `docs/07_BUILD_PHASES.md`.
+**Status:** `closed` (Phase 7, DEC-055) — `utilization.hcai_patient_origin` (ZIP-level) is now allocated to tracts through the Phase 2 ZCTA-tract crosswalk, clearly labeled modeled/derived (never observed), and `analytics.utilization_criterion_validity` persists a real, non-tautological criterion-validity correlation (Spearman r 0.27-0.37 across all 8 scenarios, n=408) between modeled tract ED rate and each scenario's own score. The underlying allocation has its own disclosed limitation — see RISK-027.
 
 ---
 
@@ -267,6 +267,36 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 **Mitigation:** The drill-down is explicitly a navigation aid ("suggest a starting point"), not an access-relevant ranking claim -- a user can search for any other tract in that city directly via the same search box, not only the 5 suggested ones.
 
 **Status:** `open` -- if Access Lab later gains its own scenario/priority concept (e.g. ranking by measured access rather than combined health-burden concern), the drill-down should be revisited to use it instead of borrowing Explore's default.
+
+---
+
+## RISK-027 — ZIP-to-tract area-weighted ED-utilization allocation is unreliable for a small number of large, sparsely-populated tracts
+
+**Category:** Analytical accuracy. **Likelihood:** Confirmed, live-measured (Phase 7, DEC-055/DEC-056). **Impact:** Medium for the affected tracts specifically -- their modeled ED rate is not usable as a real figure; Low for the platform overall, since the affected tracts are a small, explicitly flagged minority.
+
+**Mitigation:** Every tract-level modeled ED rate is flagged `rate_reliability="plausible_range"` or `"low_reliability"` (392 of 408 tracts are `plausible_range`; 16 are `low_reliability`, live-measured), with an explanatory note on every flagged row and a dedicated audit (`_audit_implausible_rates_are_flagged`) enforcing the flag is never missing above the disclosed ceiling. The Utilization UI shows this as a prominent badge on every affected row, not a footnote.
+
+**Status:** `open` -- a defensible fix (population-weighted rather than land-area-weighted allocation) would require a sub-tract population-density source this project has not ingested; area weighting via the existing Census ZCTA-tract relationship remains the default per DEC-005's documented fallback ordering. Revisit if a keyless dasymetric/population-weighted crosswalk source becomes available.
+
+---
+
+## RISK-028 — Two named scenarios (`mobile_transit_care_v1`, `older_adult_support_v1`) currently produce identical rankings
+
+**Category:** Product/methodology completeness. **Likelihood:** Confirmed, live-measured (found during Phase 7 reproducibility-hash testing). **Impact:** Low -- both scenarios remain individually defensible (each has its own documented rationale in `config/scenarios.yml`), but a user comparing them on the Prioritize page today will see no difference in results, which may be surprising.
+
+**Mitigation:** Both scenarios' own `notes` fields already disclose the underlying cause: "Mobile or transit-linked care" is missing real transit-frequency and ED-pressure metrics (falls back to generic access/resource proxies), and "Older-adult support" is missing an age-65+ population metric (same fallback) -- the coincidence is a natural consequence of two different real gaps resolving to the same substitute weighting, not a copy-paste error.
+
+**Status:** `open` -- resolving this requires ingesting either a real transit-frequency-as-a-metric source or an ACS age-65+ population-share metric (the latter already flagged as a gap in `older_adult_support_v1`'s own notes and DEC-020) so the two scenarios can differentiate on real, distinct inputs.
+
+---
+
+## RISK-029 — Phase 7 `analytics.utilization_*` tables have no offline demo snapshot
+
+**Category:** Deployment completeness. **Likelihood:** Confirmed by design (matches RISK-019's precedent for Phase 4 `analytics.*`). **Impact:** Low -- `make demo` remains geography-only; the Utilization, and the custom-weighting/export paths of Prioritize, and the Validate page all require the live warehouse (`make data`) and return a truthful 503 with a clear remediation command in demo-only mode, never fabricated data.
+
+**Mitigation:** Every Phase 7 API route follows the same `_require_table`/503 pattern already established for Phase 4/6 analytics routes; the 503 detail message names the exact command to run (`run_utilization_pipeline`). Named-scenario Prioritize routes (`/api/v1/scenarios/*`) already have this same limitation from Phase 4 (RISK-019) and are unaffected by this entry.
+
+**Status:** `open` -- matches RISK-019's own open status and rationale; revisit both together if/when a frozen offline analytics snapshot is prioritized.
 
 ---
 
