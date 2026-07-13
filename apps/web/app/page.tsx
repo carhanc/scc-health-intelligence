@@ -159,7 +159,8 @@ export default function OverviewPage() {
         <p className="mt-4 text-xs text-[var(--color-text-tertiary)]">
           Santa Clara Health Intelligence is a clean-room, open-data public-health intelligence
           platform. It supports prioritization and advocacy; it does not replace community
-          engagement, official county systems, clinical judgment, or formal program evaluation.
+          engagement, official county systems, clinical judgment, or formal program evaluation. 
+          Developed by Arhan Chakravarthy.
         </p>
       </footer>
     </div>
