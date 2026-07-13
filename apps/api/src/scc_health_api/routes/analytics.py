@@ -437,7 +437,9 @@ def get_recommendations(
                 if straight_line_domains:
                     assumptions.append(
                         f"Domain(s) {', '.join(sorted(straight_line_domains))} use straight-line "
-                        "distance as a screening proxy, not network travel time (Phase 6 scope)."
+                        "distance as a screening proxy, not network travel time. Real network-"
+                        "routed walking/driving distances are available separately in the "
+                        "Access Lab (/api/v1/access/network/*), not blended into this score."
                     )
 
                 recommendations.append(

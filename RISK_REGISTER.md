@@ -210,4 +210,54 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-021 — Scheduled-transit accessibility is a walk-to-stop + frequency proxy, not true multi-modal routing
+
+**Category:** Analytical accuracy / scope. **Likelihood:** Confirmed (DEC-043, deliberate scope decision). **Impact:** Medium — the proxy cannot account for actual in-vehicle travel time, transfers, or realistic wait times the way a real transit router (R5, OpenTripPlanner) would; two stops with identical walk distance and frequency but very different onward travel time to a destination would be scored identically.
+
+**Mitigation:** Every transit-access value carries a distinct method label ("scheduled transit access under the selected service window") and a lower method-reliability flag than network-routed walking/driving results, propagated through the API and UI identically to the straight-line-distance labeling pattern established in DEC-024. Never described as travel time, real-time, or door-to-door.
+
+**Status:** `open` — a full R5/OpenTripPlanner integration would close this gap; not attempted this phase per DEC-043's rationale (a Java-based server-oriented routing engine was judged out of proportion to the rest of Phase 6's scope within this session).
+
+---
+
+## RISK-022 — Libraries, community centers, senior centers, and pharmacies have no verified official bulk source reachable this session
+
+**Category:** Data completeness. **Likelihood:** Confirmed (DEC-045). **Impact:** Medium — the Access Lab's resource inventory and optimizer candidate-site universe are narrower than `docs/03_ANALYTICS_METHODS.md` §13.2's full suggested list (no community centers, libraries, senior centers, or pharmacies); every other named category (hospitals, clinics, health centers, food/SNAP retailers, transit stops/hubs) is present and real.
+
+**Mitigation:** Santa Clara County's own directly-hosted GIS REST services (`sccgov.org/gis/rest/services/...`) returned HTTP 403 to every automated fetch attempt this session; the County's separate ArcGIS Hub open-data catalogs were queried live and contain no facility-inventory dataset for these categories. Documented honestly rather than fabricated, approximated via an unverified guessed layer ID, or silently substituted with a lower-quality source (matching the HPI precedent, DEC-018).
+
+**Status:** `open` — revisitable if a maintainer can reach the County's GIS services from a context not subject to the same bot-blocking, or supplies a CA Board of Pharmacy bulk-export credential (docs/02 §6.4's primary recommended pharmacy source).
+
+---
+
+## RISK-023 — Resource deduplication group formation is anchor-based (star pattern), not fully pairwise
+
+**Category:** Analytical accuracy / data integrity. **Likelihood:** Confirmed by design; observed live on real Santa Clara facility data during Phase 6 build. **Impact:** Low-Medium — `pipelines/src/scc_health_pipeline/resources/canonicalize.py`'s `deduplicate_records()` compares every later record only against the group's first (anchor) member, not against every other member already in the group. If record A matches both B and C under the tier-1 (exact name+address) or tier-2 (spatial+name fallback) rules, B and C join the same canonical facility even though B and C were never directly compared to each other. On live data this produced plausible results (e.g. an HCAI hospital record merging with 3 HRSA site records and 2 SCC clinic records all within 3-40 meters of each other, matching the real-world pattern of an FQHC grantee co-enrolling separate medical/dental/behavioral-health site records at one building), but it is a theoretical over-merge path: two genuinely distinct, dissimilar sites could both independently clear the fallback threshold against the same anchor without ever being compared to each other.
+
+**Mitigation:** Every merge decision (which pair, by which rule, at what distance and name similarity) is written to `resources.facility_duplicate_review` — nothing is merged silently, and the full pairwise evidence for every canonical facility with more than one contributing source is auditable. `n_contributing_sources` and `dedup_status` on every canonical facility make multi-source merges visible in the API/UI rather than hidden.
+
+**Status:** `open` — a fully pairwise (all-members-mutually-qualify) grouping algorithm would close this gap; not implemented this phase given the anchor-based approach's results were manually spot-checked as plausible on the real dedup output (72 multi-source matches, all at sub-40-meter distances with 0.5-1.0 name similarity).
+
+---
+
+## RISK-024 — Driving network travel times assume free-flow speeds, with no traffic congestion modeling
+
+**Category:** Analytical accuracy / scope. **Likelihood:** Confirmed by design (DEC-046). **Impact:** Low-Medium — `run_build_network_graphs.py`'s drive graph uses `osmnx.routing.add_edge_speeds()`, which imputes travel speed from OSM `maxspeed` tags and highway-type defaults (live-verified: a real 16.2-mile-straight-line, 17.9-mile-network route computed at an implied 44.1 mph average, consistent with free-flow, not rush-hour, conditions). Actual drive times during peak commute periods in Santa Clara County could be meaningfully longer, especially on the corridors this platform's own equity analysis cares about most (e.g. congested urban arterials serving higher-need neighborhoods).
+
+**Mitigation:** Every driving-mode result carries `method="osm_network_drive"` and is never described as real-time or as accounting for current traffic conditions. This is a standard, disclosed limitation of static free-flow network routing (the same category of limitation as the scheduled-transit proxy in RISK-021), not a silent inaccuracy.
+
+**Status:** `open` — a time-of-day/congestion-aware routing engine (e.g. a service with live or historical traffic data) would close this gap; out of scope for a keyless, locally-reproducible pipeline per this project's "core functionality must work without paid API keys" requirement (CLAUDE.md).
+
+---
+
+## RISK-025 — Access Lab's resource browser has no custom MapLibre facility-marker map view, only an accessible table
+
+**Category:** Product completeness / UI scope. **Likelihood:** Confirmed by design, this session. **Impact:** Low — docs/01 §5.9's accessibility rule requires that everything shown on a map also be available in an accessible table, which the Access Lab resource browser satisfies (a full `DataTable` of all 4,207 canonical facilities, filterable by category, sortable, keyboard-operable). It does not require a map to exist at all; the table is complete and independently correct, not degraded. The reverse (a map with no accessible alternative) would have been a real regression -- that was avoided.
+
+**Mitigation:** None needed for the accessibility requirement itself. For the visual/spatial exploration value a map would add (e.g. seeing facility clustering relative to a selected tract), the table's address/city columns and per-facility detail (via `/api/v1/access/facilities/{id}`, not yet surfaced in the UI as a detail view) are the current substitute.
+
+**Status:** `open` -- a facility-marker layer reusing Explore's existing MapLibre setup (`explore-map.tsx`) is a reasonable, scoped future enhancement, not a defect. Not attempted this session; building and testing a new map layer (marker clustering at 4,207 points, category color-coding, popup detail, keyboard/screen-reader parity with the table) was judged a large enough addition to risk not finishing it to the same tested standard as the rest of Phase 6 within the remaining session budget.
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

@@ -144,7 +144,10 @@ def test_optimization_runs_reflect_real_solver_output(client: TestClient) -> Non
     response = client.get("/api/v1/optimization/runs")
     assert response.status_code == 200
     body = response.json()
-    assert len(body["runs"]) == 3
+    # Phase 6 (DEC-049) expanded the mobile-clinic optimizer step from 3
+    # to 6 runs -- a real sensitivity/robustness sweep varying k_sites,
+    # distance_threshold, and whether an equity constraint applies.
+    assert len(body["runs"]) == 6
     statuses = {r["status"] for r in body["runs"]}
     assert statuses <= {"OPTIMAL", "FEASIBLE", "INFEASIBLE"}
     # k=10 at a 1-mile threshold with a 50% equity constraint was

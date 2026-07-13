@@ -387,6 +387,151 @@ export interface CorrelationDiagnosticsResponse {
   diagnostics: CorrelationDiagnostic[];
 }
 
+// --- Phase 6 Access Lab ---
+
+export interface FacilitySummary {
+  canonical_resource_id: string;
+  category: string;
+  subtype: string;
+  name: string;
+  status: string;
+  address: string;
+  city: string;
+  zip_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  is_official: boolean;
+  dedup_status: string;
+  coordinate_quality: string;
+  n_contributing_sources: number;
+  limitation_notes: string;
+}
+
+export interface FacilityListResponse {
+  data_mode: DataMode;
+  facilities: FacilitySummary[];
+  category_counts: Record<string, number>;
+}
+
+export interface FacilitySourceRecord {
+  source_id: string;
+  source_specific_id: string;
+  match_method: string;
+  match_confidence: string;
+}
+
+export interface FacilityDetailResponse {
+  data_mode: DataMode;
+  facility: FacilitySummary;
+  sources: FacilitySourceRecord[];
+}
+
+export interface NetworkAccessResult {
+  mode: string;
+  category: string;
+  status: string;
+  nearest_facility_id: string | null;
+  distance_miles: number | null;
+  duration_minutes: number | null;
+  method: string;
+  unavailable_reason: string | null;
+}
+
+export interface NetworkAccessResponse {
+  data_mode: DataMode;
+  block_group_geoid: string;
+  tract_geoid_2020: string | null;
+  results: NetworkAccessResult[];
+}
+
+export interface TractAccessSummaryResponse {
+  data_mode: DataMode;
+  tract_geoid_2020: string;
+  representative_block_group_geoid: string;
+  representative_population: number;
+  n_block_groups_in_tract: number;
+  network_results: NetworkAccessResult[];
+  transit_result: TransitAccessResult;
+}
+
+export interface TransitAccessResult {
+  status: string;
+  nearest_stop_id: string | null;
+  nearest_stop_name: string | null;
+  walk_distance_miles: number | null;
+  n_trips_in_window: number | null;
+  headway_minutes: number | null;
+  service_level: string | null;
+  method: string;
+  service_window: string;
+  unavailable_reason: string | null;
+}
+
+export interface TransitAccessResponse {
+  data_mode: DataMode;
+  block_group_geoid: string;
+  tract_geoid_2020: string | null;
+  result: TransitAccessResult;
+}
+
+export interface E2SFCAResult {
+  block_group_geoid: string;
+  tract_geoid_2020: string | null;
+  mode: string;
+  category: string;
+  capacity_type: string;
+  accessibility_score: number;
+  n_facilities_in_catchment: number;
+  catchment_radius_miles: number;
+  sigma_miles: number;
+  method: string;
+}
+
+export interface E2SFCAResponse {
+  data_mode: DataMode;
+  results: E2SFCAResult[];
+}
+
+export interface ResourceGapResult {
+  tract_geoid_2020: string;
+  need_percentile: number;
+  access_percentile: number;
+  classification: "priority_gap" | "need_met" | "low_priority" | "well_served";
+  method: string;
+}
+
+export interface ResourceGapResponse {
+  data_mode: DataMode;
+  mode: string;
+  category: string;
+  need_domain: string;
+  results: ResourceGapResult[];
+}
+
+export interface OptimizationScenario {
+  data_mode: DataMode;
+  run_id: string;
+  scenario_label: string;
+  status: string;
+  objective_value: number | null;
+  k_sites: number;
+  distance_threshold_miles: number;
+  selected_sites: string[];
+  population_covered: number;
+  high_need_population_covered: number;
+  total_population: number;
+  total_high_need_population: number;
+  unserved_high_need_tracts: string[];
+  overlap_count: number;
+  assumptions: string[];
+  method: string;
+}
+
+export interface OptimizationScenariosResponse {
+  data_mode: DataMode;
+  scenarios: OptimizationScenario[];
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -496,4 +641,26 @@ export const api = {
   getOptimizationRuns: () => apiGet<OptimizationRunsResponse>("/api/v1/optimization/runs"),
   getCorrelationDiagnostics: () =>
     apiGet<CorrelationDiagnosticsResponse>("/api/v1/validation/correlation-diagnostics"),
+  getFacilities: (category?: string) =>
+    apiGet<FacilityListResponse>(
+      `/api/v1/access/facilities${category ? `?category=${encodeURIComponent(category)}` : ""}`,
+    ),
+  getFacility: (facilityId: string) =>
+    apiGet<FacilityDetailResponse>(`/api/v1/access/facilities/${encodeURIComponent(facilityId)}`),
+  getNetworkAccess: (blockGroupGeoid: string) =>
+    apiGet<NetworkAccessResponse>(`/api/v1/access/network/${encodeURIComponent(blockGroupGeoid)}`),
+  getTractAccessSummary: (tractGeoid: string) =>
+    apiGet<TractAccessSummaryResponse>(`/api/v1/access/tract/${encodeURIComponent(tractGeoid)}/summary`),
+  getTransitAccess: (blockGroupGeoid: string) =>
+    apiGet<TransitAccessResponse>(`/api/v1/access/transit/${encodeURIComponent(blockGroupGeoid)}`),
+  getE2SFCA: (mode: string, category: string) =>
+    apiGet<E2SFCAResponse>(
+      `/api/v1/access/e2sfca?mode=${encodeURIComponent(mode)}&category=${encodeURIComponent(category)}`,
+    ),
+  getResourceGaps: (mode: string, category: string) =>
+    apiGet<ResourceGapResponse>(
+      `/api/v1/access/gaps?mode=${encodeURIComponent(mode)}&category=${encodeURIComponent(category)}`,
+    ),
+  getOptimizationScenarios: () =>
+    apiGet<OptimizationScenariosResponse>("/api/v1/access/optimize/scenarios"),
 };

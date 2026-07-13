@@ -65,6 +65,48 @@ test.describe("Accessibility (axe-core)", () => {
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
+
+  test("Access Lab (no tract selected) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/access-lab");
+    await expect(page.getByRole("heading", { name: "Access Lab" })).toBeVisible({ timeout: 15_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Access Lab summary tab (tract selected) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/access-lab?geography=tract&id=06085500100");
+    await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 15_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Access Lab resource browser has no serious or critical violations", async ({ page }) => {
+    await page.goto("/access-lab?tab=resources");
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Access Lab resource-gaps tab has no serious or critical violations", async ({ page }) => {
+    await page.goto("/access-lab?tab=gaps&geography=tract&id=06085500100");
+    await expect(page.getByText("Where estimated health need and measured access overlap")).toBeVisible({
+      timeout: 15_000,
+    });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Access Lab mobile-service scenarios tab has no serious or critical violations", async ({ page }) => {
+    await page.goto("/access-lab?tab=scenarios");
+    await expect(page.getByText("No solution satisfies these constraints")).toBeVisible({ timeout: 15_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
 });
 
 test.describe("Keyboard navigation and focus", () => {

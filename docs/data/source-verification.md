@@ -221,6 +221,45 @@ Fields recorded per source: publisher/landing page, current vintage, access meth
 
 ---
 
+## 17. Census Bureau 2020 Mean Center of Population (block group) — ✅ verified live (Phase 6)
+
+- **Publisher / landing page:** U.S. Census Bureau; `https://www.census.gov/geographies/reference-files/time-series/geo/centers-population.html`.
+- **Current vintage:** 2020 Census, released 2021-08-12.
+- **Access method:** `https://www2.census.gov/geo/docs/reference/cenpop2020/blkgrp/CenPop2020_Mean_BG06.txt` (California, statewide, filtered to Santa Clara County FIPS `06085` at normalize time) — confirmed live: a 1.1MB keyless CSV, no bulk-file registration or key required.
+- **Native geography:** Block group (population-weighted mean center point per block group).
+- **Key required:** No.
+- **License/terms:** Public domain (U.S. government work).
+- **Limitations:** A small number of block groups report zero or near-zero population (expected for non-residential/industrial areas) — retained and audited, not silently dropped. This file is the Bureau's own pre-computed population-weighted point; no further weighting computation is performed on it (DEC-044).
+- **Update cadence:** Fixed vintage (tied to the decennial census), not a recurring refresh.
+
+---
+
+## 18. Santa Clara County Public Health Department "Health clinics" layer — ✅ verified live (Phase 6)
+
+- **Publisher / landing page:** Santa Clara County Public Health Department; `https://data-sccphd.opendata.arcgis.com/datasets/sccphd::health-clinics`.
+- **Current vintage:** Rolling/continuous (ArcGIS Hub live layer, not a dated snapshot).
+- **Access method:** ArcGIS FeatureServer, `https://services2.arcgis.com/RiZWfy7B1r76pKTz/arcgis/rest/services/Health_clinics/FeatureServer/0` — confirmed live: 99 real records (e.g. AACI, Gardner Family Health Network, Bay Area Community Health), fields `OBJECTID`, `USER_H_CenterName`, `USER_OperatedBy`, `Status`, `Match_addr`, point geometry.
+- **Native geography:** Point-level (individual clinic locations).
+- **Key required:** No.
+- **License/terms:** County of Santa Clara ArcGIS Hub open-data terms.
+- **Limitations:** One of very few real, currently-reachable facility inventories found directly on the County's own ArcGIS Hub catalogs during Phase 6 discovery — used as a supplemental clinical-care source alongside HCAI/HRSA, not a replacement for either. Direct `sccgov.org`-hosted GIS REST services (a separate, non-Hub domain) returned HTTP 403 to every automated fetch attempt and were not usable this session (DEC-045).
+- **Update cadence:** Not explicitly stated; treated as rolling/continuous per the Hub's own layer description.
+
+---
+
+## 19. OpenStreetMap road/path network (via Overpass API, OSMnx) — ✅ verified live (Phase 6)
+
+- **Publisher / landing page:** OpenStreetMap contributors; `https://www.openstreetmap.org/copyright`. Accessed via the Overpass API through the `osmnx` Python library, not a direct planet-file download.
+- **Current vintage:** Live extract at time of fetch (not a fixed dataset vintage) — OSM is continuously edited; the extract used is a snapshot, checksummed and cached (`data/raw/osm_network/`), not re-fetched on every pipeline run.
+- **Access method:** `osmnx.graph_from_place("Santa Clara County, California, USA", network_type=...)` for both `walk` and `drive` network types — confirmed live: drive network 45,836 nodes/109,872 edges (38-148s), walk network 277,444 nodes/788,154 edges (171-194s). Cached as GraphML with a sha256 checksum and a `DATA_MANIFEST.json` entry (`source_id=osm_overpass_network`).
+- **Native geography:** Road/path network graph (not tract-aligned; nodes are individual intersections/path points).
+- **Key required:** No.
+- **License/terms:** Open Database License (ODbL) 1.0.
+- **Limitations:** A crowd-sourced dataset — coverage and attribute completeness (e.g. `maxspeed` tags used for drive-mode speed imputation) vary by area and are not independently verified per-edge. The walk network's edge speeds are NOT taken from OSM tags (see `docs/methods/routing.md` for the real speed-imputation bug this caused and how it was fixed) — a constant 5 km/h is assigned instead.
+- **Update cadence:** Not applicable in the traditional sense (continuously edited upstream); this platform re-fetches only when the cached graph is explicitly deleted, per `run_build_network_graphs.py`'s cache-first design.
+
+---
+
 ## Summary of material changes vs. what an older or generic spec might assume
 
 1. **Census API now mandates a key for every call** (not just high-volume) — the no-key mode must route through `data.census.gov` bulk downloads by default, matching the spec's own documented fallback ordering.
@@ -230,3 +269,4 @@ Fields recorded per source: publisher/landing page, current vintage, access meth
 5. **Santa Clara County's meeting portal runs on Granicus/IQM2**, not Legistar or the legacy MinuteTraq system — document connectors in Phase 8 must target the correct platform.
 6. **HCAI publishes at least three distinct product families** (ED encounters, facility attributes, patient-origin/market-share) under **two different license tiers** (OPA-restricted vs. CC-BY) — these must never be merged into a single manifest entry or a single license assumption.
 7. Two sources (**Santa Clara County GIS Hub** and the **county meeting-portal landing page**) returned HTTP 403 to automated fetch during this pass and need a manual browser-based re-confirmation before their Phase 3/8 adapters are finalized — flagged, not blocking, since working underlying endpoints were independently located for both.
+8. **Phase 6 added three new sources** (items 17-19): the Census Bureau's own pre-computed 2020 Mean Center of Population file (block group), avoiding a self-computed population-weighting step; the SCC Public Health Department's "Health clinics" ArcGIS layer, the one real facility inventory found directly reachable on the County's ArcGIS Hub catalogs (the direct `sccgov.org`-hosted GIS REST services remained 403-blocked, same as Phase 3); and live OpenStreetMap network extracts via Overpass/OSMnx for real walking/driving routing, checksummed and cached rather than re-fetched per run.

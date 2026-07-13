@@ -15,10 +15,20 @@ bootstrap:
 data:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_geography_pipeline
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_core_sources_pipeline
+	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_resource_canonicalization
+	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_build_network_graphs
+	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_access_metrics_pipeline
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_analytics_pipeline
 	@echo "make data: geography spine (Phase 2) + core sources (Phase 3) + analytics/"
-	@echo "scoring/uncertainty/optimization (Phase 4) implemented. See TASKS.md for scope"
-	@echo "and DECISIONS.md for documented scope-narrowing decisions."
+	@echo "scoring/uncertainty/optimization (Phase 4) + resource canonicalization +"
+	@echo "OSM network graphs + real network/transit/E2SFCA access metrics (Phase 6)"
+	@echo "implemented. See TASKS.md for scope and DECISIONS.md for documented"
+	@echo "scope-narrowing decisions. Note: the OSM network graph download is a live"
+	@echo "multi-minute Overpass API extract on first run (~4 min total); subsequent"
+	@echo "runs reuse the cached data/raw/osm_network/*.graphml files unless deleted."
+	@echo "run_access_metrics_pipeline is a separate real batch computation over"
+	@echo "~1,173 population origins (live-measured ~59 minutes); it is NOT cached"
+	@echo "and re-runs at full cost every time, unlike the OSM graph download."
 
 demo:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_demo_pipeline

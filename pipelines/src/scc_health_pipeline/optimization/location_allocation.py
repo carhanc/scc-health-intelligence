@@ -4,20 +4,48 @@ docs/03_ANALYTICS_METHODS.md §13.
 
 Candidate sites use VTA GTFS high-frequency transit stops (docs §13.2
 explicitly lists "transit hubs" as a valid candidate category, and this
-is real, available data -- community centers/libraries are not yet
-ingested). Demand-to-site coverage uses straight-line distance (DEC-024),
-never network travel time. This is a scenario-planning tool: outputs are
-explicitly labeled a modeled configuration, never a forecast of avoided
-ED visits, dollars saved, or health outcomes (docs §13.4, CLAUDE.md).
+is real, available data -- community centers/libraries are documented as
+an unavailable source category this phase, RISK-022, not fabricated).
+Sites may also be marked `site_type="abstract_analytical"` -- e.g. a
+population-weighted block-group origin used as a candidate point when
+exploring "what if a site existed near this demand concentration"
+scenarios -- per this project's explicit rule that abstract candidate
+points must be clearly labeled as such, never presented as a real
+deployment site (CLAUDE.md, docs/03 §13.2).
+
+Demand points carry real population-weighted block-group origins (Phase
+6's `geo.block_group_population_origins`), not tract-internal-point
+counts -- resolving one of this module's originally-documented Phase 6
+scope gaps.
+
+Coverage distance defaults to straight-line (DEC-024) and stays fully
+functional with no external dependency for arbitrary candidate sites
+(including hypothetical ones with no precomputed route). Callers with a
+precomputed network-distance lookup for their specific candidate/demand
+pairs (e.g. from `routing/network_osm.py`) may inject it via
+`distance_fn`/`distance_method_label` to get network-aware coverage
+instead -- the result's `method` field always reflects which was
+actually used, so a straight-line-covered scenario is never presented as
+network-routed.
+
+This is a scenario-planning tool: outputs are explicitly labeled a
+modeled configuration, never a forecast of avoided ED visits, dollars
+saved, or health outcomes (docs §13.4, CLAUDE.md).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from ortools.sat.python import cp_model
 
 from scc_health_pipeline.routing.straight_line import METHOD_LABEL, haversine_miles
+
+SiteType = Literal["transit_hub", "abstract_analytical"]
+
+DistanceFn = Callable[[float, float, float, float], float]
 
 
 @dataclass(frozen=True)
@@ -26,6 +54,7 @@ class CandidateSite:
     label: str
     lat: float
     lon: float
+    site_type: SiteType = "transit_hub"
 
 
 @dataclass(frozen=True)
@@ -35,6 +64,7 @@ class DemandPoint:
     lon: float
     population: float
     need_weight: float  # 0-1, e.g. health_burden domain score / 100
+    block_group_geoid: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,18 +83,32 @@ class OptimizationResult:
     marginal_gain_per_site: dict[str, float] = field(default_factory=dict)
     overlap_count: int = 0  # demand points covered by more than one selected site
     assumptions: list[str] = field(default_factory=list)
+    n_abstract_analytical_sites_selected: int = 0
     method: str = METHOD_LABEL
 
 
-_ASSUMPTIONS = [
-    "Coverage is a modeled scenario configuration, not a forecast of avoided ED visits, "
-    "dollars saved, or health outcomes.",
-    "Distance is straight-line ('as the crow flies'), not network travel time (Phase 6 scope).",
-    "Candidate sites are VTA GTFS high-frequency transit stops; community centers, libraries, "
-    "and other public-site categories from docs/03 §13.2 are not yet ingested.",
-    "Demand is represented at the tract level (internal point), not population-weighted "
-    "sub-tract centroids (docs/03 §2.5's preferred finer-grained origins are Phase 6 scope).",
-]
+def _build_assumptions(
+    distance_method: str, candidate_sites: list[CandidateSite]
+) -> list[str]:
+    site_type_counts: dict[str, int] = {}
+    for s in candidate_sites:
+        site_type_counts[s.site_type] = site_type_counts.get(s.site_type, 0) + 1
+    site_type_summary = ", ".join(f"{n} {t}" for t, n in sorted(site_type_counts.items()))
+
+    assumptions = [
+        "Coverage is a modeled scenario configuration, not a forecast of avoided ED visits, "
+        "dollars saved, or health outcomes.",
+        f"Distance method: {distance_method}.",
+        f"Candidate sites ({len(candidate_sites)} total): {site_type_summary}. "
+        "'transit_hub' sites are real VTA GTFS stops; 'abstract_analytical' sites are "
+        "hypothetical analytical points (e.g. a population-weighted demand center), not "
+        "real, buildable, or currently-available locations -- see RISK-022 for the "
+        "documented gap in real community-center/library/senior-center candidate data.",
+        "Demand uses real population-weighted block-group origins where available "
+        "(geo.block_group_population_origins), falling back to tract-level population for "
+        "any demand point without one.",
+    ]
+    return assumptions
 
 
 def run_maximal_covering_location(
@@ -75,23 +119,62 @@ def run_maximal_covering_location(
     high_need_percentile_threshold: float = 75.0,
     equity_min_coverage_fraction: float | None = None,
     time_limit_seconds: float = 15.0,
+    distance_fn: DistanceFn | None = None,
+    distance_method_label: str = "straight_line_screening",
+    precomputed_distances: dict[tuple[str, str], float] | None = None,
 ) -> OptimizationResult:
+    """Three layered ways to get coverage distance, in priority order:
+
+    1. `precomputed_distances[(origin_id, site_id)]` (origin_id is
+       `demand.block_group_geoid` if set, else `demand.tract_geoid_2020`)
+       -- an exact real network distance already computed elsewhere (e.g.
+       `routing/network_osm.py`'s batch output). A demand/site pair with
+       no entry is treated as "distance unknown for this pair," NOT
+       covering -- it never silently falls back to a different method for
+       that one pair, which would produce a coverage matrix mixing
+       methods without disclosure.
+    2. `distance_fn(origin_lat, origin_lon, dest_lat, dest_lon) -> miles`
+       -- any other distance lookup/computation (e.g. a live routing
+       call), used for pairs not in `precomputed_distances`.
+    3. Haversine straight-line screening (DEC-024), the default when
+       neither of the above is supplied -- works for any candidate site,
+       including hypothetical ones with no precomputed route.
+    """
+    if precomputed_distances is not None:
+        distance_method = "network_distance_precomputed"
+    elif distance_fn is not None:
+        distance_method = distance_method_label
+    else:
+        distance_method = METHOD_LABEL
+
     if not candidate_sites or not demand_points or k_sites <= 0:
         return OptimizationResult(
             status="INVALID_INPUT",
             objective_value=None,
             k_sites=k_sites,
             distance_threshold_miles=distance_threshold_miles,
-            assumptions=_ASSUMPTIONS,
+            assumptions=_build_assumptions(distance_method, candidate_sites),
         )
+
+    fallback_dist = distance_fn if distance_fn is not None else haversine_miles
+
+    def _distance(origin_id: str, d: DemandPoint, s: CandidateSite) -> float | None:
+        if precomputed_distances is not None:
+            key = (origin_id, s.site_id)
+            if key in precomputed_distances:
+                return precomputed_distances[key]
+            if distance_fn is None:
+                return None  # no precomputed entry, no fallback callable -- unknown, not covering
+        return fallback_dist(d.lat, d.lon, s.lat, s.lon)
 
     # Coverage matrix: covering_sites[i] = list of candidate indices within threshold of demand i.
     covering_sites: list[list[int]] = []
     for d in demand_points:
+        origin_id = d.block_group_geoid or d.tract_geoid_2020
         covers = [
             j
             for j, s in enumerate(candidate_sites)
-            if haversine_miles(d.lat, d.lon, s.lat, s.lon) <= distance_threshold_miles
+            if (dist := _distance(origin_id, d, s)) is not None and dist <= distance_threshold_miles
         ]
         covering_sites.append(covers)
 
@@ -141,7 +224,7 @@ def run_maximal_covering_location(
             distance_threshold_miles=distance_threshold_miles,
             total_population=sum(d.population for d in demand_points),
             total_high_need_population=sum(demand_points[i].population for i in high_need_indices),
-            assumptions=_ASSUMPTIONS,
+            assumptions=_build_assumptions(distance_method, candidate_sites),
         )
 
     selected_site_indices = [j for j in range(len(candidate_sites)) if solver.Value(x[j]) == 1]
@@ -171,6 +254,10 @@ def run_maximal_covering_location(
             site_id = candidate_sites[covering_selected[0]].site_id
             marginal_gain[site_id] = marginal_gain.get(site_id, 0.0) + demand_points[i].population
 
+    n_abstract_selected = sum(
+        1 for j in selected_site_indices if candidate_sites[j].site_type == "abstract_analytical"
+    )
+
     return OptimizationResult(
         status=status_name,
         objective_value=solver.ObjectiveValue() / scale,
@@ -185,5 +272,7 @@ def run_maximal_covering_location(
         unserved_high_need_tracts=unserved_high_need,
         marginal_gain_per_site=marginal_gain,
         overlap_count=overlap_count,
-        assumptions=_ASSUMPTIONS,
+        assumptions=_build_assumptions(distance_method, candidate_sites),
+        n_abstract_analytical_sites_selected=n_abstract_selected,
+        method=distance_method,
     )

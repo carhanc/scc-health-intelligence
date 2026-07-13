@@ -504,20 +504,35 @@ def main() -> int:  # noqa: PLR0915 -- orchestration script, sequential by desig
         for t, lat, lon in tract_points
     ]
 
+    # Sensitivity/robustness sweep (Phase 6 spec): vary k_sites, distance
+    # threshold, and whether an equity constraint is applied, so the
+    # Access Lab can show which siting conclusions are stable across
+    # reasonable parameter choices and which are assumption-sensitive.
+    # run_id encodes every varied parameter so the API/UI can group and
+    # label runs without re-deriving the scenario from raw numbers.
+    _OPTIMIZATION_SCENARIOS: list[tuple[str, int, float, float | None]] = [
+        ("baseline", 5, 2.0, 0.5),
+        ("more_sites", 10, 2.0, 0.5),
+        ("tight_threshold", 10, 1.0, 0.5),
+        ("no_equity_constraint", 5, 2.0, None),
+        ("walk_plausible_threshold", 5, 0.5, None),
+        ("larger_network", 15, 2.0, 0.5),
+    ]
     optimization_rows = []
-    for k_sites, threshold in [(5, 2.0), (10, 2.0), (10, 1.0)]:
+    for scenario_key, k_sites, threshold, equity in _OPTIMIZATION_SCENARIOS:
         optimization_result = run_maximal_covering_location(
             candidate_sites,
             demand_points,
             k_sites=k_sites,
             distance_threshold_miles=threshold,
-            equity_min_coverage_fraction=0.5,
+            equity_min_coverage_fraction=equity,
         )
         optimization_rows.append(
             {
-                "run_id": f"mobile_clinic_k{k_sites}_r{threshold}",
+                "run_id": f"mobile_clinic_{scenario_key}",
                 "scenario_label": (
-                    "Mobile clinic siting (health_burden-weighted, transit-hub candidates)"
+                    f"Mobile clinic siting -- {scenario_key.replace('_', ' ')} "
+                    "(health_burden-weighted, transit-hub candidates)"
                 ),
                 "k_sites": optimization_result.k_sites,
                 "distance_threshold_miles": optimization_result.distance_threshold_miles,
@@ -537,7 +552,8 @@ def main() -> int:  # noqa: PLR0915 -- orchestration script, sequential by desig
             }
         )
         print(
-            f"  k={k_sites}, threshold={threshold}mi: status={optimization_result.status}, "
+            f"  {scenario_key}: k={k_sites}, threshold={threshold}mi, equity={equity}: "
+            f"status={optimization_result.status}, "
             f"population_covered={optimization_result.population_covered:.0f}"
         )
     _write_table(conn, "analytics", "optimization_runs", _rows_to_df(optimization_rows))

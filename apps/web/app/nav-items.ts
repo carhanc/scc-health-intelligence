@@ -43,8 +43,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Access Lab",
     href: "/access-lab",
     description: "Travel time, resource proximity, and mobile-clinic site planning.",
-    status: "coming_soon",
-    phase: "Phase 6",
+    status: "available",
   },
   {
     id: "utilization",

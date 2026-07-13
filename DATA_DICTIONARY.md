@@ -210,7 +210,37 @@ HCAI patient-origin/market-share pivot profile, 2024. Native geography is patien
 - ACS tables beyond population/poverty/disability (income, insurance coverage, vehicle access, language isolation, housing cost burden, education) — DEC-020, RISK-014.
 - HUD USPS ZIP-tract crosswalk (optional enhancement, DEC-014).
 - Additional SCC GIS layers beyond supervisor districts (Parks, Community Service Districts — verified available, DEC-021).
-- A unified, deduplicated `resources.facilities` table merging `resources.hcai_facilities` and `resources.hrsa_health_center_sites` by coordinate/name/address — deferred to Phase 6 (Access Lab), where deduplication is actually needed for routing/optimization.
+- Libraries, community centers, senior centers, and pharmacies as canonical facility categories — no verified official bulk source found this session (DEC-045, RISK-022).
+
+## Phase 6 tables (Access Lab — implemented)
+
+### `geo.block_group_population_origins` — 1,173 rows
+
+Census Bureau 2020 Mean Center of Population, block-group level (DEC-044). Fields: `block_group_geoid` (12-char), `tract_geoid_2020` (11-char), `latitude`, `longitude`, `population`. Every tract has ≥1 origin (audited); total population reconciles with the independent ACS B01003 total within 1.8% (audited).
+
+### `resources.canonical_facilities` — 4,207 rows
+
+Deduplicated, cross-source-matched facility inventory (15 hospitals, 155 clinics, 796 food retailers, 3,241 transit hubs). Fields include `canonical_resource_id`, `category`, `subtype`, `name`, `address`, `latitude`/`longitude`, `is_official`, `dedup_status` (`single_source` | `matched_multi_source`), `coordinate_quality`, `n_contributing_sources`, `limitation_notes`. See `docs/methods/accessibility.md` §2.
+
+### `resources.facility_source_crosswalk` / `facility_duplicate_review` / `facility_rejected_records` / `facility_category_coverage`
+
+Full source lineage for every canonical facility (never lost on merge); every merge/non-merge decision with its distance/name-similarity evidence; records rejected outright (e.g. missing name) rather than silently dropped; category coverage summary.
+
+### `analytics.network_access_metrics` — 4,692 rows
+
+Nearest hospital/clinic by real walk/drive network distance and duration per population origin. Fields: `block_group_geoid`, `tract_geoid_2020`, `mode`, `category`, `status`, `nearest_facility_id`, `distance_miles`, `duration_minutes`, `method`, `unavailable_reason`. Complete (origin × mode × category) coverage — an unreachable combination is a `status="unavailable"` row with a stated reason, never a silently missing one (audited).
+
+### `analytics.transit_access_metrics` — 1,173 rows
+
+Best-served walkable transit stop per population origin, real GTFS-derived weekday-daytime headway. Fields include `nearest_stop_id`, `walk_distance_miles`, `n_trips_in_window`, `headway_minutes`, `service_level`, `service_window`. `method` is always `"scheduled_transit_access_proxy"` (audited) — never presented as real-time.
+
+### `analytics.e2sfca_accessibility` — 4,692 rows
+
+E2SFCA catchment accessibility per population origin, mode, and category. Fields include `capacity_type` (`real_capacity` | `count_proxy`, never mixed within a category — audited), `accessibility_score`, `n_facilities_in_catchment`, `catchment_radius_miles`, `sigma_miles`. See `docs/methods/e2sfca.md`.
+
+### `analytics.optimization_runs` — 6 rows (extended from Phase 4's 3)
+
+Mobile-clinic siting sensitivity sweep varying k_sites/distance_threshold/equity constraint, including one real `INFEASIBLE` result. See `docs/methods/optimization.md`.
 
 ## Versioning
 

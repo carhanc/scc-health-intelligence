@@ -1,8 +1,11 @@
 import { test, expect } from "@playwright/test";
 
+// Access Lab moved from "coming soon" to a real, built page in Phase 6 --
+// see e2e/access-lab-core.spec.ts for its own coverage, and
+// nav-coming-soon's own "nav marks unavailable destinations distinctly"
+// test below for the (still coming-soon) remainder.
 const COMING_SOON_ROUTES = [
   { path: "/prioritize", title: "Prioritize" },
-  { path: "/access-lab", title: "Access Lab" },
   { path: "/utilization", title: "Utilization" },
   { path: "/validate", title: "Validate" },
   { path: "/advocate", title: "Advocate" },

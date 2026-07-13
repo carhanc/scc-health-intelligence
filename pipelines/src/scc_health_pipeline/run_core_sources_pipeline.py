@@ -23,6 +23,7 @@ from scc_health_pipeline.sources.ca_hpi import CaHpiAdapter, blocked_manifest_en
 from scc_health_pipeline.sources.calenviroscreen import CalEnviroScreenAdapter
 from scc_health_pipeline.sources.cdc_atsdr_svi import CdcAtsdrSviAdapter
 from scc_health_pipeline.sources.cdc_places import CdcPlacesAdapter
+from scc_health_pipeline.sources.census_population_origins import CenPopBlockGroupAdapter
 from scc_health_pipeline.sources.hcai_ed_facility_profile import HcaiEdFacilityProfileAdapter
 from scc_health_pipeline.sources.hcai_ed_patient_county import all_breakdown_adapters
 from scc_health_pipeline.sources.hcai_facility_attributes import HcaiFacilityAttributesAdapter
@@ -35,6 +36,7 @@ from scc_health_pipeline.sources.hrsa_shortage_areas import (
     primary_care_adapter,
 )
 from scc_health_pipeline.sources.manifest import load_manifest, record_artifact, save_manifest
+from scc_health_pipeline.sources.scc_health_clinics import SccHealthClinicsAdapter
 from scc_health_pipeline.sources.usda_snap_retailers import UsdaSnapRetailersAdapter
 from scc_health_pipeline.sources.vta_gtfs import VtaGtfsAdapter
 
@@ -118,6 +120,22 @@ _MANIFEST_META: dict[str, SourceManifestMeta] = {
         "2026-01-29",
         "census tract (national crosswalk)",
         "Public domain (U.S. government work)",
+    ),
+    "census_cenpop_2020_block_group": SourceManifestMeta(
+        "U.S. Census Bureau",
+        "https://www.census.gov/geographies/reference-files/time-series/geo/centers-population.html",
+        "2020 Census (Mean Center of Population)",
+        "2021-08-12",
+        "block group (population-weighted point)",
+        "Public domain (U.S. government work)",
+    ),
+    "scc_health_clinics": SourceManifestMeta(
+        "Santa Clara County Public Health Department",
+        "https://data-sccphd.opendata.arcgis.com/datasets/sccphd::health-clinics",
+        "rolling/continuous",
+        None,
+        "facility point",
+        "County of Santa Clara ArcGIS Hub open-data terms",
     ),
 }
 
@@ -269,9 +287,13 @@ def main() -> int:  # noqa: PLR0915 -- orchestration script, sequential by desig
         if acs_tables:
             table_outputs[("social", "acs_observations")] = acs_tables
 
+    # --- geo.* (Phase 6: population-weighted origins) ---
+    run(CenPopBlockGroupAdapter(), "geo", "block_group_population_origins")
+
     # --- resources.* ---
     run(HcaiFacilityAttributesAdapter(), "resources", "hcai_facilities")
     run(HrsaHealthCentersAdapter(), "resources", "hrsa_health_center_sites")
+    run(SccHealthClinicsAdapter(), "resources", "scc_health_clinics")
     run(UsdaSnapRetailersAdapter(), "resources", "snap_retailers")
 
     gtfs_result = _run_adapter(VtaGtfsAdapter(), context)

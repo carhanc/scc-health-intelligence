@@ -1,0 +1,101 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.937103000297,
+          37.3157189997893
+        ]
+      },
+      "properties": {
+        "OBJECTID": 1,
+        "Status": "M",
+        "Match_addr": "2400 MOORPARK AVENUE, SAN JOSE, 95128",
+        "USER_H_CenterName": "AACI",
+        "USER_OperatedBy": "THE ASIAN AMERICANS FOR COMMUNITY INVOLVEMENT OF SANTA CLARA COUNTY, INC."
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.975415999841,
+          37.4247990001278
+        ]
+      },
+      "properties": {
+        "OBJECTID": 2,
+        "Status": "M",
+        "Match_addr": "1621 GOLD STREET, SAN JOSE, 95002",
+        "USER_H_CenterName": "ALVISO HEALTH CENTER",
+        "USER_OperatedBy": "GARDNER FAMILY HEALTH NETWORK, INC"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.830156000134,
+          37.2927510003265
+        ]
+      },
+      "properties": {
+        "OBJECTID": 3,
+        "Status": "M",
+        "Match_addr": "3200 SENTER ROAD, SAN JOSE, 95111",
+        "USER_H_CenterName": "Andrew Hill SB Health Clinic",
+        "USER_OperatedBy": "BAY AREA COMMUNITY HEALTH"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.81943249977,
+          37.3569120000934
+        ]
+      },
+      "properties": {
+        "OBJECTID": 4,
+        "Status": "M",
+        "Match_addr": "1066 SOUTH WHITE ROAD, SAN JOSE, 95127",
+        "USER_H_CenterName": "BACH Family Clinic",
+        "USER_OperatedBy": "BAY AREA COMMUNITY HEALTH"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 5,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -121.941836999673,
+          37.3539599996949
+        ]
+      },
+      "properties": {
+        "OBJECTID": 5,
+        "Status": "M",
+        "Match_addr": "3490 THE ALAMEDA, SANTA CLARA, 95050",
+        "USER_H_CenterName": "BILL WILSON CENTER",
+        "USER_OperatedBy": "GARDNER FAMILY HEALTH NETWORK, INC"
+      }
+    }
+  ]
+}

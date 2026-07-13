@@ -30,6 +30,10 @@ warehouse/*.duckdb.wal
 !data/staged/.gitkeep
 !data/curated/.gitkeep
 
+# http_fetch.py's checksum-keyed raw-download cache (sources/manifest.py) --
+# real fetched artifacts, some 100MB+, never committed.
+cache/
+
 # Generated reports / uploads
 uploads/
 exports/

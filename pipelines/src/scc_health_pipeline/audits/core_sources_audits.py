@@ -45,11 +45,13 @@ _EXPECTED_TABLES: list[tuple[str, str, int]] = [
     ("social", "acs_observations", 20000),
     ("resources", "hcai_facilities", 50),
     ("resources", "hrsa_health_center_sites", 20),
+    ("resources", "scc_health_clinics", 20),
     ("resources", "snap_retailers", 500),
     ("resources", "transit_stops", 1000),
     ("resources", "transit_routes", 10),
     ("resources", "hrsa_hpsa", 10),
     ("resources", "hrsa_mua_p", 5),
+    ("geo", "block_group_population_origins", 900),
     ("utilization", "hcai_ed_patient_county", 100),
     ("utilization", "hcai_ed_facility_profile", 3),
     ("utilization", "hcai_patient_origin", 5000),
@@ -111,6 +113,7 @@ def run_core_sources_audits(warehouse_path: Path) -> AuditReport:
         _audit_hcai_suppression_preserved(conn, report)
         _audit_coordinate_bounds(conn, report)
         _audit_no_all_null_required_geoid(conn, report)
+        _audit_population_origins_coverage(conn, report)
         _audit_manifest_provenance_present(report)
     finally:
         conn.close()
@@ -366,6 +369,69 @@ def _audit_no_all_null_required_geoid(conn: duckdb.DuckDBPyConnection, report: A
             null_geoid == 0,
             f"{null_geoid} row(s) in {schema}.{table} have a null {geo_col}.",
         )
+
+
+def _audit_population_origins_coverage(
+    conn: duckdb.DuckDBPyConnection, report: AuditReport
+) -> None:
+    """Phase 6: every one of the 408 Santa Clara tracts should have at
+    least one population-weighted origin, and the origins' total
+    population should reconcile against the independently-sourced ACS
+    total-population estimate (two different Census Bureau products,
+    2020 decennial vs. 2020-2024 ACS 5-year, so an exact match isn't
+    expected -- but a large divergence would indicate a real join/filter
+    bug, not just normal vintage drift)."""
+    if not _table_exists(conn, "geo", "block_group_population_origins"):
+        return
+
+    if _table_exists(conn, "geo", "tracts"):
+        (tracts_without_origin,) = _fetchone(
+            conn,
+            "SELECT COUNT(*) FROM geo.tracts t "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM geo.block_group_population_origins o "
+            "  WHERE o.tract_geoid_2020 = t.tract_geoid_2020"
+            ")",
+        )
+        report.add(
+            "population_origins_cover_every_tract",
+            tracts_without_origin == 0,
+            f"{tracts_without_origin} of 408 tracts have zero population-weighted origins "
+            "(would fall back to a geometric centroid for access analysis in that tract).",
+        )
+
+    (null_coords,) = _fetchone(
+        conn,
+        "SELECT COUNT(*) FROM geo.block_group_population_origins "
+        "WHERE latitude IS NULL OR longitude IS NULL OR population IS NULL",
+    )
+    report.add(
+        "population_origins_no_null_coords_or_population",
+        null_coords == 0,
+        f"{null_coords} block-group origin(s) have a null latitude/longitude/population.",
+    )
+
+    if _table_exists(conn, "social", "acs_observations"):
+        (origins_total,) = _fetchone(
+            conn, "SELECT SUM(population) FROM geo.block_group_population_origins"
+        )
+        acs_row = _fetchone(
+            conn,
+            "SELECT SUM(estimate) FROM social.acs_observations "
+            "WHERE variable_id = 'B01003_E001'",
+        )
+        acs_total = acs_row[0]
+        if origins_total is not None and acs_total is not None and acs_total > 0:
+            relative_diff = abs(origins_total - acs_total) / acs_total
+            report.add(
+                "population_origins_reconcile_with_acs_total",
+                relative_diff < 0.10,
+                f"Block-group origins sum to {origins_total:,.0f} population; ACS 5-year "
+                f"B01003 tract total is {acs_total:,.0f} (relative difference "
+                f"{relative_diff:.1%}). A large gap would suggest a join/filter bug -- some "
+                "gap is expected since these are two different Census products "
+                "(2020 decennial mean-center-of-population vs. 2020-2024 ACS 5-year estimate).",
+            )
 
 
 def _audit_manifest_provenance_present(report: AuditReport) -> None:
