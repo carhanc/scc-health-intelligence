@@ -1,5 +1,6 @@
 .PHONY: bootstrap data demo dev dev-web dev-api test test-unit test-e2e audit \
-        export-demo lint typecheck docs build clean-generated refresh
+        export-demo lint typecheck docs build clean-generated refresh \
+        data-manifest publish-data smoke-test
 
 # Polars' native-CPU-feature check misfires on this project's reference dev
 # machine (x86_64 Homebrew running under Rosetta on Apple Silicon -- see
@@ -70,8 +71,11 @@ audit:
 	@echo "(Phases 2-4). See TASKS.md."
 
 export-demo:
-	@echo "make export-demo: sample advocacy brief/evidence packet generation — implemented starting Phase 9."
-	@echo "Not available yet (Phase 1 scaffold only). See TASKS.md Phase 9."
+	uv run python scripts/export_demo.py
+	@echo "make export-demo: packages the real, frozen offline demo geography snapshot"
+	@echo "(data/demo/geography/) as exports/scc_health_demo_geography.zip. Health/social/"
+	@echo "analytics/utilization data has no offline snapshot yet (RISK-019/RISK-029) --"
+	@echo "the zip's own README says so honestly, it does not claim a full data export."
 
 lint:
 	uv run ruff check .
@@ -94,3 +98,17 @@ clean-generated:
 refresh:
 	@if [ -z "$(SOURCE)" ]; then echo "Usage: make refresh SOURCE=<source_id>"; exit 1; fi
 	@echo "make refresh SOURCE=$(SOURCE): per-source refresh jobs are added starting Phase 3."
+
+# --- Phase 9: production data artifact ---
+
+data-manifest:
+	uv run python scripts/build_production_manifest.py
+
+publish-data: data-manifest
+	uv run python scripts/publish_data_artifact.py
+	@echo "Built the local artifact and printed the 'gh release create' command."
+	@echo "Re-run with 'uv run python scripts/publish_data_artifact.py --publish' to"
+	@echo "actually publish (requires 'gh auth login' first)."
+
+smoke-test:
+	uv run python scripts/smoke_test.py --frontend-url $${FRONTEND_URL:-http://localhost:3000} --backend-url $${BACKEND_URL:-http://localhost:8000}

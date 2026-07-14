@@ -55,7 +55,7 @@ export function GapPanel({
           Where estimated health need and measured access overlap
         </h2>
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-          Compares each tract&apos;s health-burden percentile (Phase 4) against its measured resource-access
+          Compares each tract&apos;s health-burden percentile against its measured resource-access
           percentile ({mode === "walk" ? "walking" : "driving"} access considering both nearby services and local
           demand). This shows where the two overlap -- it does not establish that low access causes worse health
           outcomes, or that adding a resource would improve them.

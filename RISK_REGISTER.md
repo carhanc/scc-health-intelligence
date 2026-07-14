@@ -330,4 +330,30 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-033 — The `deploy.yml` and `scheduled-refresh.yml` GitHub Actions workflows have never executed on a real GitHub Actions runner or against a real Render/Vercel deployment
+
+**Category:** Deployment/operational readiness. **Likelihood:** Confirmed by design -- no cloud accounts, GitHub Actions runner, or repository secrets were available in the environment this phase was built in. **Impact:** Moderate until first real execution -- every constituent command (`make data`, `make audit`, `make data-manifest`, `scripts/publish_data_artifact.py`, `scripts/fetch_data_artifact.py`, `scripts/smoke_test.py`) was independently verified to work correctly against this repository's real local warehouse and dev servers, and both workflow YAML files were syntax-validated, but the orchestration itself (secrets wiring, `workflow_run` triggering, Render/Vercel deploy-hook behavior, GitHub Release creation via `gh`) is unexercised end to end.
+
+**Mitigation:** `docs/deployment/production-deployment-guide.md` gives the exact, numbered steps the repository owner must run to create the real cloud resources and secrets; `docs/release/release-checklist.md` explicitly marks these two items as unverified rather than claiming false confidence.
+
+**Status:** `open` -- closes the first time the repository owner completes the deployment guide and a real `Deploy`/`Scheduled data refresh` workflow run succeeds. Record the outcome (and fix anything the live environment surfaces that local testing couldn't) in this entry or a follow-up one.
+
+## RISK-034 — The per-IP rate limiter is in-process and does not coordinate across multiple backend instances
+
+**Category:** Scalability. **Likelihood:** Confirmed by design (`apps/api/src/scc_health_api/rate_limit.py`'s own docstring). **Impact:** Low for this release (a single Render instance is the deployment target, DEC-066) -- would become a real gap only if the backend is later horizontally scaled, at which point each instance would enforce its own independent budget rather than a shared one.
+
+**Mitigation:** Documented inline in the module itself and in `docs/deployment/api-operations.md`, so this is a known, intentional simplification, not a silent gap that would surprise someone scaling the service later.
+
+**Status:** `open`, low priority -- revisit (move to a shared store, e.g. Redis) only if/when horizontal scaling is actually planned.
+
+## RISK-035 — No open-source license has been assigned to this repository
+
+**Category:** Legal/governance. **Likelihood:** Confirmed (no `LICENSE` file exists). **Impact:** Moderate for anyone wanting to reuse, fork, or contribute to this code under clear legal terms -- without an explicit license, default copyright law applies and the terms under which others may use this code are ambiguous.
+
+**Mitigation:** `README.md`'s License section states this plainly rather than silently omitting it or defaulting to an unstated assumption.
+
+**Status:** `open` -- this is the repository owner's decision to make (e.g. MIT, Apache 2.0, or a decision to keep the code proprietary/unlicensed); not something this assistant can decide on the owner's behalf.
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

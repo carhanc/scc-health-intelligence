@@ -30,6 +30,12 @@ warehouse/*.duckdb.wal
 !data/staged/.gitkeep
 !data/curated/.gitkeep
 
+# Generated production data manifest (scripts/build_production_manifest.py)
+# -- regenerated from the live warehouse on every build, never hand-edited
+# or committed as if it were source.
+DATA_MANIFEST.production.json
+data-artifact/
+
 # http_fetch.py's checksum-keyed raw-download cache (sources/manifest.py) --
 # real fetched artifacts, some 100MB+, never committed.
 cache/

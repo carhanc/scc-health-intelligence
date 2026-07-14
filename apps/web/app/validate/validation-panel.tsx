@@ -46,7 +46,7 @@ export function ValidationPanel() {
 
       <ValidationSection
         title="Criterion validity -- against modeled emergency-department utilization"
-        description="Do tracts with a higher priority score also show more modeled emergency-department use? This closes a real, previously open gap (RISK-015): HCAI's ED data had no usable independent outcome until Phase 7 built a ZIP-to-tract allocation. A moderate, positive, non-tautological correlation is exactly what would be expected of a defensible screening tool -- not proof of causation."
+        description="Do tracts with a higher priority score also show more modeled emergency-department use? Real ZIP-level HCAI data had to be allocated down to the tract level to make this comparison possible at all -- see the Utilization page for that method and its limitations. A moderate, positive, non-tautological correlation is exactly what would be expected of a defensible screening tool -- not proof of causation."
         query={criterionQuery}
         rows={criterionQuery.data?.results ?? []}
         dataMode={criterionQuery.data?.data_mode}

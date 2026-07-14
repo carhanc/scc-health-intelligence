@@ -25,3 +25,13 @@ class WarehouseStatusResponse(BaseModel):
     spatial_extension_loaded: bool
     data_mode: Literal["live", "demo", "unavailable"]
     detail: str | None = None
+
+
+class ReadyResponse(BaseModel):
+    """Readiness (not liveness): can this instance actually serve real
+    queries right now? Distinct from /health, which only confirms the
+    process itself is up -- a process can be "alive" with no warehouse."""
+
+    ready: bool
+    data_mode: Literal["live", "demo", "unavailable"]
+    detail: str | None = None

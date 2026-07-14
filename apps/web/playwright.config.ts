@@ -8,7 +8,16 @@ import { defineConfig, devices } from "@playwright/test";
  * macOS permission gap this session -- see RISK-012) via the Bash tool's
  * unrestricted process spawning, so this is the primary automated
  * browser-verification path for Phase 5.
+ *
+ * Phase 9: SMOKE_TEST_BASE_URL, if set, points every test at a deployed
+ * URL instead of the local dev server and skips spawning local
+ * webServer processes entirely -- this is how `e2e/production-smoke.spec.ts`
+ * runs against a real Vercel/Render deployment (see
+ * docs/deployment/production-deployment-guide.md). Unset, everything
+ * behaves exactly as before.
  */
+const smokeTestBaseUrl = process.env.SMOKE_TEST_BASE_URL;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -25,25 +34,27 @@ export default defineConfig({
     // as different origins even though they resolve to the same host.
     // Using 127.0.0.1 here silently CORS-blocked every API fetch and
     // made every data-dependent test time out with no visible error.
-    baseURL: "http://localhost:3000",
+    baseURL: smokeTestBaseUrl ?? "http://localhost:3000",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: [
-    {
-      command:
-        "cd ../.. && uv run --package scc-health-api uvicorn scc_health_api.main:app --port 8000",
-      url: "http://localhost:8000/api/v1/health",
-      reuseExistingServer: true,
-      timeout: 60_000,
-    },
-    {
-      command: "pnpm dev",
-      url: "http://localhost:3000",
-      reuseExistingServer: true,
-      timeout: 60_000,
-    },
-  ],
+  webServer: smokeTestBaseUrl
+    ? undefined
+    : [
+        {
+          command:
+            "cd ../.. && uv run --package scc-health-api uvicorn scc_health_api.main:app --port 8000",
+          url: "http://localhost:8000/api/v1/health",
+          reuseExistingServer: true,
+          timeout: 60_000,
+        },
+        {
+          command: "pnpm dev",
+          url: "http://localhost:3000",
+          reuseExistingServer: true,
+          timeout: 60_000,
+        },
+      ],
   projects: [
     {
       name: "desktop-chromium",

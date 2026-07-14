@@ -1,0 +1,116 @@
+name: Deploy
+
+# Triggers Render (backend) and Vercel (frontend) deploy hooks after CI
+# passes on main, then runs the real smoke-test suite against the live
+# URLs and fails loudly (not silently green) if anything doesn't check
+# out. Deploy hooks are simple webhook URLs (no vendor SDK/API token
+# needed) -- see docs/deployment/production-deployment-guide.md for how
+# to create them and add them as repo secrets.
+#
+# This workflow does NOT perform an automatic rollback on smoke-test
+# failure -- Render/Vercel rollback is a one-click dashboard action
+# (documented in docs/deployment/rollback-guide.md); a failed smoke test
+# here is a loud signal to go do that, not something this workflow
+# silently "handles" for you.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "latest"
+
+      - name: Trigger Render backend deploy
+        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -sf -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Trigger Vercel frontend deploy
+        if: env.VERCEL_DEPLOY_HOOK_URL != ''
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl -sf -X POST "$VERCEL_DEPLOY_HOOK_URL"
+
+      - name: Skip (no deploy hooks configured yet)
+        if: env.RENDER_DEPLOY_HOOK_URL == '' && env.VERCEL_DEPLOY_HOOK_URL == ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          echo "::warning::Neither RENDER_DEPLOY_HOOK_URL nor VERCEL_DEPLOY_HOOK_URL is set."
+          echo "See docs/deployment/production-deployment-guide.md to create the services and hooks."
+          exit 0
+
+      - name: Wait for deployments to roll out
+        if: env.RENDER_DEPLOY_HOOK_URL != '' || env.VERCEL_DEPLOY_HOOK_URL != ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: sleep 90
+
+      - name: Install JS dependencies (for Playwright smoke checks)
+        if: env.PRODUCTION_FRONTEND_URL != ''
+        env:
+          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies (for the backend smoke checks)
+        if: env.PRODUCTION_BACKEND_URL != ''
+        env:
+          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+        run: uv sync --package scc-health-api
+
+      - name: Backend + API smoke test
+        if: env.PRODUCTION_FRONTEND_URL != '' && env.PRODUCTION_BACKEND_URL != ''
+        env:
+          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+        run: >
+          uv run python scripts/smoke_test.py
+          --frontend-url "$PRODUCTION_FRONTEND_URL"
+          --backend-url "$PRODUCTION_BACKEND_URL"
+
+      - name: Browser smoke test (console errors, accessibility)
+        if: env.PRODUCTION_FRONTEND_URL != ''
+        env:
+          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+        run: |
+          pnpm --filter @scc-health/web exec playwright install --with-deps chromium
+          SMOKE_TEST_BASE_URL="$PRODUCTION_FRONTEND_URL" pnpm --filter @scc-health/web exec playwright test e2e/production-smoke.spec.ts --project=desktop-chromium
+
+      - name: Skip smoke tests (production URLs not configured as repo variables yet)
+        if: env.PRODUCTION_FRONTEND_URL == '' || env.PRODUCTION_BACKEND_URL == ''
+        env:
+          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+        run: |
+          echo "::warning::Set the PRODUCTION_FRONTEND_URL and PRODUCTION_BACKEND_URL repo"
+          echo "variables (Settings > Secrets and variables > Actions > Variables) once the"
+          echo "services are deployed, so this workflow can smoke-test the live deployment."

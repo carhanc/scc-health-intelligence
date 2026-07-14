@@ -49,4 +49,27 @@ test.describe("Overview", () => {
     await expect(page).toHaveURL(/\/data$/);
     await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
   });
+
+  test("every footer link points somewhere real and distinct -- Phase 9 regression: Accessibility/Privacy previously both silently pointed at /validate", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const footer = page.getByRole("navigation", { name: "Footer" });
+
+    await footer.getByRole("link", { name: "Accessibility" }).click();
+    await expect(page).toHaveURL(/\/accessibility$/);
+    await expect(page.getByRole("heading", { name: "Accessibility", level: 1 })).toBeVisible();
+
+    await page.goto("/");
+    await footer.getByRole("link", { name: "Privacy" }).click();
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
+
+    await page.goto("/");
+    const contactLink = footer.getByRole("link", { name: "Contact / report an issue" });
+    await expect(contactLink).toHaveAttribute(
+      "href",
+      "https://github.com/carhanc/scc-health-intelligence/issues",
+    );
+  });
 });

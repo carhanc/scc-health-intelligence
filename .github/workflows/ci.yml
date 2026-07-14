@@ -5,14 +5,25 @@ on:
   push:
     branches: [main]
 
+# Least-privilege by default -- individual jobs opt into anything more
+# (none currently need to write anything).
+permissions:
+  contents: read
+
+# Cancel a superseded run on the same branch/PR rather than letting two
+# runs race each other (Phase 9 hardening).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     runs-on: macos-14 # Apple Silicon runner, matches the project's target platform
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: ".nvmrc"
 
@@ -20,7 +31,7 @@ jobs:
         run: corepack enable
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           version: "latest"
 
@@ -31,7 +42,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Python dependencies
-        run: uv sync
+        # --all-packages is required in this uv workspace -- syncing a
+        # single package's deps strips other workspace packages'
+        # dependencies (e.g. the pipeline package's polars/scikit-learn/
+        # ortools), a gotcha documented in STATE.md.
+        run: uv sync --all-packages
 
       - name: Clean-room check
         run: uv run python scripts/check_clean_room.py
@@ -57,6 +72,123 @@ jobs:
       - name: Build web app
         run: pnpm --filter @scc-health/web build
 
+  security-audit:
+    runs-on: macos-14
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "latest"
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync --all-packages
+
+      - name: Python dependency audit (pip-audit)
+        # Fails only on a real, currently-known vulnerability in a
+        # resolved dependency -- see docs/security/dependency-audit.md
+        # for anything accepted-as-risk with documented reasoning.
+        # The two local editable workspace packages (scc-health-api,
+        # scc-health-pipeline) aren't on PyPI and can't be looked up
+        # there -- filtered out before pip-audit sees the requirements.
+        run: |
+          uv export --no-hashes --all-packages | grep -v '^-e ' > /tmp/requirements-for-audit.txt
+          uvx pip-audit --strict -r /tmp/requirements-for-audit.txt
+
+      - name: JS dependency audit (pnpm audit)
+        # --audit-level=high: a PR gate should catch real, actionable
+        # vulnerabilities, not block every contributor on a low-severity
+        # transitive advisory with no fix available yet.
+        run: pnpm audit --audit-level=high
+
+  e2e:
+    runs-on: macos-14
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "latest"
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync --all-packages
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @scc-health/web exec playwright install --with-deps chromium
+
+      - name: Find latest published data artifact
+        id: find_artifact
+        run: |
+          TAG=$(curl -sf -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases" \
+            | python3 -c "
+          import json, sys
+          releases = json.load(sys.stdin)
+          data_releases = [r['tag_name'] for r in releases if r['tag_name'].startswith('data-')]
+          print(data_releases[0] if data_releases else '')
+          ")
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch production data artifact
+        if: steps.find_artifact.outputs.tag != ''
+        env:
+          DATA_ARTIFACT_RELEASE_TAG: ${{ steps.find_artifact.outputs.tag }}
+        run: uv run python scripts/fetch_data_artifact.py
+
+      - name: Skip e2e (no data artifact published yet)
+        if: steps.find_artifact.outputs.tag == ''
+        run: |
+          echo "::warning::No 'data-*' tagged release found yet. The e2e suite needs a real"
+          echo "warehouse (analytics tables have no offline demo snapshot -- RISK-019/RISK-029)."
+          echo "Run 'make publish-data' once (see docs/deployment/production-deployment-guide.md)"
+          echo "to publish the first one; this job will use it automatically after that."
+          exit 0
+
+      - name: Run Playwright e2e suite
+        if: steps.find_artifact.outputs.tag != ''
+        run: pnpm --filter @scc-health/web e2e
+
+      - name: Upload Playwright report
+        if: always() && steps.find_artifact.outputs.tag != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
+
   # Live-source refresh jobs are intentionally kept separate from PR CI
-  # (docs/04_ARCHITECTURE_IMPLEMENTATION.md §17) — added in Phase 3 as a
-  # scheduled workflow, not a pull-request gate.
+  # (docs/04_ARCHITECTURE_IMPLEMENTATION.md §17) -- see
+  # .github/workflows/scheduled-refresh.yml (Phase 9).

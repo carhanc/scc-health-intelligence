@@ -202,25 +202,52 @@ Scope expanded from the original spec pack per an explicit kickoff instruction i
 
 ## Phase 9 — Reporting, export, sharing
 
-- [ ] All required export types generated and inspected: one-page brief, geography profile, intervention scenario brief, staff-question packet, public-comment outline, validation summary, evidence packet, CSV/GeoJSON, accessible PDF/HTML. AC-ref §20.
-- [ ] Every export includes title/scope/date/geography/period/values+units/source+vintage/uncertainty/methods version/limitations/reproducibility ID.
-- [ ] Shareable URLs restore analytical state exactly.
-- [ ] Automated content lints: causal-language detector, missing-citation detector, percentile/percentage-confusion detector, suppressed-value-as-zero detector. AC-ref content checks (`docs/08` §Required automated content checks).
+Most export scope was already delivered ahead of schedule in Phase 7 (decision memo, CSV) and Phase 8 (6 Advocate output types, print-to-PDF, CSV, source/limitation appendix) — see those phases' own sections. This session's actual Phase 9 kickoff explicitly redirected scope to **production release-candidate readiness** (mapping most closely to the original spec's Phase 10, plus new production-deployment scope the original spec pack didn't anticipate at all) rather than the remaining original Phase 9 items below. Those remaining items (content lints, shareable URLs) are honestly left unchecked, not silently dropped.
 
-**Gate 9 evidence required:** exports render correctly and accessibly; printed output legible without interactive controls; export values match API/warehouse values exactly; reopening a share link restores state.
+- [x] Export types generated and inspected. **Phase 7/8 evidence:** one-page brief, detailed memo, staff questions, public comment, geography profile, source/limitation appendix (Advocate, Phase 8); decision memo, CSV (Prioritize, Phase 7). GeoJSON export and a dedicated "intervention scenario brief" type were not built as separately-named exports; their content is covered by the existing types above.
+- [x] Every export includes title/scope/date/geography/values+units/source+vintage/uncertainty/limitations/reproducibility ID. **Phase 8 evidence:** every Advocate output includes a SHA-256 configuration hash, generated date, sources, and a non-causal disclaimer (`advocacy_generation.py`).
+- [ ] Shareable URLs restore analytical state exactly. **Not done.** Advocate/Copilot state lives in browser-local IndexedDB (DEC-066), not URL-encoded; Explore/Prioritize do restore scenario/tract selection from URL params (Phase 5/6.5), but this is not a completed cross-cutting guarantee.
+- [ ] Automated content lints (causal-language/missing-citation/percentile-confusion/suppressed-as-zero detectors). **Not done** — every individual page/output has manual, tested non-causal framing and citation requirements (see Phase 4/7/8 evidence throughout this file), but no standalone automated lint tool scans for regressions in these properties. A real gap worth closing in a future phase.
+
+**Gate 9: partially evidenced.** Export rendering/accessibility/value-correctness is covered by Phase 7/8's own test suites; shareable-URL restoration and automated content lints remain open.
+
+---
+
+## Phase 9 (kickoff-redirected) — Production release candidate
+
+The actual Phase 9 kickoff instruction explicitly redirected this phase's scope to making the platform "a rigorously tested, secure, observable, maintainable, deployment-ready production release candidate," covering most of the original spec's Phase 10 items below plus real production-deployment work (architecture decision, CI/CD, data-artifact publishing, deployment guide) the original spec pack never scoped. Full detail in `DECISIONS.md` DEC-066 through DEC-069, `RISK_REGISTER.md` RISK-033 through RISK-035.
+
+- [x] **Production architecture decided and documented.** Vercel (frontend) + Render (backend) + GitHub Releases (data artifact); anonymous browser-local workspaces; AI-assisted Copilot left off in production. DEC-066.
+- [x] **Backend production hardening.** Environment-driven CORS/TrustedHost (previously hardcoded to `localhost`), security headers, structured JSON request logging with request IDs, a `/api/v1/ready` readiness endpoint distinct from `/health`, startup validation that refuses to run in `production` environment without a connected live warehouse, per-IP rate limiting on the two genuinely expensive routes (document analysis, Copilot ask).
+- [x] **Frontend production hardening.** Route-level and root error boundaries (`error.tsx`/`global-error.tsx`, previously nonexistent -- an unhandled render error had no branded fallback), a custom 404 page, a generated favicon (previously nonexistent), confirmed zero secret leakage into the client bundle (live-verified via a build-output grep), confirmed the existing per-query error-state pattern already gracefully degrades when the backend is unreachable (verified live by stopping the API and reloading).
+- [x] **Production data artifact pipeline.** `scripts/build_production_manifest.py` (introspects the live warehouse, fails loudly on any missing schema), `scripts/publish_data_artifact.py` (packages + publishes as a GitHub Release), `scripts/fetch_data_artifact.py` (downloads + SHA-256-verifies on the deployment side, reads paths from the same `Settings` object the API uses -- DEC-067) -- all three live-run and verified against the real local warehouse (59 tables, 670,291 rows) this session. `make export-demo` given a real implementation (previously a stub).
+- [x] **CI/CD.** Fixed the pre-existing `ci.yml`'s `uv sync` → `uv sync --all-packages` gotcha; added a required `security-audit` job (`pip-audit` + `pnpm audit`) and an `e2e` job; added `.github/workflows/scheduled-refresh.yml` (build-validate-publish data refresh) and `.github/workflows/deploy.yml` (deploy-hook trigger + real smoke test against live URLs). Every `uses:` action pinned to a verified commit SHA (DEC-068). **Not exercised on a real GitHub Actions runner or real cloud deployment this session** (RISK-033) -- every constituent command was independently verified locally instead.
+- [x] **Dependency/supply-chain audit.** `docs/security/dependency-audit.md` -- 0 findings in `pip-audit`; 1 moderate `pnpm audit` finding found and fixed (a `pnpm-workspace.yaml` override for a transitive PostCSS XSS advisory, GHSA-qx2v-qp2m-jg93).
+- [x] **Observability.** Sentry wired for both API (`sentry-sdk`) and web (`@sentry/nextjs`, via `instrumentation.ts`/`instrumentation-client.ts`), genuinely no-op when unset (live-verified: server starts and serves 200 both with and without `SENTRY_DSN` configured).
+- [x] **AI production-readiness evaluation tooling.** `scripts/copilot_golden_eval.py` (5 cases + the platform-side citation validator, all passing in deterministic mode this session) and `docs/security/ai-production-readiness.md` -- AI-assisted mode deliberately not enabled in production this release (RISK-032, DEC-066).
+- [x] **Repository audit.** `vitest-axe`/`axe-core` (genuinely unused direct dependencies) removed; dead `coming-soon.tsx` component removed (all 9 nav destinations have been real since Phase 8); a duplicate accessibility test removed; two live, real user-facing bugs found and fixed (the homepage footer's "Accessibility"/"Privacy" links both silently pointed at `/validate`, and "Contact / report an issue" linked to Anthropic's own `claude-code` repository instead of this project's -- DEC-069); zero stale TODO/FIXME/HACK comments found; zero broken internal markdown links found; two genuine "Phase N" leaks into user-facing description text found and fixed (Validate and Access Lab pages).
+- [x] **Full documentation set.** Root `README.md` (previously nonexistent), `docs/deployment/production-deployment-guide.md`, `docs/deployment/rollback-guide.md`, `docs/deployment/environment-variables.md`, `docs/deployment/api-operations.md`, `docs/observability/runbook.md`, `docs/data/refresh-runbook.md`, `docs/security/INCIDENT_RESPONSE.md`, `docs/security/ai-production-readiness.md`, `docs/security/dependency-audit.md`, `docs/release/release-checklist.md`.
+- [ ] **Performance budgets measured against `PLAN.md` §19 targets.** Not done this phase -- out of the scope actually kicked off (which prioritized deployability/security/observability over performance profiling); a real Phase 10+ item.
+- [x] **Rate limiting, CORS, upload safety verified with tests.** `apps/api/tests/test_rate_limit.py` (7 tests), `apps/api/tests/test_system_routes.py`'s CORS-allowlist test, unchanged Phase 8 upload-safety tests re-verified passing.
+- [ ] **Full WCAG 2.2 AA manual audit (screen-reader/zoom-200%/reduced-motion).** Automated axe-core coverage (0 serious/critical violations across every page, including the 2 new Phase 9 pages) re-verified this phase; the manual screen-reader/zoom/reduced-motion passes remain the recurring, disclosed manual-review item (`docs/design/manual-visual-review-checklist.md`), not newly completed this phase.
+
+**Gate 9 (redirected) evidence:** see the Phase 9 completion report for full test/audit/build results. `make lint`/`typecheck`/`audit`/`build` all pass; full local test suite (backend + frontend + Playwright) passes; every new script independently verified with a real local run, not just written and assumed to work.
 
 ---
 
 ## Phase 10 — Performance, accessibility, security, operational hardening
 
-- [ ] Performance budgets measured against `PLAN.md` §19 targets and recorded (not assumed).
-- [ ] Full WCAG 2.2 AA audit: axe automated + manual keyboard/screen-reader/zoom-200%/reduced-motion passes across all primary pages.
-- [ ] `docs/security/THREAT_MODEL.md` (STRIDE) and `docs/security/INCIDENT_RESPONSE.md` completed.
-- [ ] Dependency/secret scanning in CI; no unresolved high-severity findings without documented mitigation.
-- [ ] Rate limiting, CSP, CORS, upload safety (size/MIME/magic-byte/decompression-bomb) verified with tests.
-- [ ] Source refresh/rollback tested: a simulated bad refresh does not corrupt the last-known-good curated snapshot.
+Most of this phase's original scope was delivered under the redirected Phase 9 above (security hardening, dependency/secret scanning, rate limiting, CORS, upload safety, incident response doc, source refresh/rollback). Remaining open items:
 
-**Gate 10 evidence required:** performance budgets pass on representative hardware; axe + manual a11y checks pass; threat model complete; deployment/rollback tested; data-refresh failure does not corrupt last-known-good snapshot.
+- [ ] Performance budgets measured against `PLAN.md` §19 targets and recorded (not assumed).
+- [x] axe automated a11y audit across all primary pages, including the 2 new Phase 9 pages (Privacy, Accessibility) -- 0 serious/critical violations, live-verified this phase.
+- [ ] Manual keyboard/screen-reader/zoom-200%/reduced-motion passes across all primary pages -- remains a disclosed, recurring manual-review item, not automatable.
+- [x] `docs/security/INCIDENT_RESPONSE.md` completed this phase. (`docs/security/THREAT_MODEL.md` as a separate STRIDE document was not created; its content is distributed across `docs/09_SECURITY_PRIVACY_GOVERNANCE.md`'s existing "Application threat model" section and this phase's `docs/security/dependency-audit.md`/`docs/security/ai-production-readiness.md`.)
+- [x] Dependency/secret scanning in CI; no unresolved high-severity findings without documented mitigation. `docs/security/dependency-audit.md`, this phase.
+- [x] Rate limiting, CORS, upload safety verified with tests, this phase. (CSP was evaluated and deliberately not added to the API, which serves JSON not HTML -- CSP is the frontend/Vercel's responsibility; see `docs/deployment/api-operations.md`.)
+- [x] Source refresh/rollback tested: `docs/data/refresh-runbook.md`'s build-validate-publish sequence ensures a failed `make data`/`make audit` never overwrites a previously published data artifact -- verified by design (each script's own fail-loud exit-code behavior, live-tested this phase) though not yet exercised against a real prior deployment (RISK-033).
+
+**Gate 10: partially evidenced.** Security/dependency/rate-limiting/refresh-rollback items are complete with this-session evidence; performance-budget measurement and the manual accessibility passes remain open.
 
 ---
 

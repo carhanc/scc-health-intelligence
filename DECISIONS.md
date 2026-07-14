@@ -738,4 +738,57 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-066 — Production architecture: Vercel (frontend) + Render (backend) + GitHub Releases (data artifact), anonymous browser-local workspaces, AI-assisted Copilot left disabled in production
+
+**Context:** Phase 9's kickoff explicitly required determining and documenting the real production architecture rather than assuming "Vercel alone" could host the whole application, and required an explicit, justified decision on authentication/workspace persistence and whether to enable AI-assisted Copilot mode in production, rather than defaulting either in without a product reason.
+
+**Decision:**
+- **Frontend:** Vercel. Next.js App Router deploys there natively; `NEXT_PUBLIC_API_BASE_URL` was already the correct seam from earlier phases.
+- **Backend:** a Render Web Service (Python/FastAPI) with a persistent disk for the DuckDB warehouse file. Rejected alternatives: Vercel serverless functions (DuckDB's file-based model and a persistent warehouse don't fit a stateless serverless function well); Fly.io and Railway (viable alternatives, not chosen only because Render's dashboard-based disk/secret management was judged simplest for a first deployment with no existing account on any of the three).
+- **Data artifact:** the DuckDB warehouse file is the *only* production data artifact the API needs at serve time (confirmed: the API never reads `data/raw|staged|curated` or `cache/` directly). Published as a versioned GitHub Release asset (not committed to git, keeping the repository small and every past version rollback-able) and fetched by the backend's build step (`scripts/fetch_data_artifact.py`), verified by SHA-256 before being trusted.
+- **Auth / workspace persistence:** anonymous, browser-local only (Option A of three evaluated) — no account system, no server-side workspace store this release.
+- **AI:** `ANTHROPIC_API_KEY` is deliberately left unset on the production Render service. Deterministic Copilot mode is the entire production AI surface for this release.
+
+**Rationale:** Population-weighted or account-based alternatives were evaluated and rejected for concrete reasons, not by default: (1) this platform has no PHI and no confirmed multi-user collaboration requirement, so an anonymous, browser-local model matches its actual stated privacy posture (`CLAUDE.md` "No PHI is required or permitted") without building auth/tenancy/backup infrastructure speculatively; (2) AI-assisted mode has real, disclosed evaluation gaps (RISK-032) — enabling it in production before running a golden-evaluation/red-team pass against a live key would be exactly the kind of "claim production-ready without evidence" this phase's own instructions explicitly prohibited; (3) Render+Vercel+GitHub Releases requires zero new paid managed-database service for a warehouse that is a single ~50MB file, keeping cost and operational complexity proportional to actual need.
+
+**Consequences:** No user can currently save a workspace that survives clearing browser data or moving devices without manually exporting/importing JSON — a real, disclosed limitation (`docs/user-guide/advocate.md`). Enabling AI-assisted mode in production requires deliberately revisiting this decision after running `scripts/copilot_golden_eval.py` with a real key (`docs/security/ai-production-readiness.md`). The full requirements for a future server-side-persistence phase are recorded in `docs/architecture/phase9-production-requirements.md` (written in Phase 8) and remain accurate.
+
+---
+
+### DEC-067 — The production data artifact is fetched via a `Settings`-driven path, not a second hardcoded path, so the API and the fetch script can never disagree about where the warehouse lives
+
+**Context:** `scripts/fetch_data_artifact.py` downloads the warehouse onto a hosted deployment's persistent disk. An early version hardcoded `REPO_ROOT / "warehouse" / "scc_health.duckdb"`, the same default the API's `Settings` class uses locally — but a Render persistent disk is mounted outside the repository checkout, at an operator-chosen path, so a hardcoded path in the fetch script could silently diverge from `SCC_HEALTH_WAREHOUSE_PATH`, the actual env var the API reads.
+
+**Decision:** `fetch_data_artifact.py` imports `scc_health_api.settings.get_settings()` and writes to `settings.scc_health_warehouse_path`/`settings.data_manifest_path` directly — the exact same object the API process itself constructs from the same environment variables. There is only one source of truth for these paths, not two independently-maintained ones.
+
+**Rationale:** Two hardcoded copies of the same path is exactly the kind of thing that silently drifts apart over time (one gets updated, the other doesn't) and fails in a confusing way (the fetch script "succeeds" while the API can't find what it downloaded). Deriving both from the same `Settings` class makes this structurally impossible to desync.
+
+**Consequences:** `fetch_data_artifact.py` now has a real (small) import-time dependency on `apps/api/src` being on its Python path — handled via a `sys.path.insert` at the top of the script, documented inline.
+
+---
+
+### DEC-068 — GitHub Actions dependencies are pinned to verified commit SHAs, looked up live via the GitHub API rather than guessed
+
+**Context:** Phase 9's kickoff required pinning `uses:` actions to exact commit SHAs for supply-chain safety. A first draft of `ci.yml` used a plausible-looking but unverified SHA for `actions/upload-artifact`, which turned out to be wrong when checked.
+
+**Decision:** Every `uses:` action in `.github/workflows/*.yml` was pinned only after fetching its real tag→commit mapping via `https://api.github.com/repos/<owner>/<repo>/git/refs/tags/<tag>` and confirming the `object.type` is `"commit"` (i.e. a lightweight tag, not an annotated tag object requiring a further dereference) — see `docs/security/dependency-audit.md`'s table of exact versions/SHAs used.
+
+**Rationale:** A wrong or fabricated commit SHA in a security-pinning context is worse than no pinning at all — it creates false confidence that a specific, audited commit is running when actually a mismatched or nonexistent one is (which would simply fail the workflow, or worse, silently resolve to something unintended depending on GitHub's own fallback behavior). Since this assistant has no ability to verify a guessed SHA is correct without checking, every pin was looked up, not guessed, and the one guess that slipped through was caught and corrected before being trusted.
+
+**Consequences:** None beyond the verification overhead already paid this session. Future action version bumps must follow the same lookup-don't-guess process, noted inline in `docs/security/dependency-audit.md`.
+
+---
+
+### DEC-069 — A repository audit surfaced and fixed two real, live user-facing bugs unrelated to Phase 9's original scope (a mis-wired footer link and a wrong-repository contact link), rather than deferring them
+
+**Context:** Phase 9's kickoff required a repository audit pass (dead code, broken links, stale references). That audit found the homepage footer's "Accessibility" and "Privacy" links both pointed at `/validate` (an unrelated methodology page, not any accessibility/privacy content), and "Contact / report an issue" linked to `https://github.com/anthropics/claude-code/issues` — Anthropic's own developer-tool repository, not this project's.
+
+**Decision:** Fixed immediately rather than only flagging for a future phase: built real `/privacy` and `/accessibility` pages with accurate, implementation-matching content, corrected all three footer links, and added `e2e/overview.spec.ts` coverage for all four footer links (the existing test only ever checked "Data & methods," which is exactly why this shipped unnoticed).
+
+**Rationale:** A live link sending a real user's issue report to the wrong company's repository is a genuine, currently-live defect with real user impact, not a stylistic nitpick appropriate to defer — `CLAUDE.md`'s general instruction to fix defects found in the course of other work, and Phase 9's own "do not reopen completed work unless a verified defect... requires it" explicitly carves out exactly this case (a verified defect).
+
+**Consequences:** None negative. Two new real pages plus one closed test-coverage gap.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

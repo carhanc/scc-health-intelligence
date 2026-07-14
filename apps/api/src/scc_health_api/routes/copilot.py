@@ -7,7 +7,9 @@ docs/09_SECURITY_PRIVACY_GOVERNANCE.md "Secrets management").
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
+from starlette.requests import Request as HttpRequest
 
+from scc_health_api.rate_limit import copilot_ask_limiter
 from scc_health_api.schemas.copilot import (
     CopilotAskRequest,
     CopilotAskResponse,
@@ -35,7 +37,8 @@ def get_copilot_status() -> CopilotStatusResponse:
 
 
 @router.post("/ask", response_model=CopilotAskResponse)
-async def ask_copilot(request: CopilotAskRequest) -> CopilotAskResponse:
+async def ask_copilot(http_request: HttpRequest, request: CopilotAskRequest) -> CopilotAskResponse:
+    copilot_ask_limiter.check(http_request)
     use_llm = request.use_llm and is_llm_configured()
     provider = AnthropicProvider() if use_llm else DeterministicProvider()
 

@@ -279,6 +279,13 @@ Every `make audit` check's `(suite, check_name, passed, message)`, tagged with a
 - **`config/topic_ontology.yml`** — a new, versioned config artifact (not a warehouse table): maps 12 advocacy topics to the existing `metrics`/`scenarios`/`resource_categories` IDs already defined in `config/metrics.yml`/`config/scenarios.yml`. `language_access` intentionally carries empty `metrics`/`scenarios` lists plus an explicit `unavailable_reason` string, consistent with the metric registry's own DEC-027 precedent.
 - **Browser-local only (not in the warehouse or the API database):** the `AdvocacyWorkspace` schema (`apps/web/lib/workspace/schema.ts`, schema version 1) persisted to the browser's IndexedDB — selected geography, selected evidence snapshots, uploaded-document *findings* (never raw file bytes), notes, and export history. No account system, no server-side persistence, no cloud sync this phase (see `docs/architecture/phase9-production-requirements.md` for what a server-side version would need).
 
+## Phase 9 (production release candidate — implemented)
+
+**No new warehouse tables.** Phase 9 is a production-hardening/deployment-readiness pass, not an analytics change — no table listed above changed shape or meaning.
+
+- **`DATA_MANIFEST.production.json`** (generated, gitignored, not committed) — produced by `scripts/build_production_manifest.py` from a live introspection of the actual warehouse file: `build_id`, `built_at`, `warehouse_sha256`, per-schema table/row counts, `source_vintages` (reusing `DATA_MANIFEST.json`'s existing per-source provenance), and `known_missing_offline_snapshots`. Read by `GET /api/v1/version`'s `data_build_id` field. Regenerated on every production build; never hand-edited.
+- **The GitHub Release data artifact** — `warehouse/scc_health.duckdb` + the manifest above, packaged and published by `scripts/publish_data_artifact.py`, one immutable, uniquely-tagged release per build. This is the actual production data-distribution mechanism (see `docs/deployment/production-deployment-guide.md`) — the warehouse file itself is never committed to git (unchanged from Phase 1's `.gitignore` policy).
+
 ## Versioning
 
 This file's structure is versioned alongside the metric registry (`config/metrics.yml`). Material changes to a metric's definition, source, or geography require a new metric ID version suffix and a changelog entry here, not a silent in-place edit — per `docs/09_SECURITY_PRIVACY_GOVERNANCE.md` "Governance for scores and models."

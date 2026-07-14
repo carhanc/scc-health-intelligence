@@ -9,3 +9,17 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  # @sentry/cli's postinstall downloads a native CLI binary used only for
+  # source-map upload -- a feature this project deliberately doesn't use
+  # yet (see apps/web/instrumentation-client.ts's comment: no source-map
+  # upload, capture-only, to avoid needing a build-time auth token).
+  # Left disallowed rather than silently allowing an unused native binary
+  # download.
+  '@sentry/cli': false
+overrides:
+  # GHSA-qx2v-qp2m-jg93 (XSS via unescaped </style> in PostCSS's CSS
+  # stringify output) -- Next.js 16.2.10 itself pins a vulnerable
+  # transitive postcss; forced to the patched line here rather than
+  # waiting on an upstream Next.js bump. Verified: build and full test
+  # suite still pass with this override (Phase 9 dependency audit).
+  postcss: ">=8.5.10"

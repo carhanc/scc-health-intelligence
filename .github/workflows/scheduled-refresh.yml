@@ -1,0 +1,90 @@
+name: Scheduled data refresh
+
+# Rebuilds the full production warehouse from live sources, audits it,
+# and only publishes a new GitHub Release data artifact if every check
+# passes -- a failed or partial build never overwrites the last-known-good
+# published artifact (build-validate-publish, per
+# docs/data/refresh-runbook.md). Kept entirely separate from PR CI
+# (docs/04_ARCHITECTURE_IMPLEMENTATION.md §17) since this hits live,
+# rate-limited external sources and can take significant time.
+#
+# Requires repo secrets (see docs/deployment/production-deployment-guide.md):
+#   CENSUS_API_KEY, HUD_USER_TOKEN (optional -- both sources have a
+#   keyless fallback, but the keyed path is faster/more reliable)
+#   A GITHUB_TOKEN with `contents: write` (the default token works if
+#   this workflow's own `permissions:` block grants it, set below).
+
+on:
+  schedule:
+    # Monthly, first of the month, 06:00 UTC -- matches this platform's
+    # source cadence (ACS/PLACES/CalEnviroScreen/SVI are annual releases;
+    # HCAI utilization data is annual; nothing here needs daily refresh).
+    - cron: "0 6 1 * *"
+  workflow_dispatch: {} # manual trigger for an out-of-cycle refresh
+
+permissions:
+  contents: write # required to create a GitHub Release
+
+concurrency:
+  group: scheduled-refresh
+  cancel-in-progress: false # never cancel a build partway through
+
+jobs:
+  refresh:
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "latest"
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --all-packages
+
+      - name: Build the full production warehouse
+        env:
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+          HUD_USER_TOKEN: ${{ secrets.HUD_USER_TOKEN }}
+        run: make data
+
+      - name: Audit the build (must pass before anything is published)
+        run: make audit
+
+      - name: Build the production manifest (fails loudly on any missing schema/table)
+        run: make data-manifest
+
+      - name: Run the backend test suite against the freshly built warehouse
+        run: uv run pytest apps/api/tests -q
+
+      - name: Publish as a GitHub Release (only reached if every prior step passed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run python scripts/publish_data_artifact.py --publish
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f DATA_MANIFEST.production.json ]; then
+            echo "### Scheduled refresh result" >> "$GITHUB_STEP_SUMMARY"
+            python3 -c "
+          import json
+          m = json.load(open('DATA_MANIFEST.production.json'))
+          print(f\"- build_id: {m['build_id']}\")
+          print(f\"- total_tables: {m['total_tables']}\")
+          print(f\"- total_rows: {m['total_rows']:,}\")
+          " >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Scheduled refresh FAILED before a manifest was produced" >> "$GITHUB_STEP_SUMMARY"
+            echo "The previously published data artifact was never touched -- nothing to roll back." >> "$GITHUB_STEP_SUMMARY"
+          fi

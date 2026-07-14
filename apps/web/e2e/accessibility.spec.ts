@@ -80,14 +80,6 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("a coming-soon shell page has no serious or critical violations", async ({ page }) => {
-    await page.goto("/advocate");
-    await expect(page.getByRole("heading", { name: "Advocate", level: 1 })).toBeVisible();
-    const results = await new AxeBuilder({ page }).analyze();
-    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
-  });
-
   test("Prioritize (custom scenario, drivers expanded) has no serious or critical violations", async ({ page }) => {
     await page.goto("/prioritize");
     await page.getByRole("radio", { name: "Custom scenario" }).click();

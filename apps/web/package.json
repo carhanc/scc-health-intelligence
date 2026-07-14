@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@scc-health/ui": "workspace:*",
+    "@sentry/nextjs": "^10.65.0",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-table": "^8.20.0",
     "maplibre-gl": "^5.0.0",
@@ -33,13 +34,11 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "axe-core": "^4.12.1",
     "eslint": "^9.0.0",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^25.0.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "vitest-axe": "^0.1.0"
+    "vitest": "^3.0.0"
   }
 }

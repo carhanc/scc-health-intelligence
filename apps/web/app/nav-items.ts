@@ -1,7 +1,9 @@
 // Canonical navigation destinations (DEC-036: 9 items, matching
-// docs/00_PRODUCT_CHARTER.md §8.1 exactly). Only Overview and Explore are
-// fully built in Phase 5; the rest are truthful "coming in a later
-// phase" shells (DEC-037), never broken links.
+// docs/00_PRODUCT_CHARTER.md §8.1 exactly). All 9 are real, built pages
+// as of Phase 9. `status: "coming_soon"` remains a valid, live-tested
+// state (DEC-037, apps/web/app-shell.tsx) for any future nav item added
+// ahead of its own page being built -- never a broken link in the
+// meantime -- it's simply unused by the current data.
 
 export type NavStatus = "available" | "coming_soon";
 

@@ -143,14 +143,14 @@ export default function OverviewPage() {
           <Link href="/data" className="hover:text-[var(--color-interactive)] hover:underline">
             Data &amp; methods
           </Link>
-          <Link href="/validate" className="hover:text-[var(--color-interactive)] hover:underline">
+          <Link href="/accessibility" className="hover:text-[var(--color-interactive)] hover:underline">
             Accessibility
           </Link>
-          <Link href="/validate" className="hover:text-[var(--color-interactive)] hover:underline">
+          <Link href="/privacy" className="hover:text-[var(--color-interactive)] hover:underline">
             Privacy
           </Link>
           <a
-            href="https://github.com/anthropics/claude-code/issues"
+            href="https://github.com/carhanc/scc-health-intelligence/issues"
             className="hover:text-[var(--color-interactive)] hover:underline"
           >
             Contact / report an issue

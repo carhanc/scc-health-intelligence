@@ -95,6 +95,10 @@ Canonical unit: 2020 Census tract (Santa Clara County, FIPS `06085`), 11-charact
 
 _Pending implementation._ Will document the pre-release equity review required by `docs/09_SECURITY_PRIVACY_GOVERNANCE.md`: whether missing data correlate with race/ethnicity/income/language/rurality, whether resource inventories undercount informal/community-based services, whether county-relative ranks obscure countywide need, and who is deprioritized under each scenario lens.
 
+## Production deployment (Phase 9)
+
+No analytics, scoring, or evidence-generation logic changed this phase — Phase 9 is a production-hardening and deployment-readiness pass, not a methodology change. Production architecture: Vercel (frontend) + Render (backend) + GitHub Releases (versioned data artifact), anonymous browser-local Advocate workspaces, AI-assisted Copilot deliberately left disabled in production (`DECISIONS.md` DEC-066). See `docs/deployment/production-deployment-guide.md` for the full deployment runbook and `docs/security/ai-production-readiness.md` for what's required before ever enabling AI-assisted mode for real users.
+
 ## Update process
 
 Material changes to inputs, weights, geography, or methods require a new score/model version and a migration note in `DECISIONS.md` and `CHANGELOG.md` — historical outputs are never silently updated in place.
@@ -130,6 +134,14 @@ _Populated continuously as each phase surfaces concrete limitations; finalized i
 - DOCX advocacy export is not implemented; print-to-PDF and CSV are the two supported export paths this phase (DEC-065/RISK-031).
 - AI-assisted Copilot mode has structural safety controls (evidence-only citation, post-generation citation validation) that are unit-tested, but no golden-evaluation set or live-model adversarial red-team pass has been run against it (RISK-032) — relevant only to a deployment that configures `ANTHROPIC_API_KEY`; the default, zero-configuration deterministic mode is unaffected.
 - Document Intelligence's structure/geography/topic detection is deliberately simple, disclosed regex/keyword matching, not a general document-understanding model — it will miss unusual phrasings, and PDF extraction does not perform OCR on scanned-image-only pages (see `docs/methods/document-intelligence.md` §7).
+
+**From Phase 9:**
+
+- No account system or server-side workspace persistence exists — an Advocate workspace lives only in the browser that created it (DEC-066); moving it to another device requires manually exporting/importing a JSON file.
+- The `deploy.yml` and `scheduled-refresh.yml` GitHub Actions workflows have never executed against a real cloud deployment or GitHub Actions runner — every constituent command was independently verified locally instead (RISK-033).
+- The per-IP rate limiter protecting document-analysis and Copilot routes is in-process and does not coordinate across multiple backend instances — a known simplification given this release targets a single Render instance, not yet a gap in practice (RISK-034).
+- Performance budgets (`PLAN.md` §19) were not measured this phase — out of the scope actually prioritized (deployability/security/observability).
+- No repository license has been assigned yet (RISK-035) — a decision for the repository owner, not one this assistant made on their behalf.
 
 **From Phase 6:**
 

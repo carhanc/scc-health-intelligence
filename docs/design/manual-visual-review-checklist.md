@@ -76,6 +76,16 @@ Resize your browser window (or use your browser's device toolbar) to each width 
 - [ ] "Evidence used" citations are visually connected to the response text they support, not a disconnected list at the bottom.
 - [ ] The disabled state of "Ask Copilot" before a place is selected is visually obvious (not just technically disabled with no visual cue).
 
+## Release polish (Phase 9)
+
+- [ ] Homepage footer attribution ("Developed by Arhan Chakravarthy...") reads as intended and isn't visually cramped against the disclaimer text above it.
+- [ ] The new Privacy (`/privacy`) and Accessibility (`/accessibility`) pages match the rest of the site's visual language (typography, spacing, link styling) rather than looking like an afterthought.
+- [ ] Print-preview quality across every Advocate output type (brief, memo, questions, public comment, geography profile, source appendix) -- not just the one type checked in the Advocate section above.
+- [ ] Copilot's deterministic-mode wording reads as helpful and plain-language, not robotic or template-flavored, across a few different actions/geographies.
+- [ ] Advocacy output tone (the generated brief/memo/talking-points prose) reads as genuinely usable, professional advocacy material -- not stiff, not overly hedged to the point of being unhelpful.
+- [ ] The custom 404 (`/nonexistent-route`) and a triggered error boundary (if you can find a way to force one) both look intentional and on-brand, not like a framework default leaking through.
+- [ ] Favicon and page title are present and correct in a real browser tab, not just in code.
+
 ## Across all of the above, confirm
 
 - [ ] No overlapping elements anywhere.

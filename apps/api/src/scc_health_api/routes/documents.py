@@ -8,9 +8,10 @@ is logged (docs/09_SECURITY_PRIVACY_GOVERNANCE.md "File upload" /
 from __future__ import annotations
 
 import duckdb
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
 from scc_health_api.db import WarehouseUnavailableError, get_read_only_connection
+from scc_health_api.rate_limit import document_analyze_limiter
 from scc_health_api.schemas.documents import (
     DetectedStructure,
     DocumentAnalysisResponse,
@@ -40,8 +41,9 @@ def _known_place_names(conn: duckdb.DuckDBPyConnection) -> list[str]:
 
 @router.post("/analyze", response_model=DocumentAnalysisResponse)
 async def analyze_uploaded_document(
-    file: UploadFile, settings: Settings = Depends(get_settings)
+    request: Request, file: UploadFile, settings: Settings = Depends(get_settings)
 ) -> DocumentAnalysisResponse:
+    document_analyze_limiter.check(request)
     content = await file.read()
 
     try:
