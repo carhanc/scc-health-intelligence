@@ -819,6 +819,135 @@ export interface ReproducibilityResponse {
   note: string;
 }
 
+// --- Phase 8: Advocate / Document Intelligence / Copilot ---
+
+export type EvidenceCategory =
+  | "metric"
+  | "scenario_score"
+  | "access"
+  | "utilization"
+  | "resource"
+  | "document_passage";
+
+export interface AdvocacyEvidenceItem {
+  evidence_id: string;
+  category: EvidenceCategory;
+  label: string;
+  value: string;
+  raw_value: number | null;
+  unit: string | null;
+  geography_type: string;
+  geography_id: string;
+  geography_label: string;
+  data_status: DataStatus;
+  publisher: string;
+  source_vintage: string;
+  retrieved_at: string;
+  method: string | null;
+  uncertainty_note: string | null;
+  limitation: string | null;
+  citation: string;
+  source_url: string | null;
+}
+
+export interface EvidenceBundleResponse {
+  data_mode: DataMode;
+  geography_type: string;
+  geography_id: string;
+  geography_label: string;
+  scenario_id: string | null;
+  items: AdvocacyEvidenceItem[];
+}
+
+export interface MeetingQuestion {
+  question: string;
+  based_on_evidence_ids: string[];
+  category: "clarifying" | "evidence_based" | "follow_up";
+}
+
+export interface GeneratedBriefResponse {
+  data_mode: DataMode;
+  generated_at: string;
+  output_type: string;
+  geography_label: string;
+  scenario_label: string | null;
+  audience: string;
+  sections: Record<string, string>;
+  evidence_used: AdvocacyEvidenceItem[];
+  questions: MeetingQuestion[];
+  limitations_note: string;
+  non_causal_disclaimer: string;
+  configuration_hash: string;
+}
+
+export interface FinancialAmount {
+  raw_text: string;
+  approximate_value: number;
+}
+
+export interface DetectedDocumentStructure {
+  title: string | null;
+  dates: string[];
+  organizations: string[];
+  agenda_item_headers: string[];
+  financial_amounts: FinancialAmount[];
+}
+
+export interface DocumentTopicMatch {
+  topic_id: string;
+  label: string;
+  matched_keywords: string[];
+  metrics: string[];
+  scenarios: string[];
+  resource_categories: string[];
+  unavailable_reason: string | null;
+}
+
+export interface DocumentAnalysisResponse {
+  filename: string;
+  file_hash: string;
+  extraction_method: string;
+  page_count: number;
+  truncated: boolean;
+  structure: DetectedDocumentStructure;
+  detected_geographies: string[];
+  detected_topics: DocumentTopicMatch[];
+  injection_warnings: string[];
+  excerpt_by_page: Record<string, string>;
+  processing_disclosure: string;
+}
+
+export type CopilotAction =
+  | "summarize_geography"
+  | "explain_prioritization"
+  | "prepare_questions"
+  | "compare_geographies"
+  | "connect_document_to_evidence"
+  | "draft_public_comment"
+  | "draft_commissioner_briefing"
+  | "list_what_cannot_be_concluded"
+  | "identify_missing_evidence"
+  | "rewrite_for_public_audience";
+
+export interface CopilotStatusResponse {
+  llm_configured: boolean;
+  provider: "anthropic" | "deterministic";
+  model: string | null;
+  deterministic_always_available: boolean;
+}
+
+export interface CopilotAskResponse {
+  provider: "anthropic" | "deterministic";
+  model: string | null;
+  is_ai_generated: boolean;
+  text: string;
+  evidence_ids_cited: string[];
+  evidence_ids_unsupported: string[];
+  evidence_used: AdvocacyEvidenceItem[];
+  generated_at: string;
+  configuration_hash: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -1046,4 +1175,105 @@ export const api = {
   getAuditStatus: () => apiGet<AuditStatusResponse>("/api/v1/validate/audit-status"),
   getKnownLimitations: () => apiGet<KnownLimitationsResponse>("/api/v1/validate/known-limitations"),
   getReproducibility: () => apiGet<ReproducibilityResponse>("/api/v1/validate/reproducibility"),
+
+  // --- Phase 8: Advocate ---
+  getAdvocateEvidence: (
+    geographyType: string,
+    geographyId: string,
+    scenarioId?: string,
+  ) => {
+    const qs = new URLSearchParams({ geography_type: geographyType, geography_id: geographyId });
+    if (scenarioId) qs.set("scenario_id", scenarioId);
+    return apiGet<EvidenceBundleResponse>(`/api/v1/advocate/evidence?${qs.toString()}`);
+  },
+  generateAdvocacyBrief: async (params: {
+    outputType: string;
+    geographyLabel: string;
+    scenarioId: string | null;
+    audience: string;
+    evidence: AdvocacyEvidenceItem[];
+    notes: string;
+    dataMode: DataMode;
+  }): Promise<GeneratedBriefResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/advocate/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        output_type: params.outputType,
+        geography_label: params.geographyLabel,
+        scenario_id: params.scenarioId,
+        audience: params.audience,
+        evidence: params.evidence,
+        notes: params.notes,
+        data_mode: params.dataMode,
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      let message = `Brief generation failed with status ${response.status}`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        if (body.detail) message = body.detail;
+      } catch {
+        // fall through
+      }
+      throw new ApiError(message, response.status);
+    }
+    return (await response.json()) as GeneratedBriefResponse;
+  },
+
+  // --- Phase 8: Document Intelligence ---
+  analyzeDocument: async (file: File): Promise<DocumentAnalysisResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/analyze`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      let message = `Document analysis failed with status ${response.status}`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        if (body.detail) message = body.detail;
+      } catch {
+        // fall through
+      }
+      throw new ApiError(message, response.status);
+    }
+    return (await response.json()) as DocumentAnalysisResponse;
+  },
+
+  // --- Phase 8: Copilot ---
+  getCopilotStatus: () => apiGet<CopilotStatusResponse>("/api/v1/copilot/status"),
+  askCopilot: async (params: {
+    action: CopilotAction;
+    instruction: string;
+    evidence: AdvocacyEvidenceItem[];
+    untrustedDocumentText?: string;
+    useLlm: boolean;
+  }): Promise<CopilotAskResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/copilot/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        action: params.action,
+        instruction: params.instruction,
+        evidence: params.evidence,
+        untrusted_document_text: params.untrustedDocumentText ?? null,
+        use_llm: params.useLlm,
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      let message = `Copilot request failed with status ${response.status}`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        if (body.detail) message = body.detail;
+      } catch {
+        // fall through
+      }
+      throw new ApiError(message, response.status);
+    }
+    return (await response.json()) as CopilotAskResponse;
+  },
 };

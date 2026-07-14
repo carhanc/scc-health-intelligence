@@ -17,6 +17,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);

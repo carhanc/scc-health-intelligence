@@ -56,6 +56,26 @@ Resize your browser window (or use your browser's device toolbar) to each width 
 - [ ] The convergent-validity and criterion-validity result cards (Validation tab) are easy to visually compare against each other.
 - [ ] The audit-status grid (Reproducibility tab) reads clearly as a real pass/fail summary, not a wall of undifferentiated text.
 
+## Advocate (`/advocate`)
+
+- [ ] The three entry paths (place/issue, document, and a prefilled cross-page workspace) are visually distinct tabs, not easy to confuse.
+- [ ] Evidence cards read clearly at a glance: value, unit, source, and the observed-vs-modeled badge are all visible without opening anything further.
+- [ ] Selecting/deselecting evidence gives immediate, visible feedback (checkbox state, selected-count text) with no lag or flicker.
+- [ ] The "Selected, in export order" list and its reorder controls look genuinely usable, not like a raw debug list.
+- [ ] The PHI/privacy warning on the document-upload tab is prominent and readable before the upload control becomes usable — it should not read as legal boilerplate easy to skip past.
+- [ ] Document analysis results (detected topics, geographies, agenda items, warnings) are organized clearly, not a wall of undifferentiated text.
+- [ ] The generated brief's sections are easy to visually scan; the non-causal disclaimer and "what evidence does not prove" section are visually distinguishable from the main narrative, not buried.
+- [ ] Switching output type (brief / memo / questions / talking points / profile / appendix) produces an obviously different, correctly-updated document, not a jarring layout jump.
+- [ ] The workspace toolbar's autosave/"Local only" status is visible without hunting for it.
+- [ ] Print preview (browser print-to-PDF) of a generated brief looks genuinely presentable — no cut-off content, no leftover interactive chrome (buttons, checkboxes) in the printed output.
+
+## Copilot (`/copilot`)
+
+- [ ] The "Deterministic (not AI-generated)" vs. any AI-generated response is unmistakably distinguishable at a glance, not a subtle label easy to miss.
+- [ ] The action dropdown's options read as plain-language tasks, not internal action-ID strings.
+- [ ] "Evidence used" citations are visually connected to the response text they support, not a disconnected list at the bottom.
+- [ ] The disabled state of "Ask Copilot" before a place is selected is visually obvious (not just technically disabled with no visual cue).
+
 ## Across all of the above, confirm
 
 - [ ] No overlapping elements anywhere.

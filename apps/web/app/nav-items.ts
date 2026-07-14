@@ -63,16 +63,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Advocate",
     href: "/advocate",
     description: "Turn evidence into a brief, staff questions, or talking points.",
-    status: "coming_soon",
-    phase: "Phase 8",
+    status: "available",
   },
   {
     id: "copilot",
     label: "Copilot",
     href: "/copilot",
     description: "Ask a plain-language question and get a grounded, cited answer.",
-    status: "coming_soon",
-    phase: "Phase 8",
+    status: "available",
   },
   {
     id: "data",

@@ -678,4 +678,64 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-061 — Advocacy evidence for a city/ZIP/supervisor-district geography is a disclosed unweighted average across member tracts, not a population-weighted re-aggregation
+
+**Context:** This platform's scores and most metrics are computed per census tract; there is no independently-computed score for a city, ZIP code, or supervisor district. Phase 8's Advocate workspace needs to show evidence for whichever geography a user picks, including these broader ones.
+
+**Decision:** `advocacy_evidence.assemble_evidence()` resolves a broader geography to its member tracts (via the existing, already-audited `geo.tract_place_assignment` / `geo.tract_supervisor_district_assignment` / `geo.crosswalk_zip_tract` tables) and reports an **unweighted average** across them, always labeled as such (`data_status: "derived"`, method `unweighted_average_across_member_tracts`, and a value string disclosing both the averaging and any missing-tract coverage gap, e.g. "12.4% (average across 8 of 9 tracts)"). A full population-weighted re-aggregation, which would better reflect where within a city or district people actually live, was considered and scoped out.
+
+**Rationale:** Population-weighted re-aggregation would require reliable sub-tract population weights and a defensible weighting methodology of its own — a real analytics project, not a Phase 8 evidence-assembly task. An honestly-labeled unweighted average ships now; a mislabeled or silently-approximated weighted figure would violate this platform's core truthfulness rules. This follows the same precedent as DEC-027/DEC-057/DEC-056: disclose the approximation, never hide it.
+
+**Consequences:** A large, sparsely-populated tract and a small, dense one currently count equally toward a city's averaged evidence — a real, disclosed limitation (see `docs/methods/advocacy-evidence.md` §7). Population-weighted re-aggregation is a reasonable Phase 9+ enhancement if a reliable sub-tract population-weighting source is identified.
+
+---
+
+### DEC-062 — A geography that resolves to zero member tracts returns no evidence at all, never a county-wide fallback
+
+**Context:** `build_resource_evidence()` (resource/facility counts) has a legitimate county-wide fallback for a *real* geography with no assigned city (e.g. some supervisor-district or ZCTA edge cases). Early in Phase 8 development, this fallback also fired for a geography ID that didn't exist at all (e.g. a malformed or made-up tract GEOID) — because an empty `tracts` list from `resolve_member_tracts()` fell through to the same code path, county-wide resource counts were returned for a place that isn't real.
+
+**Decision:** `assemble_evidence()` now checks `if not tracts: return geography_label, []` immediately after resolving member tracts, before calling any evidence builder — a nonexistent or empty geography returns zero evidence, full stop. The county-wide fallback inside `build_resource_evidence()` only ever fires downstream of a real, resolved geography.
+
+**Rationale:** Returning county-wide facility counts for a geography that doesn't exist would silently misattribute real county data to a fabricated place — exactly the kind of "silent fallback" `CLAUDE.md` prohibits. This bug was caught by a new regression test (`test_evidence_bundle_unknown_tract_is_404`) written specifically because assembling evidence for city/ZIP/district geographies (DEC-061) meant more code paths than a single-tract lookup, and each needed its own "does this actually exist" check.
+
+**Consequences:** None beyond the fix itself — the API's evidence-bundle route already returns 404 for an unknown geography given empty evidence, so this fix makes that 404 the *only* possible outcome for a nonexistent geography, not a possible-county-wide-data outcome depending on which evidence category ran first.
+
+---
+
+### DEC-063 — Copilot's deterministic and LLM-backed modes share one provider interface and the same underlying generation functions, never two parallel implementations
+
+**Context:** Phase 8 requires a Copilot that works fully with zero configuration (deterministic mode) and optionally drafts richer prose when a server-side AI provider key is configured. A naive implementation risks two independently-maintained "how do I summarize this evidence" code paths that drift apart over time.
+
+**Decision:** `copilot_provider.py` defines one `LLMProvider` Protocol with two implementations: `DeterministicProvider` (routes by action to the exact same `advocacy_generation.py` functions the Advocate page's brief builder calls) and `AnthropicProvider` (drafts prose from the same evidence, server-side only, key read from `ANTHROPIC_API_KEY`). `get_provider()` picks between them based solely on whether a key is configured — the calling route code (`routes/copilot.py`) is identical either way.
+
+**Rationale:** `docs/05_AI_COPILOT.md` §2.1 requires that deterministic mode "guarantees core usability and reproducibility" — sharing the exact generation functions with Advocate (not a parallel reimplementation) is what makes that guarantee mechanically true rather than aspirational: a bug fix or improvement to `advocacy_generation.py` automatically improves both Advocate and Copilot's deterministic mode, and there is no way for the two to silently diverge in what counts as "a good summary."
+
+**Consequences:** `DeterministicProvider`'s output is template-shaped prose (never claims to be generative AI, per `docs/05` §2.1's explicit requirement), visibly different in style from `AnthropicProvider`'s drafted prose — this is intentional and disclosed, not something to visually unify, since the UI must always make plain which mode produced a given response.
+
+---
+
+### DEC-064 — Every AI-assisted Copilot response is validated post-generation against only the evidence it was actually given; a claimed citation to unknown evidence is silently dropped, never surfaced
+
+**Context:** `docs/05_AI_COPILOT.md` requires that "every factual claim maps to evidence IDs" and that unsupported claims be "removed or labeled." An LLM can hallucinate a citation to an evidence_id that was never in its context, especially under adversarial or malformed input.
+
+**Decision:** `AnthropicProvider.complete()` requires the system prompt to end every response with a `"Evidence used: [id1, id2, ...]"` line. `_validate_citations()` parses that line and intersects it against `{e.evidence_id for e in request.evidence}` — the actual set of evidence objects that were sent in this request. Any claimed ID not in that set is placed in `evidence_ids_unsupported` and never presented to the user as a valid citation.
+
+**Rationale:** This makes citation validity a property the *platform* enforces mechanically, not a property that depends on the model's own honesty. It is the same principle as `CLAUDE.md`'s "never fabricate... in production outputs," applied specifically to AI-generated citations rather than platform-computed metrics.
+
+**Consequences:** A response whose citations don't validate isn't blocked outright (the model's prose may still be useful even with one bad citation) — but the UI's evidence-used display only ever lists validated IDs, so a user never sees a citation pointing at evidence that doesn't exist. Tested in `apps/api/tests/test_copilot_provider.py`.
+
+---
+
+### DEC-065 — DOCX export deferred; print-to-PDF (reusing DEC-060's decision-memo pattern) and CSV are the two Phase 8 export paths
+
+**Context:** The Phase 8 spec lists PDF, CSV, and DOCX as candidate advocacy-output export formats, with an explicit allowance to "document its deferral honestly" for any not "reliably implementable" or "tested/maintainable" this phase.
+
+**Decision:** Advocate's exports are: browser print-to-PDF (`window.print()` on a print-friendly output view, reusing the exact pattern Prioritize's decision memo established in DEC-060 rather than adding a new server-side PDF-rendering dependency) and a CSV of selected evidence. DOCX generation was evaluated and deferred — no server-side DOCX-authoring dependency was added.
+
+**Rationale:** `window.print()` requires zero new dependencies, is already tested and working (DEC-060), and every major browser's "Save as PDF" print target produces a real, shareable PDF — reusing it is a direct instance of `CLAUDE.md`'s "write small, testable... rather than monolithic" and this Phase 8 kickoff's explicit "reuse the existing decision-memo export pattern... rather than creating an unrelated export architecture." A DOCX exporter would need a new dependency (e.g. `python-docx` write support, already present read-only for document intelligence) plus new template/formatting logic and its own test surface — real scope, not a quick addition, and not worth rushing to avoid an honest deferral note.
+
+**Consequences:** A user who specifically needs an editable `.docx` file must currently copy content from a generated brief manually, or convert a print-to-PDF output with an external tool. This is recorded as an open, low-severity limitation (see `RISK_REGISTER.md`), not a silent gap — the Advocate user guide states it plainly.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

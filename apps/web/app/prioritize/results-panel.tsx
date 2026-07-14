@@ -17,6 +17,7 @@ import {
 import { api, ApiError, type CustomDomainContribution, type StabilityLabel } from "@/lib/api";
 import { domainLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
+import { UseInAdvocateButton } from "../use-in-advocate-button";
 
 export interface RankedRow {
   tract_geoid_2020: string;
@@ -251,14 +252,24 @@ function ExplainCard({
           redistributed across the remaining factors, not treated as zero).
         </p>
       )}
-      <Link
-        href={`/explore?geography=tract&id=${encodeURIComponent(row.tract_geoid_2020)}${
-          scenarioId ? `&scenario=${encodeURIComponent(scenarioId)}` : ""
-        }`}
-        className="mt-3 inline-block text-xs font-medium text-[var(--color-interactive)] hover:underline"
-      >
-        View full sources &amp; evidence in Explore
-      </Link>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Link
+          href={`/explore?geography=tract&id=${encodeURIComponent(row.tract_geoid_2020)}${
+            scenarioId ? `&scenario=${encodeURIComponent(scenarioId)}` : ""
+          }`}
+          className="text-xs font-medium text-[var(--color-interactive)] hover:underline"
+        >
+          View full sources &amp; evidence in Explore
+        </Link>
+        <UseInAdvocateButton
+          geography={{
+            geographyType: "tract",
+            geoid: row.tract_geoid_2020,
+            displayName: name ?? row.tract_geoid_2020,
+          }}
+          scenarioId={scenarioId ?? undefined}
+        />
+      </div>
     </div>
   );
 }

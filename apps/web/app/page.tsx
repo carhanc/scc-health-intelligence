@@ -160,7 +160,7 @@ export default function OverviewPage() {
           Santa Clara Health Intelligence is a clean-room, open-data public-health intelligence
           platform. It supports prioritization and advocacy; it does not replace community
           engagement, official county systems, clinical judgment, or formal program evaluation. 
-          Developed by Arhan Chakravarthy.
+          Developed by Arhan Chakravarthy. Built using publicly available data from Santa Clara County, HCAI, the U.S. Census Bureau, OpenStreetMap, and other cited sources.
         </p>
       </footer>
     </div>

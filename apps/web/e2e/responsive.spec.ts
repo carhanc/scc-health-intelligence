@@ -136,5 +136,37 @@ for (const bp of BREAKPOINTS) {
       await page.getByRole("tab", { name: "Reproducibility" }).click();
       await expect(page.getByText("Audit status")).toBeVisible({ timeout: 10_000 });
     });
+
+    test("Advocate: the full geography-to-brief workflow completes and never overflows horizontally", async ({
+      page,
+    }) => {
+      await page.goto("/advocate");
+      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Advocate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      await page.getByLabel("Find a place").fill("Sunnyvale");
+      await page.getByRole("button", { name: "Search" }).click();
+      await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
+      await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+
+      await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
+      await page.getByRole("button", { name: "Generate" }).click();
+      await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
+
+      const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);
+    });
+
+    test("Copilot: search and ask remain usable", async ({ page }) => {
+      await page.goto("/copilot");
+      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Copilot must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+    });
   });
 }

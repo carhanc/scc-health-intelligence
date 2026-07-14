@@ -272,6 +272,13 @@ Criterion-validity correlation (Spearman + Pearson + 2,000-draw bootstrap CI) be
 
 Every `make audit` check's `(suite, check_name, passed, message)`, tagged with a single `run_at` timestamp per invocation (replaced, not appended, on each run — DEC-059). Powers `GET /api/v1/validate/audit-status` without the API importing the pipeline package.
 
+## Phase 8 (Advocate / Document Intelligence / Copilot — implemented)
+
+**No new warehouse tables.** Phase 8 is a read-only presentation layer over the tables already documented above (DEC-030 boundary preserved) — every advocacy evidence figure traces back to an existing `analytics.*`/`resources.*` row; nothing was recomputed or newly persisted server-side.
+
+- **`config/topic_ontology.yml`** — a new, versioned config artifact (not a warehouse table): maps 12 advocacy topics to the existing `metrics`/`scenarios`/`resource_categories` IDs already defined in `config/metrics.yml`/`config/scenarios.yml`. `language_access` intentionally carries empty `metrics`/`scenarios` lists plus an explicit `unavailable_reason` string, consistent with the metric registry's own DEC-027 precedent.
+- **Browser-local only (not in the warehouse or the API database):** the `AdvocacyWorkspace` schema (`apps/web/lib/workspace/schema.ts`, schema version 1) persisted to the browser's IndexedDB — selected geography, selected evidence snapshots, uploaded-document *findings* (never raw file bytes), notes, and export history. No account system, no server-side persistence, no cloud sync this phase (see `docs/architecture/phase9-production-requirements.md` for what a server-side version would need).
+
 ## Versioning
 
 This file's structure is versioned alongside the metric registry (`config/metrics.yml`). Material changes to a metric's definition, source, or geography require a new metric ID version suffix and a changelog entry here, not a silent in-place edit — per `docs/09_SECURITY_PRIVACY_GOVERNANCE.md` "Governance for scores and models."

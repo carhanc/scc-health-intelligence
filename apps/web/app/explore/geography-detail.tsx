@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import type { SelectedGeography } from "./selection";
 import { domainLabel } from "@/lib/labels";
+import { UseInAdvocateButton } from "../use-in-advocate-button";
 
 export function GeographyDetail({
   selected,
@@ -247,6 +248,14 @@ function TractDetail({
         <Button variant="secondary" size="sm" onClick={() => setEvidenceOpen(true)}>
           View sources &amp; evidence
         </Button>
+        <UseInAdvocateButton
+          geography={{
+            geographyType: "tract",
+            geoid: profile.tract_geoid_2020,
+            displayName: `Tract ${profile.tract_geoid_2020}`,
+          }}
+          scenarioId={scenarioId}
+        />
       </div>
 
       <Dialog open={evidenceOpen} onClose={() => setEvidenceOpen(false)} title="Sources and evidence" variant="side">
@@ -458,6 +467,13 @@ function PlaceDetail({
         </div>
       </dl>
 
+      <div className="mt-3">
+        <UseInAdvocateButton
+          geography={{ geographyType: "place", geoid: profile.place_geoid, displayName: profile.name_long }}
+          scenarioId={scenarioId}
+        />
+      </div>
+
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
           Highest-concern areas in {profile.name_long}
@@ -570,6 +586,17 @@ function DistrictDetail({
           <dd>{profile.tract_count}</dd>
         </div>
       </dl>
+
+      <div className="mt-3">
+        <UseInAdvocateButton
+          geography={{
+            geographyType: "supervisor_district",
+            geoid: String(profile.district_number),
+            displayName: `Supervisor District ${profile.district_number}`,
+          }}
+          scenarioId={scenarioId}
+        />
+      </div>
 
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">

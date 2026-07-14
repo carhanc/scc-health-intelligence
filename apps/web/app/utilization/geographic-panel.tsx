@@ -6,6 +6,7 @@ import { Badge, DataModeBadge, DataTable, ErrorState, LoadingRegion, SkeletonTex
 import { api, ApiError, type TractUtilization, type ZipObservedEncounters } from "@/lib/api";
 import { crosswalkQualityLabel, pattypeGroupLabel, rateReliabilityLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
+import { UseInAdvocateButton } from "../use-in-advocate-button";
 
 /**
  * Geographic view: two DISTINCT, never-merged tables -- real observed
@@ -127,6 +128,20 @@ function TractSection() {
         ) : (
           ""
         ),
+    },
+    {
+      id: "advocate",
+      header: "Advocate",
+      cell: ({ row }) => (
+        <UseInAdvocateButton
+          geography={{
+            geographyType: "tract",
+            geoid: row.original.tract_geoid_2020,
+            displayName: tractNames.get(row.original.tract_geoid_2020) ?? row.original.tract_geoid_2020,
+          }}
+          label="Use"
+        />
+      ),
     },
   ];
 

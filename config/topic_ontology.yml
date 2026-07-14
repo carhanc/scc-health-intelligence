@@ -1,0 +1,99 @@
+# Topic-to-data ontology (Phase 8, docs/05_AI_COPILOT.md §12).
+#
+# Maps a human-readable advocacy/document topic to the real, already-scored
+# metric_ids (config/metrics.yml), scenario_ids (config/scenarios.yml), and
+# resource categories (resources.canonical_facilities.category) this
+# platform actually has. Never invents a mapping to something unscored --
+# a topic with no real supporting metric/scenario says so explicitly
+# (e.g. language_access) rather than pointing at an unrelated substitute.
+#
+# Inspectable and editable here, not hidden in a prompt (docs/05 §12's
+# explicit requirement). Loaded by both the Document Intelligence topic
+# detector and the deterministic/grounded Copilot's tool layer.
+
+topics:
+  - topic_id: diabetes_prevention
+    label: "Diabetes prevention"
+    keywords: ["diabetes", "blood sugar", "a1c", "prediabetes"]
+    metrics: [places_diabetes_prevalence, places_obesity, places_physical_inactivity, places_high_cholesterol]
+    scenarios: [diabetes_prevention_v1]
+    resource_categories: [clinic, hospital]
+
+  - topic_id: coverage_navigation
+    label: "Coverage / Medi-Cal / insurance navigation"
+    keywords: ["medi-cal", "medicaid", "uninsured", "insurance", "coverage", "enrollment"]
+    metrics: [places_uninsured, acs_poverty_rate]
+    scenarios: [coverage_navigation_v1]
+    resource_categories: [clinic]
+
+  - topic_id: mobile_transit_care
+    label: "Mobile or transit-linked care"
+    keywords: ["mobile clinic", "mobile health", "transit", "transportation", "bus", "vta"]
+    metrics: [places_transportation_barriers, nearest_clinical_care_distance]
+    scenarios: [mobile_transit_care_v1]
+    resource_categories: [transit_hub, clinic]
+
+  - topic_id: older_adult_support
+    label: "Older-adult support"
+    keywords: ["older adult", "senior", "elderly", "aging", "dementia", "caregiver"]
+    metrics: [places_high_blood_pressure, places_any_disability, places_transportation_barriers]
+    scenarios: [older_adult_support_v1]
+    resource_categories: [clinic]
+
+  - topic_id: behavioral_health
+    label: "Behavioral health"
+    keywords: ["mental health", "behavioral health", "depression", "substance use", "psychiatric"]
+    metrics: [places_depression, places_frequent_mental_distress]
+    scenarios: [behavioral_health_access_v1]
+    resource_categories: [clinic, hospital]
+
+  - topic_id: food_insecurity
+    label: "Food insecurity"
+    keywords: ["food insecurity", "food access", "snap", "calfresh", "grocery", "food desert"]
+    metrics: [places_food_insecurity, places_diabetes_prevalence, places_obesity]
+    scenarios: [food_access_v1]
+    resource_categories: [food_retailer]
+
+  - topic_id: environmental_burden
+    label: "Environmental burden"
+    keywords: ["pollution", "air quality", "environmental justice", "toxic", "calenviroscreen"]
+    metrics: [ces_pollution_burden, ces_population_vulnerability]
+    scenarios: [environmental_burden_priority_v1]
+    resource_categories: []
+
+  - topic_id: workforce_shortage
+    label: "Healthcare workforce shortage"
+    keywords: ["workforce shortage", "provider shortage", "hpsa", "medically underserved"]
+    metrics: [hpsa_proximity_score, mua_designated_flag]
+    scenarios: []
+    resource_categories: [clinic]
+
+  - topic_id: emergency_care_utilization
+    label: "Emergency-department utilization"
+    keywords: ["emergency department", "emergency room", " ed visit", "hospitalization"]
+    metrics: []
+    scenarios: []
+    resource_categories: [hospital]
+    utilization_tables: [utilization_ed_facility_summary, utilization_ed_county_trends, utilization_access_vs_utilization]
+
+  - topic_id: resource_accessibility
+    label: "Resource / clinical-care accessibility"
+    keywords: ["access to care", "clinic access", "travel time", "distance to care"]
+    metrics: [nearest_clinical_care_distance]
+    scenarios: []
+    resource_categories: [clinic, hospital]
+
+  - topic_id: language_access
+    label: "Language access"
+    keywords: ["language access", "limited english", "interpreter", "translation"]
+    metrics: []
+    scenarios: []
+    resource_categories: []
+    unavailable_reason: "No tract-level language-barrier metric is scored by this platform (DEC-027/DEC-057) -- this topic is detected for document-matching purposes only, and never mapped to a fabricated metric or scenario."
+
+  - topic_id: balanced_general
+    label: "Balanced / general health and access"
+    keywords: ["public health", "health equity", "health disparities"]
+    metrics: []
+    scenarios: [default_integrated_screen_v1]
+    resource_categories: []

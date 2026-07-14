@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge, Card, DataModeBadge, EmptyState, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { categoryLabel, methodLabel, serviceLevelLabel } from "@/lib/labels";
+import { UseInAdvocateButton } from "../use-in-advocate-button";
 
 function formatDistance(miles: number | null): string {
   if (miles === null) return "Not available";
@@ -138,6 +139,10 @@ export function AccessSummaryPanel({
           </div>
         )}
       </Card>
+
+      <UseInAdvocateButton
+        geography={{ geographyType: "tract", geoid: tractGeoid, displayName: `Tract ${tractGeoid}` }}
+      />
     </div>
   );
 }

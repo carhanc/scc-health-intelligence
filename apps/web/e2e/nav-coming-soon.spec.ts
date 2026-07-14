@@ -1,16 +1,14 @@
 import { test, expect } from "@playwright/test";
 
 // Access Lab moved from "coming soon" to a real, built page in Phase 6,
-// and Prioritize/Utilization/Validate moved in Phase 7 -- see
-// e2e/access-lab-core.spec.ts, e2e/prioritize-core.spec.ts,
-// e2e/utilization-core.spec.ts, and e2e/validate-core.spec.ts for their
-// own coverage, and nav-coming-soon's own "nav marks unavailable
-// destinations distinctly" test below for the (still coming-soon)
-// remainder.
-const COMING_SOON_ROUTES = [
-  { path: "/advocate", title: "Advocate" },
-  { path: "/copilot", title: "Copilot" },
-];
+// Prioritize/Utilization/Validate in Phase 7, and Advocate/Copilot in
+// Phase 8 -- see e2e/access-lab-core.spec.ts, e2e/prioritize-core.spec.ts,
+// e2e/utilization-core.spec.ts, e2e/validate-core.spec.ts,
+// e2e/advocate-core.spec.ts, and e2e/copilot-core.spec.ts for their own
+// coverage. Every nav destination in the current build is now real --
+// this list is intentionally empty rather than deleted, since it is the
+// established place a future phase's still-unbuilt nav items belong.
+const COMING_SOON_ROUTES: { path: string; title: string }[] = [];
 
 test.describe("Coming-soon nav destinations are truthful, not broken", () => {
   for (const route of COMING_SOON_ROUTES) {
@@ -29,7 +27,9 @@ test.describe("Coming-soon nav destinations are truthful, not broken", () => {
     });
   }
 
-  test("nav marks unavailable destinations distinctly from available ones", async ({ page }) => {
+  test("every primary nav destination is real and reachable (none still marked coming-soon)", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     // Below the desktop breakpoint, navigation lives inside a
@@ -40,7 +40,10 @@ test.describe("Coming-soon nav destinations are truthful, not broken", () => {
     }
 
     const nav = page.getByRole("navigation", { name: "Primary" }).first();
-    await expect(nav.getByRole("link", { name: "Advocate Soon" })).toBeVisible();
     await expect(nav.getByRole("link", { name: /^Explore$/ })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /^Advocate$/ })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /^Copilot$/ })).toBeVisible();
+    // No nav link should carry the "Soon" suffix used for coming-soon items.
+    await expect(nav.getByText(/Soon$/)).toHaveCount(0);
   });
 });

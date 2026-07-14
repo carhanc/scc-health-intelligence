@@ -300,4 +300,34 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-030 — Advocacy evidence for a city/ZIP/supervisor-district geography is an unweighted average across member tracts, not population-weighted
+
+**Category:** Analytics methodology. **Likelihood:** Confirmed by design (DEC-061). **Impact:** Low-to-moderate -- a large, sparsely-populated member tract and a small, dense one currently count equally in a city or district's averaged evidence figures, which could understate or overstate the true population-weighted picture for a broad geography with uneven internal population distribution.
+
+**Mitigation:** Every aggregate evidence value is explicitly labeled as an averaged, derived figure (`data_status: "derived"`, a visible "(average across N of M tracts)" suffix), never presented as a single real observed figure. A user who needs tract-precision figures can drill into individual tracts via Explore.
+
+**Status:** `open` -- a real, disclosed scope choice, not a defect. Population-weighted re-aggregation is a reasonable Phase 9+ enhancement if a reliable sub-tract population-weighting source is identified.
+
+---
+
+## RISK-031 — DOCX advocacy export is not implemented (print-to-PDF and CSV are the two supported export paths)
+
+**Category:** Product completeness. **Likelihood:** Confirmed by design (DEC-065). **Impact:** Low -- a user who specifically wants an editable `.docx` file must copy content manually or convert a print-to-PDF output externally; every other required output type/format is fully supported.
+
+**Mitigation:** Advocate's user guide (`docs/user-guide/advocate.md`) states this limitation plainly rather than silently omitting a DOCX button. Print-to-PDF (reusing the DEC-060 decision-memo pattern) and CSV cover the two export paths this phase actually needed.
+
+**Status:** `open`, low severity -- revisit if user feedback specifically requests DOCX; `python-docx` write support could reuse the same dependency already present read-only for document intelligence.
+
+---
+
+## RISK-032 — AI-assisted Copilot mode (when an operator configures `ANTHROPIC_API_KEY`) has no dedicated golden-evaluation set or adversarial red-team suite beyond the citation-validation and prompt-injection-detection unit tests
+
+**Category:** AI quality/safety. **Likelihood:** Confirmed by design (out of Phase 8's scope; a Phase 8 kickoff-listed item, "golden evaluation set (>=50 questions)," belongs to the original spec's later phase). **Impact:** Moderate if AI-assisted mode is enabled in a real deployment without further evaluation -- the structural safeguards (evidence-only citation, post-generation citation validation, non-causal system-prompt rules, untrusted-document-text isolation) are unit-tested, but no systematic evaluation of response *quality* or a dedicated adversarial red-team pass against the live model has been run.
+
+**Mitigation:** AI-assisted mode is opt-in per deployment (requires an operator-set key) and per-request (`use_llm` flag) -- it is never the only way to use Copilot, and deterministic mode (fully evaluated via its shared code path with Advocate) remains the default, zero-configuration experience. `apps/api/tests/test_copilot_provider.py` unit-tests the citation-validation mechanism itself (that a model-claimed unknown evidence_id is always discarded) even though it can't exercise this against a live model without a real API key in CI.
+
+**Status:** `open` -- recorded as the Phase 9 resume point for any deployment that intends to actually enable AI-assisted mode in production; a golden evaluation set and adversarial red-team pass should run against a real configured key before that mode is presented to real end users at scale.
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

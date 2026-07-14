@@ -75,6 +75,14 @@ Canonical unit: 2020 Census tract (Santa Clara County, FIPS `06085`), 11-charact
 - **Reliability flag for area-weighting outliers** (DEC-056): a tract-level rate above a disclosed plausibility ceiling (1,000 modeled ED visits per 1,000 residents) is flagged `rate_reliability="low_reliability"` with an explanatory note (16 of 408 tracts, live-measured) — never presented as an ordinary modeled value.
 - **Facility, geographic, and trends-over-time views** (`/api/v1/utilization/*`, `/utilization`): payer mix, disposition, language breakdown per facility; ranked tract-level modeled utilization with a client-computed "high modeled use" percentile flag (excludes low-reliability tracts from its own threshold computation); real 2008-2024 county trend lines by disposition/race/sex/payer. Capacity (`licensed_bed_band`) and demand (`total_ed_encounters`) are shown side by side as a factual comparison, explicitly never labeled occupancy or over-capacity, since no public data reports actual bed-day usage.
 
+## Advocacy evidence and Copilot capabilities (Phase 8)
+
+- **Advocacy evidence assembly** (`advocacy_evidence.py`): a read-only presentation layer over already-computed `analytics.*`/`resources.*` tables (DEC-030 boundary preserved) — no score, percentile, or access figure is recomputed for advocacy use. Every returned `EvidenceItem` carries its own publisher, vintage, retrieval time, method, uncertainty note, limitation, and citation.
+- **City/ZIP/supervisor-district evidence is a disclosed unweighted average across member tracts**, never presented as a single tract's real figure (DEC-061/RISK-030). A geography that resolves to zero member tracts returns no evidence at all, never a county-wide fallback (DEC-062).
+- **Document Intelligence** (`document_intelligence.py`): validated, in-memory-only extraction (PDF/DOCX/TXT/Markdown) and rule-based structure/topic/geography detection against `config/topic_ontology.yml`'s versioned mapping to real platform metrics/scenarios/resource categories. Never invents a topic mapping to something unscored — "language access" is disclosed as unavailable, matching DEC-027/DEC-057's precedent.
+- **Deterministic advocacy generation** (`advocacy_generation.py`): rules/templates over already-cited evidence, zero AI calls, always available. Every generated brief includes an explicit non-causal disclaimer and a reproducible configuration hash.
+- **Copilot, two modes behind one interface** (DEC-063): `DeterministicProvider` reuses the exact same generation functions as Advocate's brief builder (never a second, divergent implementation); `AnthropicProvider` is server-side-only, active only when `ANTHROPIC_API_KEY` is configured, and every response is validated post-generation so a claimed citation to evidence it was never given is silently discarded, never surfaced (DEC-064).
+
 ## Validation results (Phase 4 convergent validity; Phase 7 criterion validity)
 
 **Tautology guard (docs §15.1, `validation/tautology_guard.py`):** every correlation check is screened before computation — an outcome that is itself a scenario's component metric (by metric_id or by identical underlying source_table/source_field) is refused outright, not merely flagged after computing a misleading number. Verified with both a positive case (the canonical "diabetes-priority score correlated with diabetes prevalence" example from docs §15.1) and negative cases (5 unit tests, `test_tautology_guard.py`), and confirmed live: all 8 persisted `analytics.correlation_diagnostics` rows and all 8 `analytics.utilization_criterion_validity` rows have `is_tautological = false`.
@@ -115,6 +123,13 @@ _Populated continuously as each phase surfaces concrete limitations; finalized i
 - A custom Prioritize weighting shows a point-in-time combined score only — Monte Carlo uncertainty ranges, stability labels, and preset-sensitivity comparisons are precomputed only for the 8 named scenarios, not for arbitrary user-supplied weight vectors.
 - Prioritize's "site & program constraints" reuses the same 6 precomputed Access Lab mobile-clinic siting scenarios (RISK-016/RISK-024's limitations apply identically) rather than exposing live, freely-parameterized optimizer solving (DEC-022/DEC-051/DEC-060).
 - `analytics.utilization_*` tables exist only in the live warehouse — no offline demo snapshot yet, matching the same disclosed gap as Phase 4 `analytics.*` (RISK-029).
+
+**From Phase 8:**
+
+- Advocacy evidence for a city, ZIP, or supervisor district is an unweighted average across member tracts, not population-weighted — a large, sparsely-populated tract and a small, dense one currently count equally (DEC-061/RISK-030).
+- DOCX advocacy export is not implemented; print-to-PDF and CSV are the two supported export paths this phase (DEC-065/RISK-031).
+- AI-assisted Copilot mode has structural safety controls (evidence-only citation, post-generation citation validation) that are unit-tested, but no golden-evaluation set or live-model adversarial red-team pass has been run against it (RISK-032) — relevant only to a deployment that configures `ANTHROPIC_API_KEY`; the default, zero-configuration deterministic mode is unaffected.
+- Document Intelligence's structure/geography/topic detection is deliberately simple, disclosed regex/keyword matching, not a general document-understanding model — it will miss unusual phrasings, and PDF extraction does not perform OCR on scanned-image-only pages (see `docs/methods/document-intelligence.md` §7).
 
 **From Phase 6:**
 
