@@ -21,6 +21,20 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+              Anonymous, aggregate site analytics
+            </h2>
+            <p className="mt-1.5">
+              The production deployment uses Vercel Web Analytics and Speed Insights to see, in aggregate, which
+              pages are visited and how quickly the site loads for real users. This is limited to anonymous page-view
+              counts and performance timing -- there are no custom events, no cookies, and no per-person profile.
+              It never records what you search for, what you upload, what you type into Advocate or Copilot, or any
+              other content you enter. These tools run only on the production deployment; local development and any
+              non-Vercel host see no network calls from them at all.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
               Advocate workspaces are stored only in your browser
             </h2>
             <p className="mt-1.5">
