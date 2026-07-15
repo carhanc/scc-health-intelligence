@@ -791,4 +791,28 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-070 — The private repository's data artifact is fetched via GitHub's authenticated release-asset API, with automatic fallback to unauthenticated public downloads, rather than assuming public access
+
+**Context:** `carhanc/scc-health-intelligence` is and remains a **private** repository (an explicit, non-negotiable constraint for this pre-deployment correction pass). The original Phase 9 `scripts/fetch_data_artifact.py` used unauthenticated `github.com/.../releases/download/...` URLs, which return 404 for any private repository regardless of whether the release/asset actually exists — this would have made the entire production data-delivery pipeline non-functional the moment real deployment was attempted.
+
+**Decision:** `fetch_data_artifact.py` now resolves release metadata via the GitHub REST API (`/repos/{repo}/releases/tags/{tag}` or `/repos/{repo}/releases` for `latest`) and downloads each asset through the authenticated `Accept: application/octet-stream` asset-download endpoint when `DATA_ARTIFACT_GITHUB_TOKEN` is set, falling back to each asset's plain `browser_download_url` when no token is configured (preserving support for a genuinely public repository/fork with zero configuration). A custom `HTTPRedirectHandler` strips the `Authorization` header whenever GitHub's authenticated endpoint redirects to a different host (its actual behavior — a temporary, pre-signed cloud-storage URL), so the token is never sent anywhere but `api.github.com`.
+
+**Rationale:** The repository's privacy is a fixed requirement, not something to work around by assuming public access "for now" — a production data pipeline that silently only works once the repository becomes public would be a landmine for whoever runs it first. The redirect-header-stripping behavior specifically follows GitHub's own documented guidance for its asset-download API (the endpoint is explicitly designed to redirect to short-lived storage URLs that must not receive the caller's token).
+
+**Consequences:** A GitHub fine-grained personal access token (`docs/deployment/production-deployment-guide.md` step 1, "Contents: Read-only" scoped to this one repository) is now a required production secret on Render and in CI, where it wasn't before. Token expiration/rotation is a new, real operational responsibility (documented in the deployment guide and `docs/observability/runbook.md`). 18 mocked tests (`scripts/tests/test_fetch_data_artifact.py`) cover authenticated/unauthenticated paths, `latest`/exact-tag resolution, every documented failure mode, atomic preservation of a known-good warehouse, and — specifically — that the token is never present in any printed output.
+
+---
+
+### DEC-071 — The data artifact is fetched at Render runtime start, not build time; a checked-in start script (`scripts/render_start.sh`) and Blueprint (`render.yaml`) encode this explicitly
+
+**Context:** Render's persistent disk is mounted only when a service instance actually starts running — it does not exist yet during the build step. The original Phase 9 deployment guide's Build Command included fetching the data artifact, which would have written the downloaded warehouse into the build's ephemeral filesystem, not onto the persistent disk — every fresh deploy would silently lose it and need to fetch it again per boot in the wrong location, defeating the entire purpose of using a persistent disk.
+
+**Decision:** The Build Command now only installs the serving package's dependencies (`uv sync --package scc-health-api` — the API never imports the pipeline package at runtime, DEC-022/DEC-030, so this stays fast and light). `scripts/render_start.sh` (the Start Command) fetches/verifies the data artifact first, refuses to start if that fails **and** no existing warehouse is already present on the disk from a previous successful fetch, and only then `exec`s uvicorn — replacing the shell process rather than spawning a child, so Render's process supervision and signal handling target uvicorn directly. `render.yaml` (a Render Blueprint, optional but provided to reduce manual dashboard-entry risk) encodes this exact topology, with every secret marked `sync: false` (Render prompts for the real value at Blueprint-creation time; no secret value is ever in the file or in git).
+
+**Rationale:** Render's disk-mount timing is a real, well-documented platform constraint, not a design preference — getting this wrong would have produced a service that silently re-downloaded a ~50MB file on every restart while still functioning (only under load/cost, not correctness), or worse, one that behaved inconsistently depending on exactly when a boot happened to fail. Preferring to start with a stale-but-real existing warehouse over refusing to start at all (when a fetch fails but a prior warehouse is present) follows the same "fail loud only when there is truly nothing usable" principle as the API's own production startup validation (`main.py`'s `validate_production_readiness()`), which remains the final, authoritative gate regardless of what this shell script decides.
+
+**Consequences:** `docs/deployment/production-deployment-guide.md` was rewritten to reflect the corrected Build/Start Command split; a persistent disk requires a paid Render plan (verified against Render's own documentation this session, not assumed) — documented explicitly rather than silently implied.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

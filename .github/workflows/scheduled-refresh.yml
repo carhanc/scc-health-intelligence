@@ -1,18 +1,29 @@
 name: Scheduled data refresh
 
 # Rebuilds the full production warehouse from live sources, audits it,
-# and only publishes a new GitHub Release data artifact if every check
-# passes -- a failed or partial build never overwrites the last-known-good
-# published artifact (build-validate-publish, per
-# docs/data/refresh-runbook.md). Kept entirely separate from PR CI
+# publishes a new GitHub Release data artifact if every check passes,
+# then genuinely DELIVERS it: triggers the Render backend's deploy hook
+# and polls /api/v1/version until it reports the newly published
+# build_id, failing loudly on timeout or mismatch. A failed or partial
+# build never overwrites the last-known-good published artifact and
+# never touches the live deployment at all (build-validate-publish-
+# deliver, per docs/data/refresh-runbook.md). Deliberately never
+# triggers a frontend (Vercel) deployment -- a data-only refresh has
+# nothing for the frontend to rebuild. Kept entirely separate from PR CI
 # (docs/04_ARCHITECTURE_IMPLEMENTATION.md §17) since this hits live,
 # rate-limited external sources and can take significant time.
 #
-# Requires repo secrets (see docs/deployment/production-deployment-guide.md):
+# Requires repo secrets/variables (see
+# docs/deployment/production-deployment-guide.md):
 #   CENSUS_API_KEY, HUD_USER_TOKEN (optional -- both sources have a
-#   keyless fallback, but the keyed path is faster/more reliable)
-#   A GITHUB_TOKEN with `contents: write` (the default token works if
-#   this workflow's own `permissions:` block grants it, set below).
+#     keyless fallback, but the keyed path is faster/more reliable)
+#   RENDER_DEPLOY_HOOK_URL (secret) -- if unset, this workflow still
+#     publishes the release but skips the deploy-and-verify steps, with
+#     a clear warning, rather than silently failing.
+#   PRODUCTION_BACKEND_URL (variable) -- required alongside the hook URL
+#     to know where to poll /api/v1/version.
+#   The built-in `github.token` authenticates the `gh release create`
+#     call in the publish step (this repository is private).
 
 on:
   schedule:
@@ -71,6 +82,42 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: uv run python scripts/publish_data_artifact.py --publish
+
+      - name: Trigger Render deploy to deliver the new build
+        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -sf -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Poll production until it reports the new build_id
+        if: env.RENDER_DEPLOY_HOOK_URL != '' && env.PRODUCTION_BACKEND_URL != ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+        run: |
+          EXPECTED_BUILD_ID=$(python3 -c "import json; print(json.load(open('DATA_MANIFEST.production.json'))['build_id'])")
+          echo "Waiting for $PRODUCTION_BACKEND_URL to report data_build_id=$EXPECTED_BUILD_ID ..."
+          for i in $(seq 1 30); do
+            ACTUAL_BUILD_ID=$(curl -sf "$PRODUCTION_BACKEND_URL/api/v1/version" | python3 -c "import json,sys; print(json.load(sys.stdin).get('data_build_id') or '')" 2>/dev/null || echo "")
+            if [ "$ACTUAL_BUILD_ID" = "$EXPECTED_BUILD_ID" ]; then
+              echo "Confirmed: production is now serving build_id=$ACTUAL_BUILD_ID."
+              exit 0
+            fi
+            echo "  attempt $i/30: production reports '$ACTUAL_BUILD_ID' (waiting for '$EXPECTED_BUILD_ID') -- retrying in 20s"
+            sleep 20
+          done
+          echo "::error::Timed out after 10 minutes waiting for production to report the new build_id ($EXPECTED_BUILD_ID). The release was published, but delivery to the live backend could not be confirmed -- check the Render deploy manually."
+          exit 1
+
+      - name: Delivery skipped (no Render deploy hook configured yet)
+        if: env.RENDER_DEPLOY_HOOK_URL == ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "::warning::RENDER_DEPLOY_HOOK_URL is not set -- the new release was published, but"
+          echo "no deploy was triggered. The backend will still pick it up on its next deploy"
+          echo "(DATA_ARTIFACT_RELEASE_TAG=latest). Set the secret to automate delivery -- see"
+          echo "docs/deployment/production-deployment-guide.md."
 
       - name: Summary
         if: always()

@@ -5,7 +5,7 @@
 | Signal | Mechanism | Where to look |
 | --- | --- | --- |
 | Backend liveness | `GET /api/v1/health` | Render's own health-check ping, or `curl` manually |
-| Backend readiness (real data connected) | `GET /api/v1/ready` (503 if not ready) | Render's configured health-check path (see deployment guide step 4.6) |
+| Backend readiness (real data connected) | `GET /api/v1/ready` (503 if not ready) | Render's configured health-check path (see `docs/deployment/production-deployment-guide.md` step 4) |
 | Deployed code/data version | `GET /api/v1/version` | Returns `app_version`, `git_commit`, `data_build_id` |
 | Structured request logs | JSON lines to stdout (`logging_config.py`) | Render's own log viewer/log stream |
 | Backend exceptions | Sentry (if `SENTRY_DSN` set) | Sentry project dashboard |
@@ -27,7 +27,7 @@ Never contains request bodies, uploaded document content, or query parameter val
 
 - Uploaded document content or extracted text (Document Intelligence is in-memory-only and never logged — `docs/security/document-handling.md`).
 - Advocate workspace contents (browser-local; never sent to the backend at all except as ephemeral request payloads for evidence/generation calls, and those payloads aren't logged).
-- Any API key or secret value (Sentry's `send_default_pii: false` setting on both SDKs; no secret is ever included in a log message).
+- Any API key or secret value (Sentry's `send_default_pii: false` setting on both SDKs; no secret is ever included in a log message). `DATA_ARTIFACT_GITHUB_TOKEN` specifically is never printed by `scripts/fetch_data_artifact.py` under any code path, including every error message -- covered by a dedicated test (`scripts/tests/test_fetch_data_artifact.py::test_authentication_failure_fails_loudly_and_never_leaks_the_token`), and GitHub Actions automatically masks it in workflow logs when sourced from `secrets`/`github.token`.
 - Copilot prompts/responses in full (Sentry captures exceptions, not successful request/response bodies).
 
 ## What constitutes an incident
@@ -42,8 +42,8 @@ See `docs/security/incident-response.md` for what to do about each.
 ## Inspecting a failed refresh
 
 1. GitHub → Actions → "Scheduled data refresh" → the failed run.
-2. Check the step that failed: `make data` (a live-source fetch broke — check which pipeline stage), `make audit` (a real data-quality problem was caught, working as intended), or the publish step (a `gh` auth/permissions issue).
-3. The step summary (bottom of the run page) reports the `build_id`/table/row counts of the last *successful* build if the run failed partway — nothing was overwritten, since publish only happens after every prior step passes.
+2. Check the step that failed: `make data` (a live-source fetch broke — check which pipeline stage), `make audit` (a real data-quality problem was caught, working as intended), the publish step (a `gh` auth/permissions issue), or the deliver step (the Render deploy hook didn't fire, or `/api/v1/version` never reported the new `build_id` within 10 minutes -- check the Render deploy's own logs for a `fetch_data_artifact.py` failure, using `docs/deployment/environment-variables.md`'s troubleshooting table).
+3. The step summary (bottom of the run page) reports the `build_id`/table/row counts of the last *successful* build if the run failed partway — nothing was overwritten, since publish only happens after every prior step passes, and delivery failing after a successful publish never un-publishes the release.
 
 ## Correlating a frontend error with a backend request
 

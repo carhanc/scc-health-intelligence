@@ -97,7 +97,9 @@ _Pending implementation._ Will document the pre-release equity review required b
 
 ## Production deployment (Phase 9)
 
-No analytics, scoring, or evidence-generation logic changed this phase — Phase 9 is a production-hardening and deployment-readiness pass, not a methodology change. Production architecture: Vercel (frontend) + Render (backend) + GitHub Releases (versioned data artifact), anonymous browser-local Advocate workspaces, AI-assisted Copilot deliberately left disabled in production (`DECISIONS.md` DEC-066). See `docs/deployment/production-deployment-guide.md` for the full deployment runbook and `docs/security/ai-production-readiness.md` for what's required before ever enabling AI-assisted mode for real users.
+No analytics, scoring, or evidence-generation logic changed this phase — Phase 9 is a production-hardening and deployment-readiness pass, not a methodology change. Production architecture: Vercel (frontend) + Render (backend, paid tier, persistent disk) + GitHub Releases (versioned data artifact, fetched via authenticated API calls since the repository is **private**), anonymous browser-local Advocate workspaces, AI-assisted Copilot deliberately left disabled in production (`DECISIONS.md` DEC-066, DEC-070, DEC-071). See `docs/deployment/production-deployment-guide.md` for the full deployment runbook and `docs/security/ai-production-readiness.md` for what's required before ever enabling AI-assisted mode for real users.
+
+A pre-deployment correction pass (same phase) fixed three verified blockers found before real cloud provisioning: the data-artifact fetch script assumed public, unauthenticated downloads (would have failed entirely against this private repository — DEC-070); the deployment guide's Build Command would have fetched the data artifact before Render's persistent disk was mounted (DEC-071); and the scheduled-refresh workflow published new releases without ever delivering them to the running backend.
 
 ## Update process
 
@@ -142,6 +144,7 @@ _Populated continuously as each phase surfaces concrete limitations; finalized i
 - The per-IP rate limiter protecting document-analysis and Copilot routes is in-process and does not coordinate across multiple backend instances — a known simplification given this release targets a single Render instance, not yet a gap in practice (RISK-034).
 - Performance budgets (`PLAN.md` §19) were not measured this phase — out of the scope actually prioritized (deployability/security/observability).
 - No repository license has been assigned yet (RISK-035) — a decision for the repository owner, not one this assistant made on their behalf.
+- A GitHub fine-grained personal access token (`DATA_ARTIFACT_GITHUB_TOKEN`) is now a required production credential (the repository is private, DEC-070) with a manual rotation responsibility before its expiration — no automated rotation/expiration-warning mechanism exists yet (RISK-036).
 
 **From Phase 6:**
 

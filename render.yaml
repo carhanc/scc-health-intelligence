@@ -1,0 +1,60 @@
+# Render Blueprint (Phase 9 correction pass) -- represents the exact,
+# corrected production backend topology described in
+# docs/deployment/production-deployment-guide.md. Reduces manual-entry
+# risk in Render's dashboard form (a multi-line start command in
+# particular is easy to mistype by hand); every secret below is
+# `sync: false`, meaning Render prompts for the real value during
+# Blueprint creation and never stores it in this file or in git.
+#
+# A persistent disk REQUIRES a paid Render plan -- Render's free tier
+# does not support attaching one at all (verified against Render's own
+# docs at the time this file was written). "starter" is the minimum
+# plan this architecture will actually run on; the disk itself is
+# billed separately by size.
+#
+# To use: Render dashboard -> New -> Blueprint -> point at this repo.
+# Render reads this file and prompts for every `sync: false` value.
+services:
+  - type: web
+    name: scc-health-api
+    runtime: python
+    plan: starter
+    region: oregon
+    rootDir: .
+    # Build-time only: the persistent disk is NOT mounted yet during the
+    # build step, so the data artifact must never be fetched here (see
+    # scripts/render_start.sh's own comment). Installs only the serving
+    # package's dependencies -- the API never imports the heavy pipeline
+    # package (ortools/geopandas/osmnx) at runtime (DEC-022/DEC-030).
+    buildCommand: "pip install uv && uv sync --package scc-health-api"
+    # Runtime: fetches/verifies the data artifact onto the now-mounted
+    # disk, then execs uvicorn. See scripts/render_start.sh.
+    startCommand: "bash scripts/render_start.sh"
+    healthCheckPath: /api/v1/ready
+    disk:
+      name: scc-health-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: SCC_HEALTH_ENVIRONMENT
+        value: production
+      - key: SCC_HEALTH_WAREHOUSE_PATH
+        value: /data/scc_health.duckdb
+      - key: SCC_HEALTH_DATA_DIR
+        value: /data
+      - key: DATA_ARTIFACT_RELEASE_TAG
+        value: latest
+      - key: DATA_ARTIFACT_GITHUB_TOKEN
+        sync: false # a fine-grained PAT scoped to read-only Contents access on this one private repo
+      - key: GITHUB_REPOSITORY
+        value: carhanc/scc-health-intelligence
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # set to the real Vercel frontend URL(s) once known -- never a wildcard
+      - key: TRUSTED_HOSTS
+        sync: false # set to this Render service's own hostname once known
+      - key: ANTHROPIC_API_KEY
+        sync: false # leave BLANK for this release -- deterministic-only Copilot in production (DEC-066)
+      - key: SENTRY_DSN
+        sync: false # optional; leave blank to disable backend error monitoring
+      - key: SENTRY_ENVIRONMENT
+        value: production

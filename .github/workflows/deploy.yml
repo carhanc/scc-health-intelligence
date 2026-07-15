@@ -1,11 +1,20 @@
 name: Deploy
 
 # Triggers Render (backend) and Vercel (frontend) deploy hooks after CI
-# passes on main, then runs the real smoke-test suite against the live
-# URLs and fails loudly (not silently green) if anything doesn't check
-# out. Deploy hooks are simple webhook URLs (no vendor SDK/API token
-# needed) -- see docs/deployment/production-deployment-guide.md for how
-# to create them and add them as repo secrets.
+# passes on main (or on a manual workflow_dispatch, for the first real
+# deployment before any push-triggered CI run exists to react to), then
+# polls the live URLs until they're actually up and runs the real
+# smoke-test suite against them -- failing loudly (not silently green)
+# if anything doesn't check out. Deploy hooks are simple webhook URLs
+# (no vendor SDK/API token needed) -- see
+# docs/deployment/production-deployment-guide.md for how to create them
+# and add them as repo secrets.
+#
+# A PARTIALLY configured deployment (a hook secret set with no matching
+# production-URL variable) is treated as a configuration ERROR and fails
+# the job loudly -- never silently deploys without being able to verify
+# the result, and never silently skips verification while still
+# reporting overall success.
 #
 # This workflow does NOT perform an automatic rollback on smoke-test
 # failure -- Render/Vercel rollback is a one-click dashboard action
@@ -18,6 +27,7 @@ on:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  workflow_dispatch: {} # manual trigger, e.g. for the first real deployment
 
 permissions:
   contents: read
@@ -28,10 +38,36 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
+    # workflow_dispatch has no github.event.workflow_run -- only gate on
+    # its conclusion when that's actually the trigger that fired.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: Determine the exact commit to deploy
+        id: target_commit
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # The commit whose CI run just succeeded -- never an
+            # unrelated, possibly-newer main HEAD that raced ahead of it.
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ steps.target_commit.outputs.sha }}
+
+      - name: Verify the checked-out commit
+        run: |
+          set -euo pipefail
+          echo "Deploying commit: ${{ steps.target_commit.outputs.sha }}"
+          ACTUAL="$(git rev-parse HEAD)"
+          if [ "$ACTUAL" != "${{ steps.target_commit.outputs.sha }}" ]; then
+            echo "::error::Checked-out commit ($ACTUAL) does not match the intended target (${{ steps.target_commit.outputs.sha }})."
+            exit 1
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -46,49 +82,111 @@ jobs:
         with:
           version: "latest"
 
+      - name: Check deployment configuration
+        # Computed once, here, rather than re-declaring the same secrets
+        # in every downstream step's own env block -- every later step
+        # reads these as job outputs instead. A hook configured with no
+        # matching production-URL variable is a real misconfiguration
+        # and fails the job immediately with an actionable message,
+        # rather than deploying something this workflow then can't verify.
+        id: config
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+        run: |
+          set -euo pipefail
+          RENDER_READY=false
+          VERCEL_READY=false
+
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            if [ -z "$PRODUCTION_BACKEND_URL" ]; then
+              echo "::error::RENDER_DEPLOY_HOOK_URL is set but the PRODUCTION_BACKEND_URL repo variable is not. Cannot verify a backend deploy without knowing its URL -- set PRODUCTION_BACKEND_URL (Settings > Secrets and variables > Actions > Variables) or remove the hook secret."
+              exit 1
+            fi
+            RENDER_READY=true
+          fi
+
+          if [ -n "$VERCEL_DEPLOY_HOOK_URL" ]; then
+            if [ -z "$PRODUCTION_FRONTEND_URL" ]; then
+              echo "::error::VERCEL_DEPLOY_HOOK_URL is set but the PRODUCTION_FRONTEND_URL repo variable is not. Cannot verify a frontend deploy without knowing its URL -- set PRODUCTION_FRONTEND_URL or remove the hook secret."
+              exit 1
+            fi
+            VERCEL_READY=true
+          fi
+
+          if [ "$RENDER_READY" = false ] && [ "$VERCEL_READY" = false ]; then
+            echo "::warning::Neither RENDER_DEPLOY_HOOK_URL nor VERCEL_DEPLOY_HOOK_URL is configured yet -- nothing to deploy. See docs/deployment/production-deployment-guide.md."
+          fi
+
+          echo "render_ready=$RENDER_READY" >> "$GITHUB_OUTPUT"
+          echo "vercel_ready=$VERCEL_READY" >> "$GITHUB_OUTPUT"
+
       - name: Trigger Render backend deploy
-        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        if: steps.config.outputs.render_ready == 'true'
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: curl -sf -X POST "$RENDER_DEPLOY_HOOK_URL"
 
       - name: Trigger Vercel frontend deploy
-        if: env.VERCEL_DEPLOY_HOOK_URL != ''
+        if: steps.config.outputs.vercel_ready == 'true'
         env:
           VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: curl -sf -X POST "$VERCEL_DEPLOY_HOOK_URL"
 
-      - name: Skip (no deploy hooks configured yet)
-        if: env.RENDER_DEPLOY_HOOK_URL == '' && env.VERCEL_DEPLOY_HOOK_URL == ''
+      - name: Poll backend until it is ready and reports a version
+        if: steps.config.outputs.render_ready == 'true'
         env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
         run: |
-          echo "::warning::Neither RENDER_DEPLOY_HOOK_URL nor VERCEL_DEPLOY_HOOK_URL is set."
-          echo "See docs/deployment/production-deployment-guide.md to create the services and hooks."
-          exit 0
+          set -euo pipefail
+          echo "Polling $PRODUCTION_BACKEND_URL for readiness (up to 5 minutes)..."
+          for i in $(seq 1 30); do
+            if curl -sf "$PRODUCTION_BACKEND_URL/api/v1/ready" > /dev/null 2>&1 \
+               && curl -sf "$PRODUCTION_BACKEND_URL/api/v1/version" > /dev/null 2>&1; then
+              echo "Backend is ready and reporting a version (attempt $i/30):"
+              curl -sf "$PRODUCTION_BACKEND_URL/api/v1/version"
+              exit 0
+            fi
+            echo "  attempt $i/30: not ready yet -- retrying in 10s"
+            sleep 10
+          done
+          echo "::error::Backend did not become ready within 5 minutes ($PRODUCTION_BACKEND_URL)."
+          exit 1
 
-      - name: Wait for deployments to roll out
-        if: env.RENDER_DEPLOY_HOOK_URL != '' || env.VERCEL_DEPLOY_HOOK_URL != ''
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        run: sleep 90
-
-      - name: Install JS dependencies (for Playwright smoke checks)
-        if: env.PRODUCTION_FRONTEND_URL != ''
+      - name: Poll frontend until it responds
+        if: steps.config.outputs.vercel_ready == 'true'
         env:
           PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+        run: |
+          set -euo pipefail
+          echo "Polling $PRODUCTION_FRONTEND_URL for a response (up to 5 minutes)..."
+          for i in $(seq 1 30); do
+            if curl -sf "$PRODUCTION_FRONTEND_URL" > /dev/null 2>&1; then
+              echo "Frontend responded (attempt $i/30)."
+              exit 0
+            fi
+            echo "  attempt $i/30: not responding yet -- retrying in 10s"
+            sleep 10
+          done
+          echo "::error::Frontend did not respond within 5 minutes ($PRODUCTION_FRONTEND_URL)."
+          exit 1
+
+      - name: Install JS dependencies (for Playwright smoke checks)
+        if: steps.config.outputs.vercel_ready == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install Python dependencies (for the backend smoke checks)
-        if: env.PRODUCTION_BACKEND_URL != ''
-        env:
-          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+        if: steps.config.outputs.render_ready == 'true' && steps.config.outputs.vercel_ready == 'true'
         run: uv sync --package scc-health-api
 
-      - name: Backend + API smoke test
-        if: env.PRODUCTION_FRONTEND_URL != '' && env.PRODUCTION_BACKEND_URL != ''
+      - name: Full smoke test (backend + frontend cross-cutting checks)
+        # Needs BOTH URLs -- exercises real cross-page flows (e.g. a
+        # deterministic Advocate generation) that assume both services
+        # are live together. If only one side was just deployed, this is
+        # skipped with an honest note below, not run partially/falsely.
+        if: steps.config.outputs.render_ready == 'true' && steps.config.outputs.vercel_ready == 'true'
         env:
           PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
           PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
@@ -98,19 +196,14 @@ jobs:
           --backend-url "$PRODUCTION_BACKEND_URL"
 
       - name: Browser smoke test (console errors, accessibility)
-        if: env.PRODUCTION_FRONTEND_URL != ''
+        if: steps.config.outputs.vercel_ready == 'true'
         env:
           PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
         run: |
           pnpm --filter @scc-health/web exec playwright install --with-deps chromium
           SMOKE_TEST_BASE_URL="$PRODUCTION_FRONTEND_URL" pnpm --filter @scc-health/web exec playwright test e2e/production-smoke.spec.ts --project=desktop-chromium
 
-      - name: Skip smoke tests (production URLs not configured as repo variables yet)
-        if: env.PRODUCTION_FRONTEND_URL == '' || env.PRODUCTION_BACKEND_URL == ''
-        env:
-          PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
-          PRODUCTION_BACKEND_URL: ${{ vars.PRODUCTION_BACKEND_URL }}
+      - name: Note -- only one side deployed this run
+        if: steps.config.outputs.render_ready != steps.config.outputs.vercel_ready
         run: |
-          echo "::warning::Set the PRODUCTION_FRONTEND_URL and PRODUCTION_BACKEND_URL repo"
-          echo "variables (Settings > Secrets and variables > Actions > Variables) once the"
-          echo "services are deployed, so this workflow can smoke-test the live deployment."
+          echo "::notice::Only one of backend/frontend was configured+deployed this run -- the full cross-cutting smoke_test.py was skipped (it needs both). This is expected for a partial/staged rollout, not a failure."

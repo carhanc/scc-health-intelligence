@@ -56,7 +56,7 @@ test: test-unit
 	@echo "responsive) -- kept separate since it needs live API+web servers."
 
 test-unit:
-	uv run pytest apps/api/tests pipelines/tests
+	uv run pytest apps/api/tests pipelines/tests scripts/tests
 	pnpm -r test
 
 test-e2e:

@@ -30,25 +30,27 @@ A full `make data` run (all 7 pipeline stages) takes on the order of **1–1.5 h
 
 ## Failure handling
 
-The scheduled workflow follows **build → validate → publish**, never skipping a step:
+The scheduled workflow follows **build → validate → publish → deliver**, never skipping a step:
 
-1. `make data` — if any pipeline stage fails, the job stops here. No manifest, no publish. The previously published data artifact is completely untouched.
+1. `make data` — if any pipeline stage fails, the job stops here. No manifest, no publish, no deploy trigger. The previously published data artifact and the live deployment are both completely untouched.
 2. `make audit` — every geography/data-quality/analytics-output check must pass. A real data-quality problem caught here is the audit **working correctly**, not a bug to route around.
 3. `make data-manifest` — fails loudly if any required schema/table is missing (a partial pipeline run that didn't error but also didn't fully populate the warehouse).
 4. A real pytest run against the freshly-built warehouse — a regression here means the new data broke something the API assumes.
 5. Only after all four pass: `scripts/publish_data_artifact.py --publish` creates a new, uniquely-tagged GitHub Release. The previous release is never deleted or overwritten.
+6. **Deliver:** if `RENDER_DEPLOY_HOOK_URL` is configured, the workflow triggers a Render deploy (which reruns `scripts/render_start.sh`, re-fetching whatever `DATA_ARTIFACT_RELEASE_TAG` resolves to — `latest` by default, so this picks up the just-published release automatically) and then polls `<backend-url>/api/v1/version` for up to 10 minutes until it reports the new `build_id`. If the hook isn't configured, this step is skipped with a clear warning (the release is still published; the backend will pick it up on its next deploy for any other reason).
 
-If the workflow fails at any of steps 1–4, the job's step summary reports exactly where, and the live deployment keeps serving whatever data artifact it was already configured with — a failed refresh is invisible to end users, not a source of downtime.
+If the workflow fails at any of steps 1–5, the job's step summary reports exactly where, and the live deployment keeps serving whatever data artifact it was already configured with — a failed refresh is invisible to end users, not a source of downtime. If step 6 (delivery) itself times out or the reported `build_id` never matches, the workflow **fails loudly** even though the release was successfully published — the release existing is not the same as production actually serving it, and this distinction matters enough to be a real failure, not a silent partial-success.
 
 ## Manually triggering an out-of-cycle refresh
 
-GitHub → Actions → "Scheduled data refresh" → **Run workflow** (the `workflow_dispatch` trigger). Same build-validate-publish sequence, on demand.
+GitHub → Actions → "Scheduled data refresh" → **Run workflow** (the `workflow_dispatch` trigger). Same build-validate-publish-deliver sequence, on demand.
 
-## After a successful refresh: rolling the change out
+## Confirming delivery worked
 
-Publishing a new data artifact does **not** automatically redeploy the backend — a Render service only re-fetches the tagged artifact on its next build. To roll a fresh refresh out:
+```bash
+curl <backend-url>/api/v1/version
+```
 
-1. Update the Render service's `DATA_ARTIFACT_RELEASE_TAG` env var to the new tag (printed in the workflow's step summary).
-2. Trigger a Render manual deploy (or push any commit to `main`, which the `Deploy` workflow will pick up).
+`data_build_id` should match the `build_id` printed in the workflow's step summary. If `RENDER_DEPLOY_HOOK_URL` wasn't configured when the refresh ran, delivery doesn't happen automatically — see `docs/deployment/production-deployment-guide.md` step 7 to configure it, or trigger a manual Render deploy to pick up the newly published `latest` release.
 
-This two-step design (publish, then separately roll out) is deliberate — it means a newly published artifact can be smoke-tested against a staging environment before being promoted to production if you want that extra safety margin, rather than every scheduled refresh silently and immediately becoming what production serves.
+Note that a scheduled refresh **never** triggers a Vercel (frontend) deploy — a data-only refresh has nothing for the frontend to rebuild, and triggering one anyway would just be a wasted build.

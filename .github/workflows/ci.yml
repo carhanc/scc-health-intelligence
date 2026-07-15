@@ -149,23 +149,61 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @scc-health/web exec playwright install --with-deps chromium
 
+      - name: Verify the exact commit being tested
+        # actions/checkout defaults to the triggering commit, but this
+        # confirms it explicitly rather than assuming -- a workflow that
+        # silently tested a different HEAD would be a real, hard-to-spot
+        # correctness gap.
+        run: |
+          set -euo pipefail
+          echo "Testing commit: ${{ github.sha }}"
+          ACTUAL="$(git rev-parse HEAD)"
+          if [ "$ACTUAL" != "${{ github.sha }}" ]; then
+            echo "::error::Checked-out commit ($ACTUAL) does not match the triggering commit (${{ github.sha }})."
+            exit 1
+          fi
+
       - name: Find latest published data artifact
         id: find_artifact
+        # This repository is private -- the releases-list request must be
+        # authenticated (github.token has read access to this repo). A
+        # genuinely empty release list (first run, before any data-*
+        # release has ever been published) is the honest, expected skip
+        # case below. `curl -sf` fails the step (and the job) loudly on
+        # any real HTTP error (401/403/5xx) rather than letting an auth
+        # failure masquerade as "no releases yet."
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=$(curl -sf -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases" \
-            | python3 -c "
-          import json, sys
-          releases = json.load(sys.stdin)
-          data_releases = [r['tag_name'] for r in releases if r['tag_name'].startswith('data-')]
-          print(data_releases[0] if data_releases else '')
+          set -euo pipefail
+          curl -sf \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
+            -o /tmp/releases.json
+          TAG=$(python3 -c "
+          import json
+          releases = json.load(open('/tmp/releases.json'))
+          candidates = [
+              r['tag_name'] for r in releases
+              if not r.get('draft') and not r.get('prerelease')
+              and str(r.get('tag_name', '')).startswith('data-')
+          ]
+          print(candidates[0] if candidates else '')
           ")
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Fetch production data artifact
         if: steps.find_artifact.outputs.tag != ''
+        # DATA_ARTIFACT_GITHUB_TOKEN=github.token authenticates the
+        # download against this private repository -- without it, every
+        # asset request would 404. GitHub Actions automatically masks
+        # this value in all logs; it is never echoed or printed directly
+        # anywhere in this workflow or in fetch_data_artifact.py itself.
         env:
           DATA_ARTIFACT_RELEASE_TAG: ${{ steps.find_artifact.outputs.tag }}
+          DATA_ARTIFACT_GITHUB_TOKEN: ${{ github.token }}
         run: uv run python scripts/fetch_data_artifact.py
 
       - name: Skip e2e (no data artifact published yet)
