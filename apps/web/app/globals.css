@@ -74,17 +74,22 @@
   --chart-5: #56b4e9; /* sky blue */
   --chart-6: #d55e00; /* vermillion */
 
-  /* Map sequential scale (single-hue, colorblind-safe, light->dark) for
-   * concern percentile choropleths -- never red/green. Keep in sync with
-   * packages/ui/src/tokens.ts MAP_SEQUENTIAL_SCALE. */
-  --map-scale-1: #eef6f6;
-  --map-scale-2: #cfe6e6;
-  --map-scale-3: #a3cfd0;
-  --map-scale-4: #6fb3b5;
-  --map-scale-5: #3d9396;
-  --map-scale-6: #0b6e75;
-  --map-scale-7: #063f43;
-  --map-no-data: #e4e0d8; /* distinct neutral pattern fill, never part of the sequential scale */
+  /* Concern gradient (DEC-072) for the Explore map choropleth and any
+   * other place-level "combined concern" indicator -- five stops,
+   * lowest concern (muted teal/green) through highest concern (dark
+   * red/red-orange), colorblind-simulation and contrast verified
+   * (docs/design/health-equity-ux-visual-review.md). This intentionally
+   * reverses the earlier single-hue "never red/green" rule; see DEC-072
+   * for the full rationale and the guardrails that replace it. Keep in
+   * sync with packages/ui/src/tokens.ts CONCERN_SCALE. This red is a
+   * distinct token from --color-alert (system/data-freshness alerts)
+   * and must never be merged with it. */
+  --concern-scale-1: #1a5c4a; /* lowest concern */
+  --concern-scale-2: #6a9b7f; /* low-moderate */
+  --concern-scale-3: #d8cfa8; /* moderate (warm neutral) */
+  --concern-scale-4: #e08f3c; /* elevated */
+  --concern-scale-5: #c0392b; /* highest concern */
+  --concern-no-data: #d9d4cc; /* gray; paired with a hatch pattern on the map, never a flat color alone */
 }
 
 html,

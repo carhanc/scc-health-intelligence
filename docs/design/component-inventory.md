@@ -78,7 +78,7 @@ A fully keyboard-accessible, sortable table built on `@tanstack/react-table`. Co
 Shows on hover **and** keyboard focus — never hover-only, since a keyboard-only or touch user must be able to reach the same information. Reserved for brief clarifications; anything essential must already be visible as text somewhere, never solely inside a tooltip (docs/01 §2's explicit anti-pattern).
 
 ### Tokens (`tokens.ts`)
-`CHART_PALETTE` (6-color Okabe-Ito qualitative palette), `MAP_SEQUENTIAL_SCALE` (7-step single-hue teal scale), `MAP_NO_DATA_COLOR`, `COLOR` (literal hex mirror of the CSS custom properties), `scoreColorExpression()` (builds a MapLibre GL `interpolate` paint expression from the sequential scale). Exist because MapLibre style expressions and any future canvas/SVG chart need literal color values, not CSS variables — see design-system.md §4 for the "must be kept in sync by hand" caveat.
+`CHART_PALETTE` (6-color Okabe-Ito qualitative palette), `CONCERN_SCALE` (5-stop red-to-teal concern gradient, DEC-072), `CONCERN_NO_DATA_COLOR`, `COLOR` (literal hex mirror of the CSS custom properties), `scoreColorExpression()` (builds a MapLibre GL `interpolate` paint expression from the concern gradient). Exist because MapLibre style expressions and any future canvas/SVG chart need literal color values, not CSS variables — see design-system.md §4 for the "must be kept in sync by hand" caveat.
 
 ---
 

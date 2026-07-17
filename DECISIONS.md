@@ -815,4 +815,18 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+---
+
+### DEC-072 — The Explore map's choropleth moves from a single-hue teal sequential scale to an explicit red→orange→neutral→teal/green "concern" gradient, reversing the earlier "never red/green" rule
+
+**Context:** `packages/ui/src/tokens.ts` and `docs/design/design-system.md` previously encoded a deliberate rule that the map's sequential scale must never use red or green, reasoned as: "a red '90th percentile' implies a fire alarm, not a screening signal" (`design-system.md:68`). The health-equity UX redesign (`docs/design/health-equity-ux-redesign.md` §6) was given an explicit, detailed specification for a concern-oriented color system (dark red/red-orange highest concern → orange → warm neutral → muted teal/green lower concern → gray/hatching for missing data), modeled on established civic-data-map conventions for communicating relative urgency at a glance.
+
+**Decision:** Adopt the new five-stop concern gradient for the map choropleth (and any other place-level "combined concern" color indicator), replacing `MAP_SEQUENTIAL_SCALE`. The guardrails that motivated the original rule are preserved by other means rather than dropped: every score-adjacent view keeps its existing non-causal disclosure sentence (unchanged, `content-style-guide.md` §6); every legend explicitly reads "Higher concern / Lower concern," never "danger," "critical," or "alarm"; color is never the sole cue (every colored map region or badge pairs with a visible score, rank, or text label); missing data gets a structurally distinct gray-plus-hatch treatment, never a shade that could read as "low concern"; and the new concern-scale red is a separate, distinctly-named token from `--color-alert` (the pre-existing system/data-freshness alert color on Validate), so the two are never visually or semantically merged.
+
+**Rationale:** The original rule addressed a real risk (a bare red number reading as a medical/safety alarm rather than a relative-ranking signal) but was one specific mechanism toward a broader goal that this redesign satisfies through several redundant means at once — explicit disclosure text, non-color redundant cues, and careful token separation — rather than through color restraint alone. A concern-oriented gradient also directly serves this redesign's comprehension goal (§5 of the redesign doc): a reader should be able to glance at the map and read "more concern here" without first learning that darker teal means "higher," which a single-hue scale requires and a familiar warm/cool gradient does not.
+
+**Consequences:** `docs/design/design-system.md` §8/§18 and `packages/ui/src/tokens.ts`'s `MAP_SEQUENTIAL_SCALE` comment are updated to describe the new rule in place of the old one, not left contradicting the shipped code. Any future surface that wants a "concern" indicator must use the new dedicated tokens, not repurpose `--color-alert` or any other existing semantic color. Colorblind-simulation and contrast verification for the new scale is a release gate for the redesign (`health-equity-ux-redesign.md` §11), not assumed safe by inheritance from the old scale's own prior verification.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*
