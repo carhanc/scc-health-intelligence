@@ -4,15 +4,42 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { useQuery } from "@tanstack/react-query";
-import { LoadingRegion, SkeletonText, ErrorState, MAP_SEQUENTIAL_SCALE, MAP_NO_DATA_COLOR } from "@scc-health/ui";
+import { LoadingRegion, SkeletonText, ErrorState, CONCERN_SCALE, CONCERN_NO_DATA_COLOR } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { isValidGeographyId, type SelectedGeography } from "./selection";
 
 const FILL_LAYER = "tract-fill";
 const LINE_LAYER = "tract-outline";
 const SELECTED_LAYER = "tract-selected";
+const NO_DATA_HATCH_LAYER = "tract-no-data-hatch";
+const NO_DATA_HATCH_IMAGE = "no-data-hatch";
 const PLACE_OUTLINE_SOURCE = "selected-place-boundary";
 const PLACE_OUTLINE_LAYER = "selected-place-outline";
+
+/** A diagonal-hatch tile so "no score for this scenario" reads as
+ * structurally distinct from the concern gradient, not just one shade
+ * lighter than "lowest concern" (DEC-072 -- missing data must never
+ * visually resemble a real low score). */
+function createNoDataHatchPattern(): ImageData {
+  const size = 12;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = CONCERN_NO_DATA_COLOR;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = "#b8b0a2";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, size);
+  ctx.lineTo(size, 0);
+  ctx.moveTo(-size / 2, size / 2);
+  ctx.lineTo(size / 2, -size / 2);
+  ctx.moveTo(size / 2, size * 1.5);
+  ctx.lineTo(size * 1.5, size / 2);
+  ctx.stroke();
+  return ctx.getImageData(0, 0, size, size);
+}
 
 /**
  * The choropleth shows only the platform's own tract polygons and place
@@ -127,9 +154,9 @@ export function ExploreMap({
     } else {
       map.addSource("tracts", { type: "geojson", data: geojson as GeoJSON.FeatureCollection });
 
-      const stopCount = MAP_SEQUENTIAL_SCALE.length;
+      const stopCount = CONCERN_SCALE.length;
       const stops: (string | number)[] = [];
-      MAP_SEQUENTIAL_SCALE.forEach((color, i) => stops.push((i / (stopCount - 1)) * 100, color));
+      CONCERN_SCALE.forEach((color, i) => stops.push((i / (stopCount - 1)) * 100, color));
 
       map.addLayer({
         id: FILL_LAYER,
@@ -140,10 +167,20 @@ export function ExploreMap({
             "case",
             ["!=", ["get", "score"], null],
             ["interpolate", ["linear"], ["get", "score"], ...stops],
-            MAP_NO_DATA_COLOR,
+            CONCERN_NO_DATA_COLOR,
           ],
           "fill-opacity": 0.85,
         },
+      });
+      if (!map.hasImage(NO_DATA_HATCH_IMAGE)) {
+        map.addImage(NO_DATA_HATCH_IMAGE, createNoDataHatchPattern());
+      }
+      map.addLayer({
+        id: NO_DATA_HATCH_LAYER,
+        type: "fill",
+        source: "tracts",
+        filter: ["==", ["get", "score"], null],
+        paint: { "fill-pattern": NO_DATA_HATCH_IMAGE, "fill-opacity": 0.9 },
       });
       map.addLayer({
         id: LINE_LAYER,
@@ -331,20 +368,24 @@ function MapLegend() {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
       <span className="font-medium text-[var(--color-text-primary)]">Combined concern:</span>
-      <div className="flex items-center gap-1">
-        <span>Lower</span>
-        <div className="flex h-3 w-28 overflow-hidden rounded-full">
-          {MAP_SEQUENTIAL_SCALE.map((color) => (
+      <div className="flex items-center gap-1.5">
+        <span>Lower concern</span>
+        <div className="flex h-3 w-32 overflow-hidden rounded-full" role="img" aria-label="Color scale from lower concern (teal) to higher concern (red)">
+          {CONCERN_SCALE.map((color) => (
             <span key={color} className="h-full flex-1" style={{ backgroundColor: color }} />
           ))}
         </div>
-        <span>Higher</span>
+        <span>Higher concern</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span
           aria-hidden="true"
-          className="h-3 w-3 rounded-sm"
-          style={{ backgroundColor: MAP_NO_DATA_COLOR }}
+          className="h-3 w-3 rounded-sm border border-[var(--color-border-strong)]"
+          style={{
+            backgroundColor: CONCERN_NO_DATA_COLOR,
+            backgroundImage:
+              "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 3px)",
+          }}
         />
         <span>No score for this scenario</span>
       </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import {
   Badge,
   StabilityBadge,
@@ -13,6 +14,7 @@ import {
   SkeletonText,
   ErrorState,
   EmptyState,
+  GuidedNextStep,
 } from "@scc-health/ui";
 import {
   api,
@@ -257,6 +259,15 @@ function TractDetail({
           scenarioId={scenarioId}
         />
       </div>
+
+      <GuidedNextStep prompt="What would you like to do next?">
+        <Link href="/copilot" className="text-[var(--color-interactive)] underline underline-offset-2">
+          Ask Copilot about this tract
+        </Link>
+        <Link href="/prioritize" className="text-[var(--color-interactive)] underline underline-offset-2">
+          See its full countywide ranking
+        </Link>
+      </GuidedNextStep>
 
       <Dialog open={evidenceOpen} onClose={() => setEvidenceOpen(false)} title="Sources and evidence" variant="side">
         <EvidenceContent explanation={explanation} />

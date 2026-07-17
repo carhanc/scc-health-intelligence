@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Badge, FreshnessBadge, SkeletonText, StabilityBadge } from "@scc-health/ui";
+import { Badge, FreshnessBadge, MetricCard, RankContext, SkeletonText, StabilityBadge } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 
 const DEFAULT_SCENARIO_ID = "default_integrated_screen_v1";
@@ -43,25 +43,35 @@ export function CountywideSnapshot() {
 
   const scores = scoresQuery.data?.scores ?? [];
   const scored = scores.filter((s) => s.score !== null);
-  const highConcernCount = scored.filter((s) => (s.score ?? 0) >= HIGH_CONCERN_THRESHOLD).length;
+  const highConcernScores = scored.filter((s) => (s.score ?? 0) >= HIGH_CONCERN_THRESHOLD);
+  const highConcernCount = highConcernScores.length;
   const dataLimitedCount = scored.filter((s) => s.stability_label === "Data-limited").length;
-  const robustCount = scored.filter((s) => s.stability_label === "Robust").length;
+  // Robustness is counted only within the high-concern subset, not across
+  // all scored tracts -- the two counts must describe the same universe,
+  // or "N of the high-concern tracts are stable" silently becomes untrue
+  // (see docs/design/health-equity-ux-redesign.md §4 / DEC-072's sibling
+  // finding: the prior version filtered `scored` independently for each
+  // card, producing e.g. "16 stable" directly under "7 high-concern" with
+  // no way for a reader to tell 16 was a different, larger universe).
+  const robustHighConcernCount = highConcernScores.filter((s) => s.stability_label === "Robust").length;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <SnapshotFact
+      <MetricCard
         value={highConcernCount}
         label="tracts in the top quartile for overlapping concern"
+        direction="Higher = more concern"
         detail="Under the balanced, all-domains scenario. A high score flags a tract for closer review -- it is not a verdict."
       />
-      <SnapshotFact
-        value={robustCount}
-        label="of those rankings are stable across tested assumptions"
+      <MetricCard
+        value={`${robustHighConcernCount} of ${highConcernCount}`}
+        label="high-concern tracts have rankings that hold up across tested assumptions"
         detail="Rank-stability is checked by re-scoring under randomized alternative priority weightings."
       />
-      <SnapshotFact
+      <MetricCard
         value={dataLimitedCount}
         label="tracts where data gaps limit confidence"
+        direction="Countywide, not limited to high-concern tracts"
         detail="Missing or highly uncertain source data reduces confidence without being hidden."
       />
       <p className="col-span-full text-xs text-[var(--color-text-secondary)]">
@@ -75,29 +85,20 @@ export function CountywideSnapshot() {
   );
 }
 
-function SnapshotFact({
-  value,
-  label,
-  detail,
-}: {
-  value: number;
-  label: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <p className="text-3xl font-semibold tabular-nums text-[var(--color-text-primary)]">{value}</p>
-      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{label}</p>
-      <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">{detail}</p>
-    </div>
-  );
-}
-
 export function PrioritySnapshot() {
   const recommendationsQuery = useQuery({
     queryKey: ["recommendations", DEFAULT_SCENARIO_ID, 3],
     queryFn: () => api.getRecommendations(DEFAULT_SCENARIO_ID, 3),
     retry: 1,
+  });
+  // A cheap limit=1 call -- total_tracts is a real COUNT(*) independent of
+  // the row limit, so this reads the true countywide denominator instead
+  // of hardcoding it (docs/design/health-equity-ux-redesign.md §8).
+  const totalTractsQuery = useQuery({
+    queryKey: ["scenario-scores-total", DEFAULT_SCENARIO_ID],
+    queryFn: () => api.getScenarioScores(DEFAULT_SCENARIO_ID, { limit: 1 }),
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (recommendationsQuery.isLoading) {
@@ -136,6 +137,11 @@ export function PrioritySnapshot() {
               >
                 Tract {rec.tract_geoid_2020}
               </Link>
+              {totalTractsQuery.data && (
+                <div>
+                  <RankContext rank={rec.rank} total={totalTractsQuery.data.total_tracts} />
+                </div>
+              )}
               <p className="text-xs text-[var(--color-text-secondary)]">
                 Top driver: {rec.supporting_evidence[0]?.label ?? "see full breakdown"}
               </p>

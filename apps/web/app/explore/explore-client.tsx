@@ -116,11 +116,17 @@ export function ExploreClient() {
           1024-1279px gets the same stacked single-column layout as
           tablet/mobile, which stays fully usable at that width. */}
       <div className="mt-4 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)_380px]">
-        <div className="order-2 xl:order-1">
+        {/* Below xl, "Find a place" must render before the map -- the
+            primary interaction (searching/selecting) belongs above a
+            tall map, not buried under it (docs/design/
+            health-equity-ux-redesign.md §3/§9.2, verified live: at
+            mobile widths the map previously rendered first, pushing the
+            search box below a large empty-looking map). */}
+        <div className="order-1">
           <SearchPanel selected={selected} onSelect={handleGeographySelect} />
         </div>
 
-        <div className="order-1 xl:order-2">
+        <div className="order-2">
           {view === "map" ? (
             <ExploreMap scenarioId={scenarioId} selected={selected} onSelect={handleGeographySelect} />
           ) : (
