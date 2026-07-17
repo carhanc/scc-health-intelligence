@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge, Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type AdvocacyEvidenceItem } from "@/lib/api";
+import { dataStatusDefinition } from "@/lib/glossary";
 import type { SelectedGeography } from "../explore/selection";
 import { CUSTOM_SCENARIO_ID } from "../prioritize/scenario-selector";
 
@@ -154,7 +155,12 @@ function EvidenceCard({
         <div className="flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium text-[var(--color-text-primary)]">{item.label}</span>
-            <Badge tone={item.data_status === "modeled" ? "caution" : "neutral"}>{item.data_status}</Badge>
+            <Badge
+              tone={item.data_status === "modeled" ? "caution" : "neutral"}
+              title={dataStatusDefinition(item.data_status)}
+            >
+              {item.data_status}
+            </Badge>
           </div>
           <p className="text-sm text-[var(--color-text-secondary)]">{item.value}</p>
           <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">

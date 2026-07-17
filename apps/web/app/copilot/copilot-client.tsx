@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Badge,
+  BackendWakeState,
   Button,
   Card,
   DataModeBadge,
@@ -139,11 +140,12 @@ export function CopilotClient() {
             </LoadingRegion>
           )}
 
-          {askMutation.isPending && (
-            <LoadingRegion label="Generating response">
-              <SkeletonText lines={6} />
-            </LoadingRegion>
-          )}
+          {/* Copilot's ask request is the platform's most latency-sensitive
+              first-load path -- on a cold-started free-tier backend this
+              can plausibly take longer than an ordinary skeleton implies,
+              so it gets the explicit wake-state treatment rather than a
+              bare spinner (docs/design/health-equity-ux-redesign.md §7/§9.8). */}
+          <BackendWakeState isLoading={askMutation.isPending} onRetry={handleAsk} skeletonLines={6} />
           {askMutation.isError && (
             <ErrorState
               title="Copilot request failed"

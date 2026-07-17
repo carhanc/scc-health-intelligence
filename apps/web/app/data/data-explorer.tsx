@@ -109,7 +109,7 @@ function SourcesTable() {
   );
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+    <div className="scroll-shadow-x overflow-x-auto rounded-lg border border-[var(--color-border)]">
       <table className="w-full min-w-[900px] border-collapse text-left text-sm">
         <caption className="sr-only">
           Data sources with publisher, vintage, freshness, and license
@@ -327,7 +327,7 @@ function TablePreview({
           {data_mode}
         </p>
       </div>
-      <div className="max-h-[480px] overflow-auto">
+      <div className="scroll-shadow-x max-h-[480px] overflow-auto">
         <table className="w-full min-w-max border-collapse text-left text-xs">
           <caption className="sr-only">
             Preview of {schemaName}.{tableName}

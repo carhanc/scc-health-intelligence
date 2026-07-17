@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
+import { Card, DataModeBadge, ErrorState, LoadingRegion, MetricCard, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type FreshnessState } from "@/lib/api";
 
 /**
@@ -56,12 +56,12 @@ export function CoveragePanel() {
       </p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Recently checked" value={counts.newest_verified} tone="success" />
-        <StatCard label="On normal schedule" value={counts.intentional_older} tone="neutral" />
-        <StatCard label="Refresh due soon" value={counts.lagged} tone="caution" />
-        <StatCard label="Overdue for refresh" value={counts.stale} tone="alert" />
-        <StatCard label="Draft (not used)" value={counts.draft} tone="alert" />
-        <StatCard label="Unavailable" value={counts.unavailable} tone="alert" />
+        <MetricCard label="Recently checked" value={counts.newest_verified} tone="success" />
+        <MetricCard label="On normal schedule" value={counts.intentional_older} tone="neutral" />
+        <MetricCard label="Refresh due soon" value={counts.lagged} tone="caution" />
+        <MetricCard label="Overdue for refresh" value={counts.stale} tone="alert" />
+        <MetricCard label="Draft (not used)" value={counts.draft} tone="alert" />
+        <MetricCard label="Unavailable" value={counts.unavailable} tone="alert" />
       </div>
 
       {unavailable.length > 0 && (
@@ -82,30 +82,5 @@ export function CoveragePanel() {
         . <DataModeBadge mode={query.data.warehouse_data_mode} />
       </p>
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "success" | "neutral" | "caution" | "alert";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-[var(--color-success)]"
-      : tone === "caution"
-        ? "text-[var(--color-caution-strong)]"
-        : tone === "alert"
-          ? "text-[var(--color-alert)]"
-          : "text-[var(--color-text-primary)]";
-  return (
-    <Card>
-      <div className={`text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</div>
-      <div className="text-xs text-[var(--color-text-secondary)]">{label}</div>
-    </Card>
   );
 }

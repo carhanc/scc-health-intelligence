@@ -17,6 +17,22 @@ export const GLOSSARY = {
     "A distance or travel time calculated from road/transit network data, not a measured or reported real-world observation.",
   scenario:
     "A named set of priority weights across health, access, environment, and resource domains -- changing it re-ranks tracts under a different combination of concerns.",
+  dataStatusObserved: "Directly reported or measured by the source, not calculated by this platform.",
+  dataStatusModeled: "Calculated by this platform from other data, not a direct measurement.",
+  dataStatusSuppressed: "Withheld by the source (often to protect privacy for small counts), not a real zero.",
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;
+
+/** Plain-language definition for an evidence item's `data_status` value
+ * (@scc-health/api's `DataStatus`), reused wherever that raw status word
+ * is shown as a badge (Advocate's evidence review). */
+const DATA_STATUS_DEFINITIONS: Record<"observed" | "modeled" | "suppressed", string> = {
+  observed: GLOSSARY.dataStatusObserved,
+  modeled: GLOSSARY.dataStatusModeled,
+  suppressed: GLOSSARY.dataStatusSuppressed,
+};
+
+export function dataStatusDefinition(status: "observed" | "modeled" | "suppressed"): string {
+  return DATA_STATUS_DEFINITIONS[status];
+}
