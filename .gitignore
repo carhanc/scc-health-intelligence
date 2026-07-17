@@ -45,6 +45,16 @@ uploads/
 exports/
 tmp/
 
+# Regenerable visual-review screenshots (apps/web/e2e/visual-review-
+# screenshots.spec.ts) -- ~60 full-page PNGs per run, not meant to be
+# committed wholesale. The small curated subset referenced directly from
+# docs/design/health-equity-ux-visual-review.md is force-added instead.
+docs/design/screenshots/*
+!docs/design/screenshots/explore-map__1440-desktop.png
+!docs/design/screenshots/explore-map__320-mobile-small.png
+!docs/design/screenshots/overview__768-tablet-portrait.png
+!docs/design/screenshots/prioritize__390-mobile.png
+
 # OS/editor
 .DS_Store
 .vscode/
