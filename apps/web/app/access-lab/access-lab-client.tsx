@@ -2,7 +2,8 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
-import { SegmentedControl, Tabs, TabPanel } from "@scc-health/ui";
+import { SegmentedControl, Tabs, TabPanel, GlossaryTerm } from "@scc-health/ui";
+import { GLOSSARY } from "@/lib/glossary";
 import { SearchPanel } from "../explore/search-panel";
 import { parseSelectedGeographyFromParams, type SelectedGeography } from "../explore/selection";
 import { AccessSummaryPanel } from "./access-summary-panel";
@@ -55,9 +56,11 @@ export function AccessLabClient() {
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
           See how far a neighborhood is from care, by real walking and driving routes and by scheduled transit, and
           where a mobile clinic might help the most people. Distances and travel times are{" "}
-          <strong className="font-semibold text-[var(--color-text-primary)]">modeled estimates</strong>, not
-          guarantees -- and mobile-service scenarios describe a possible configuration to explore, not a decided
-          plan.
+          <GlossaryTerm definition={GLOSSARY.modeledEstimate}>
+            <strong className="font-semibold text-[var(--color-text-primary)]">modeled estimates</strong>
+          </GlossaryTerm>
+          , not guarantees -- and mobile-service scenarios describe a possible configuration to explore, not a
+          decided plan.
         </p>
       </div>
 

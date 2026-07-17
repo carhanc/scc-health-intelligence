@@ -56,7 +56,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
+    <div className="scroll-shadow-x overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)]">
       <table className="w-full min-w-max border-collapse text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="sticky top-0 bg-[var(--color-surface-sunken)]">

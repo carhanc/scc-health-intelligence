@@ -4,7 +4,7 @@
 // Wording follows docs/design/content-style-guide.md (short sentences,
 // no internal identifiers, non-causal framing where relevant).
 
-export const GLOSSARY: Record<string, string> = {
+export const GLOSSARY = {
   combinedConcernScore:
     "A 0-100 county-relative screening score combining this scenario's weighted domains. A high score means this tract's profile warrants a closer look, not a prediction or a causal claim.",
   countyRelative:

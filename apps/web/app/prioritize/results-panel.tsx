@@ -13,11 +13,21 @@ import {
   LoadingRegion,
   SkeletonText,
   EmptyState,
+  Button,
 } from "@scc-health/ui";
 import { api, ApiError, type CustomDomainContribution, type StabilityLabel } from "@/lib/api";
 import { domainLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
+
+// The full ranked list is always 408 rows -- rendering all of them into
+// the DOM by default (with no pagination or filter) is a real density
+// problem verified live during the health-equity UX redesign (docs/
+// design/health-equity-ux-redesign.md §3/§8). The API already returns
+// rows sorted by score (desc, nulls last), so the top N by rank is a
+// safe head-slice, not a re-sort -- full data remains one click and the
+// existing sort/export controls away.
+const DEFAULT_VISIBLE_COUNT = 25;
 
 export interface RankedRow {
   tract_geoid_2020: string;
@@ -38,6 +48,7 @@ export function ResultsPanel({
   scenarioSelection: { kind: "named"; scenarioId: string } | { kind: "custom"; weights: Record<string, number> };
 }) {
   const [expandedTract, setExpandedTract] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const tractNames = useTractNames();
 
   const namedQuery = useQuery({
@@ -183,6 +194,8 @@ export function ResultsPanel({
   ];
 
   const expandedRow = rows.find((r) => r.tract_geoid_2020 === expandedTract);
+  const visibleRows = showAll ? rows : rows.slice(0, DEFAULT_VISIBLE_COUNT);
+  const isTruncated = !showAll && rows.length > DEFAULT_VISIBLE_COUNT;
 
   return (
     <div className="space-y-3">
@@ -203,12 +216,25 @@ export function ResultsPanel({
       )}
 
       <DataTable
-        data={rows}
+        data={visibleRows}
         columns={columns}
         caption="Ranked geographies by combined priority score"
         initialSorting={[{ id: "score", desc: true }]}
         getRowId={(r) => r.tract_geoid_2020}
       />
+
+      <div className="flex items-center justify-between gap-3 text-sm text-[var(--color-text-secondary)]">
+        <p>
+          {isTruncated
+            ? `Showing the top ${DEFAULT_VISIBLE_COUNT} of ${rows.length} tracts.`
+            : `Showing all ${rows.length} tracts.`}
+        </p>
+        {rows.length > DEFAULT_VISIBLE_COUNT && (
+          <Button variant="secondary" size="sm" onClick={() => setShowAll((v) => !v)}>
+            {isTruncated ? `Show all ${rows.length}` : `Show top ${DEFAULT_VISIBLE_COUNT}`}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

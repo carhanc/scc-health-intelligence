@@ -120,6 +120,27 @@ textarea:focus-visible {
   border-radius: var(--radius-sm);
 }
 
+/* Makes horizontal overflow in a wide table visually obvious instead of
+ * a hard, unlabeled clip at the container edge -- a real defect verified
+ * live on Utilization/Data during the health-equity UX redesign
+ * (docs/design/health-equity-ux-redesign.md §9.5/§9.9). Pure-CSS "scroll
+ * shadow": two color-matched gradients (background-attachment: local)
+ * hide themselves once scrolled fully in either direction, plus two
+ * fixed edge shadows (background-attachment: scroll) that only become
+ * visible where content is actually clipped. Decorative only -- the
+ * underlying overflow-x-auto/keyboard-scrollable table is unaffected. */
+.scroll-shadow-x {
+  background:
+    linear-gradient(to right, var(--color-surface) 30%, rgb(255 255 255 / 0)),
+    linear-gradient(to right, rgb(255 255 255 / 0), var(--color-surface) 70%) right,
+    linear-gradient(to right, rgb(30 41 51 / 0.12), rgb(30 41 51 / 0)),
+    linear-gradient(to left, rgb(30 41 51 / 0.12), rgb(30 41 51 / 0)) right;
+  background-repeat: no-repeat;
+  background-color: var(--color-surface);
+  background-size: 40px 100%, 40px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
 /* Reduced motion: honor the OS preference everywhere, per docs/01 §14. */
 @media (prefers-reduced-motion: reduce) {
   *,
