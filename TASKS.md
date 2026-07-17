@@ -280,6 +280,20 @@ Most of this phase's original scope was delivered under the redirected Phase 9 a
 
 ---
 
+## Health-equity UX redesign (branch `ux/health-equity-redesign`, not merged to `main`)
+
+- [x] Research and audit phase (frontend architecture, live multi-viewport browser review, API-schema inspection, Overview "7"/"16" root-cause trace) — `docs/design/health-equity-ux-redesign.md` §3/§4.
+- [x] Redesign plan document (`docs/design/health-equity-ux-redesign.md`), 12 sections, written before implementation.
+- [x] Commit 1 — design tokens (DEC-072 concern gradient) + 11 new shared `packages/ui` components, unit-tested in isolation.
+- [x] Commit 2 — Overview 7-of-7 metric fix (regression-tested) + Explore map recolor, mobile search/map reorder, GuidedNextStep.
+- [x] Commit 3 — Prioritize top-25 default, Access Lab GlossaryTerm, Utilization/DataTable scroll-shadow affordance.
+- [x] Commit 4 — Validate MetricCard migration, Advocate data-status tooltip, Copilot BackendWakeState, Data scroll-shadow.
+- [x] Commit 5 — full a11y/responsive/unit/e2e regression pass + real WCAG-contrast/colorblind-simulation check + `docs/design/health-equity-ux-visual-review.md`.
+
+**Gate (this branch): PASS**, evidenced in `docs/design/health-equity-ux-visual-review.md` — 85/85 unit tests, 25/25 axe checks, 161+221 e2e tests across desktop/mobile Playwright projects, zero new dependencies, zero hardcoded values introduced. One pre-existing (not introduced) defect disclosed: Access Lab's tab row clips at ≤390px. Branch not pushed, not merged, not deployed.
+
+---
+
 ## Cross-cutting acceptance items (apply across phases, tracked here for visibility)
 
 - [ ] No all-null production metric column at any point after Phase 3. **Phase 4 evidence:** `analytics_audits.py` checks resource/workforce columns aren't all-null; all 25 metrics show 100% coverage live.

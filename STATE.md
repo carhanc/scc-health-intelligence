@@ -1,6 +1,26 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-14 (Phase 9 — Production release candidate, plus a pre-deployment correction pass — complete)
+**Last updated:** 2026-07-17 (health-equity UX redesign — complete on branch `ux/health-equity-redesign`, not merged to `main`)
+
+## Most recent work: health-equity UX redesign (branch, not on `main`)
+
+`main` is unchanged since the Phase 9 correction pass described below (still at `e58a7ea`, Vercel Analytics). A separate branch, `ux/health-equity-redesign`, was created off `main` (base `e58a7ea`) and now has **5 commits** implementing a full evidence-driven UX redesign — plan document, shared design-system components, a real metric-explanation bug fix, map recolor, density/accessibility fixes across every primary page, and a full verification pass. **Nothing on this branch has been pushed or merged.**
+
+Commits, in order: `9af8b64` (design tokens + 11 new shared components + DEC-072), `89912f9` (Overview 7/16 fix + Explore recolor/mobile-order fix), `dd7e345` (Prioritize top-25 default, Access Lab glossary term, Utilization scroll-shadow), `e6074cd` (Validate/Advocate/Copilot/Data polish), `6b94bfe` (a11y/responsive/visual verification, `docs/design/health-equity-ux-visual-review.md`).
+
+**Full plan:** `docs/design/health-equity-ux-redesign.md`. **Full verification evidence:** `docs/design/health-equity-ux-visual-review.md`. **Key decision:** `DECISIONS.md` DEC-072 (the concern-gradient color reversal).
+
+**The single most important finding this session:** Overview's "stable rankings" card read "16" directly under a "7 high-concern tracts" card with copy implying 16 was a subset of 7 — it wasn't; the code independently re-filtered the full 408-tract array. Verified against the live warehouse: the true, intended value is 7 of 7. Fixed in `apps/web/app/overview-snapshot.tsx`; regression-tested in `apps/web/test/overview-snapshot.test.tsx` with a fixture that discriminates the old (buggy) computation from the new one.
+
+**Verification, all live-run this session:** 85/85 vitest unit tests; 25/25 axe accessibility checks (zero serious/critical violations); full Playwright suite 161 passed/1 expected-skip (desktop-chromium) and 221 passed/1 expected-skip (mobile-chromium); `tsc --noEmit` and `eslint` clean on both `apps/web` and `packages/ui`; zero new runtime dependencies added (checked via `git diff main...ux/health-equity-redesign -- **/package.json`); a real, non-assumed WCAG-contrast + colorblind-simulation check on the new concern gradient (see the visual-review doc §3); 10 representative real Playwright screenshots inspected directly across all 9 pages and all 6 required breakpoints.
+
+**One pre-existing, out-of-scope defect found and disclosed, not fixed:** Access Lab's tab row visually clips at 390px/320px — predates this branch, touches shared `Tabs.tsx` which this redesign did not modify. Noted in the visual-review doc, not silently dropped.
+
+**Next action for this thread:** the branch is complete and ready for review. Nothing further is planned unless the repository owner requests changes, wants it merged, or wants the disclosed Access Lab tab-clipping issue fixed as a follow-up.
+
+---
+
+## Prior phase history (all on `main`, unaffected by the branch above)
 
 ## Current phase and gate
 
