@@ -67,6 +67,14 @@ for (const bp of BREAKPOINTS) {
       await expect(result).toBeVisible({ timeout: 10_000 });
       await result.click();
 
+      // Below the app's own xl (1280px) breakpoint, the selected-tract
+      // profile opens behind a collapsed summary bar instead of inline
+      // (MobileSelectedSheet) -- open it before asserting on the heading.
+      if (bp.width < 1280) {
+        await page
+          .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
+          .click();
+      }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
     });
 
@@ -86,12 +94,28 @@ for (const bp of BREAKPOINTS) {
 
     test("Tract detail, comparison, and evidence drawer remain operable", async ({ page }) => {
       await page.goto("/explore?geography=tract&id=06085500100");
+      // Below the app's own xl (1280px) breakpoint, the selected-tract
+      // profile opens behind a collapsed summary bar instead of inline
+      // (MobileSelectedSheet).
+      if (bp.width < 1280) {
+        await page
+          .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
+          .click();
+      }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible();
 
       await page.getByRole("button", { name: "Compare" }).click();
+      // Tapping Compare from inside the mobile sheet closes it first (the
+      // comparison panel renders as a page-level sibling, not inside the
+      // sheet) -- on desktop the inline panel is unaffected either way.
       await expect(page.getByRole("region", { name: "Compare with another place" })).toBeVisible();
 
+      if (bp.width < 1280) {
+        await page
+          .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
+          .click();
+      }
       await page.getByRole("button", { name: "View sources & evidence" }).click();
       const dialog = page.getByRole("dialog", { name: "Sources and evidence" });
       await expect(dialog).toBeVisible();

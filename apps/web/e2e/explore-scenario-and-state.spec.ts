@@ -4,6 +4,10 @@ const KNOWN_TRACT_A = "06085500100";
 const KNOWN_TRACT_B = "06085503112";
 
 test.describe("Explore -- scenario switching and URL/browser state", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("switching priorities changes the displayed results", async ({ page }) => {
     await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_A}`);
     await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });

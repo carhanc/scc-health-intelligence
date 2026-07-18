@@ -1,8 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Advocate -- cross-page 'Use in Advocate' integration", () => {
-  test("starting from a selected tract in Explore carries real structured state", async ({ page }) => {
+  test("starting from a selected tract in Explore carries real structured state", async ({ page, isMobile }) => {
     await page.goto("/explore?geography=tract&id=06085500100");
+    if (isMobile) {
+      // Below the xl breakpoint the profile opens behind a collapsed
+      // summary bar (MobileSelectedSheet); open it first.
+      await page.getByRole("button", { name: /Tap to view its full profile|combined concern/ }).click();
+    }
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({
       timeout: 15_000,
     });

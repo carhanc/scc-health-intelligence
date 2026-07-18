@@ -36,7 +36,12 @@ test.describe("Accessibility (axe-core)", () => {
 
   test("Explore with a tract selected (score, domains, evidence drawer) has no serious or critical violations", async ({
     page,
+    isMobile,
   }) => {
+    // Below the xl breakpoint the same content lives inside a bottom
+    // sheet reached by tapping the collapsed summary bar -- see the
+    // mobile-specific equivalents of this scan below.
+    test.skip(isMobile, "mobile collapsed-bar and expanded-sheet axe coverage is below");
     await page.goto("/explore?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
     // Expand a domain disclosure and open the evidence drawer so their
@@ -50,10 +55,50 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
+  test("Explore mobile: collapsed summary bar has no serious or critical violations", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "desktop-inline coverage is above");
+    await page.goto("/explore?geography=tract&id=06085500100");
+    await expect(page.getByRole("button", { name: /06085500100/ })).toBeVisible({ timeout: 10_000 });
+
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Explore mobile: expanded bottom sheet (domains, driver list, evidence drawer) has no serious or critical violations", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, "desktop-inline coverage is above");
+    await page.goto("/explore?geography=tract&id=06085500100");
+    const collapsedButton = page.getByRole("button", { name: /06085500100/ });
+    await expect(collapsedButton).toBeVisible({ timeout: 10_000 });
+    await collapsedButton.click();
+
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 5_000 });
+    await sheet.locator("details summary").first().click();
+    await sheet.getByRole("button", { name: "View sources & evidence" }).click();
+    await expect(page.getByRole("dialog", { name: "Sources and evidence" })).toBeVisible();
+
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
   test("Explore with a city selected (highest-concern-tract drill-down) has no serious or critical violations", async ({
     page,
+    isMobile,
   }) => {
     await page.goto("/explore?geography=place&id=0668000");
+    if (isMobile) {
+      // A place selection also opens behind the collapsed summary bar
+      // below the xl breakpoint; open it so the drill-down list is
+      // actually part of the scanned DOM. The trailing "View profile ->"
+      // cue is aria-hidden (redundant with the button's own role), so
+      // the accessible name to match on is the descriptive text instead.
+      await page.getByRole("button", { name: /Tap to view its full profile/ }).click();
+    }
     await expect(page.getByText("Highest-concern areas in San Jose", { exact: false })).toBeVisible({
       timeout: 10_000,
     });
@@ -239,6 +284,7 @@ test.describe("Keyboard navigation and focus", () => {
 
   test("the full Explore workflow -- search, select, expand evidence, close -- works with keyboard only", async ({
     page,
+    isMobile,
   }) => {
     await page.goto("/explore");
     await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
@@ -250,6 +296,18 @@ test.describe("Keyboard navigation and focus", () => {
     await expect(result).toBeVisible({ timeout: 10_000 });
     await result.focus();
     await page.keyboard.press("Enter");
+
+    if (isMobile) {
+      // Below the xl breakpoint, selecting a tract surfaces a collapsed
+      // summary button first; it must itself be keyboard-operable before
+      // the full profile (and its own evidence button) becomes reachable.
+      // The trailing "View profile ->" cue is aria-hidden, so match the
+      // descriptive text that's actually part of the accessible name.
+      const collapsedButton = page.getByRole("button", { name: /Tap to view its full profile|combined concern/ });
+      await expect(collapsedButton).toBeVisible({ timeout: 10_000 });
+      await collapsedButton.focus();
+      await page.keyboard.press("Enter");
+    }
 
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
 

@@ -8,6 +8,10 @@ import { test, expect } from "@playwright/test";
  * tract inside it" without already knowing a GEOID.
  */
 test.describe("Explore -- selecting a place pans the map to it", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("searching and selecting Sunnyvale outlines it on the map and lets the user click a tract inside it", async ({
     page,
   }) => {

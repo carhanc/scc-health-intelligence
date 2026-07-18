@@ -3,6 +3,17 @@ import { test, expect } from "@playwright/test";
 const TRACT_GEOID_PATTERN = /^06085\d{6}$/;
 
 test.describe("Explore -- search, selection, and view switching", () => {
+  // These tests assert on the desktop-inline detail panel (selection
+  // wiring: does the right URL/heading appear). Below the 1280px xl
+  // breakpoint, a selected geography opens in a collapsed summary bar +
+  // bottom sheet instead (see MobileSelectedSheet in geography-detail.tsx),
+  // so the same assertions don't apply on the mobile-chromium project --
+  // that layout and its own content are covered in
+  // e2e/explore-mobile-sheet.spec.ts.
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("search by city name finds a real place", async ({ page }) => {
     await page.goto("/explore");
     // First navigation of the suite pays Next.js dev mode's on-demand

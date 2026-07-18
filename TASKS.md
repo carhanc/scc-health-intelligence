@@ -292,6 +292,17 @@ Most of this phase's original scope was delivered under the redirected Phase 9 a
 
 **Gate (this branch): PASS**, evidenced in `docs/design/health-equity-ux-visual-review.md` — 85/85 unit tests, 25/25 axe checks, 161+221 e2e tests across desktop/mobile Playwright projects, zero new dependencies, zero hardcoded values introduced. One pre-existing (not introduced) defect disclosed: Access Lab's tab row clips at ≤390px. Branch not pushed, not merged, not deployed.
 
+### Second pass — Explore health-equity comprehension, driver explanation, mobile bottom sheet
+
+- [x] Research phase: reference-product methodology review (Tree Equity Score, HPI, Health Equity Tracker, County Health Rankings), 11-item live comprehension audit, API/data-model availability inventory — `docs/design/explore-health-equity-research.md`.
+- [x] Backend: `tract-boundaries` endpoint extended with 5 scenario-independent domain scores (DEC-073), tested.
+- [x] Frontend fixes: contribution-based (not percentile-based) driver sorting, live-computed countywide-rank denominator (DEC-074); zero-extra-request map layer switcher (7 layers); redesigned hover card; non-modal Explore orientation state; desktop Health Equity Screening Profile (headline comparison, interpretation, domain breakdown, ranked driver list with disclosed Strong-driver threshold, "what this does not mean" disclosure); mobile collapsed-summary-bar + bottom-sheet pattern reusing the same profile content.
+- [x] Two real defects found and fixed during live verification, not just written and assumed correct: Compare not closing the mobile sheet (stranding the comparison workflow behind a still-open modal) and a raw place GEOID showing in the mobile collapsed bar instead of a resolved name (DEC-075).
+- [x] Full verification gate: frontend unit 98/98, backend pytest 192/192, full Playwright suite 425 passed/29 honestly-skipped/0 failed (clean run), axe 0 serious/critical violations (including 2 new mobile-specific scans), responsive suite passing at all 6 breakpoints, lint/typecheck clean (frontend and backend), production build clean, zero new runtime dependencies, zero new network requests from map-layer switching (live-verified).
+- [x] `docs/design/explore-health-equity-visual-review.md` — real screenshots, the two defects found/fixed, and an investigated-and-ruled-out preview-pane tooling artifact (backend-unavailable state), documented rather than silently omitted.
+
+**Gate (second pass): PASS.** Two commits on the same branch, not pushed, not merged, not deployed.
+
 ---
 
 ## Cross-cutting acceptance items (apply across phases, tracked here for visibility)

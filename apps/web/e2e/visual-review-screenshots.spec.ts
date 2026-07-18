@@ -39,6 +39,18 @@ for (const bp of BREAKPOINTS) {
       await page.goto(`http://localhost:3000${p.path}`);
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(bp.name.includes("explore") || p.slug.includes("explore") ? 2000 : 800);
+      if (p.slug === "explore-tract-detail" && bp.width < 1280) {
+        // Below the app's own xl breakpoint the profile opens behind a
+        // collapsed summary bar (MobileSelectedSheet) -- open it so the
+        // screenshot captures the actual profile, not just the bar.
+        const collapsedButton = page.getByRole("button", {
+          name: /Tap to view its full profile|combined concern/,
+        });
+        if (await collapsedButton.isVisible().catch(() => false)) {
+          await collapsedButton.click();
+          await page.waitForTimeout(400);
+        }
+      }
       await page.screenshot({
         path: `../../docs/design/screenshots/${p.slug}__${bp.name}.png`,
         fullPage: true,

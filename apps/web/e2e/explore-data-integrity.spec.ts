@@ -1,6 +1,10 @@
 import { test, expect, request } from "@playwright/test";
 
 test.describe("Explore -- missing data is never rendered as zero", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("a tract with a null score (if one exists in current live data) shows a dash, never 0", async ({ page }) => {
     // Look for a real tract the live data currently reports as unscored,
     // rather than mocking one -- consistent with this project's "never

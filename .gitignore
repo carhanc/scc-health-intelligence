@@ -54,6 +54,11 @@ docs/design/screenshots/*
 !docs/design/screenshots/explore-map__320-mobile-small.png
 !docs/design/screenshots/overview__768-tablet-portrait.png
 !docs/design/screenshots/prioritize__390-mobile.png
+# Curated subset for docs/design/explore-health-equity-visual-review.md
+# (this pass's own review doc).
+!docs/design/screenshots/explore-map__1024-tablet-landscape.png
+!docs/design/screenshots/explore-tract-detail__1440-desktop.png
+!docs/design/screenshots/explore-tract-detail__390-mobile.png
 
 # OS/editor
 .DS_Store
