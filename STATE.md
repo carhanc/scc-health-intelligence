@@ -1,8 +1,93 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-17 (Product-wide health-equity UX consolidation pass — third pass on branch `ux/health-equity-redesign`, not merged to `main`)
+**Last updated:** 2026-07-18 (Final score, map-context, and product-intuitiveness pass — fourth pass on branch `ux/health-equity-redesign`, not merged to `main`)
 
-## Most recent work: Product-wide health-equity UX consolidation and visual polish (third pass, same branch, not on `main`)
+## Most recent work: Final score, map-context, and product-intuitiveness pass (fourth pass, same branch, not on `main`)
+
+Triggered by stakeholder feedback on the third pass's redesign: three fundamental problems remained --
+(1) the product had deemphasized the 0-100 composite score too far for a tool whose job is screening and
+prioritization; (2) the map had no real geographic context, making it read as abstract colored polygons
+rather than a recognizable map; (3) hover/selection still felt visually separate from the main comprehension
+flow. Adds **6 new commits** on top of the third pass's `a10a76f`, plus this governance-update commit:
+
+1. `78af17d` -- canonical `ScreeningScore` component + `docs/methods/screening-score-interpretation.md` (the
+   required scientific trace, written before the score was elevated anywhere).
+2. `c053677` -- real map basemap (OpenFreeMap, free/keyless) + redesigned hover/selection interaction model.
+3. `a5f6bec` -- headline score re-elevated as the dominant visual element; visual tracks added to top factors.
+4. `33c68c7` -- score consistency applied across Prioritize, Compare, Advocate, Validate.
+5. `0e57810` -- e2e/unit test fixes for the score/map/hover changes.
+6. `76104ff` -- blind usability review (3 independent subagents) + visual verification doc.
+
+**What changed, concretely:** traced the score's exact formula/bounds/direction/scenario-dependence/
+comparison-universe/missing-data/uncertainty/rank-percentile treatment before touching any presentation
+(`docs/methods/screening-score-interpretation.md`); centralized every score display (Explore headline, mobile
+collapsed bar, map hover/selection callouts, Prioritize table, Explore's tract comparison, Advocate's backend
+evidence service) through one shared `packages/ui/src/ScreeningScore.tsx` component, replacing 5 previously
+independent, inconsistently-rounded formatting call sites; re-elevated the 0-100 number as the selected-tract
+profile's dominant visual (reversing the third pass's deliberate deemphasis, DEC-078); discovered the map had
+**no basemap at all** (not just hidden labels -- `style: {sources: {}, layers: [background]}`) and added
+OpenFreeMap's free, keyless vector basemap with every tract layer inserted below the basemap's own label
+layers so city/road/water names render correctly (DEC-080); redesigned hover to a sidebar "Quick preview"
+when nothing is selected (map stays fully unobscured) and a small non-blocking map callout when hovering a
+different tract while one is already selected.
+
+**Two real bugs found and fixed during implementation** (not usability-review findings): (1) a React Strict
+Mode + remote-map-style-URL bug where `mapReady` never became `true` despite tiles rendering correctly,
+fixed by adding `idle` and `isStyleLoaded()` as redundant readiness signals alongside `load`; (2) a `aria-label`
+substring collision where the score component's accessible name accidentally contained the literal text
+"screening view," colliding with the actual "Screening view" `<select>` control's own label -- caught by the
+e2e suite, fixed by not appending redundant text to the scenario label passed to the component.
+
+**Two real bugs found by independent blind usability review** (3 cold subagents, screenshots only, no
+implementation context) and fixed: (1) three Prioritize rows all displaying "75/100" but two different
+concern-band labels, because the band was computed from the raw unrounded score while the number shown was
+rounded -- fixed by computing the band from the same rounded value everywhere (DEC-079); (2) "higher than
+100% of tracts" reading as a literal claim of beating every tract including itself, especially next to a tied
+rank #1 -- reworded the ceiling case without changing the underlying statistic.
+
+**Full research:** map-context and hover-model alternatives evaluated and documented in
+`docs/design/final-score-map-and-intuitiveness-review.md`. **Full verification evidence:** same document.
+**Key decisions:** `DECISIONS.md` DEC-078 through DEC-080.
+
+**Verification, all live-run this session:** frontend unit 98/98 (17 files); frontend lint/typecheck clean;
+backend+pipeline+scripts pytest 470/470; backend ruff/mypy clean; production build clean (zero new runtime
+dependencies -- confirmed via `git diff` on every `package.json`/`pnpm-lock.yaml`, none changed); full
+Playwright suite (`desktop-chromium` + `mobile-chromium`) **456 total, 426 passed, 30 skipped, 0 failed**,
+exit code 0 on the final confirmation run (reflecting every fix, including the 3 usability-review-driven
+ones made after the previous full run). One axe `document-title` failure was isolated and re-run 3 times in
+a row cleanly before being confirmed a genuine flake (parallel-worker resource contention against a manually
+started dev server, not a real defect) and excluded from the failure count, per this project's "do not call a
+failure a flake without isolated reproduction and evidence" rule. Secret scan and oversized-file scan both
+clean; `DATA_MANIFEST.json`'s working-tree diff reconfirmed as pure `retrieved_at` timestamp churn (0
+non-timestamp fields changed) and excluded from every commit; `next-env.d.ts` had no diff at all this pass.
+
+**Known limitations, disclosed not hidden** (full list in the visual-review doc §7): the 5 domain percentile
+bars have no visible numeric scale/endpoints beyond their text sentence; the mobile bottom sheet covers most
+of the map so a selected tract's city isn't nameable from the sheet view alone (an inherent tradeoff of the
+already-validated two-state sheet pattern, not new); an unrelated, pre-existing floating "N" UI element
+partially overlaps content at some mobile scroll positions (predates this pass, out of scope); Prioritize's
+"Data coverage"/"Stability" column headers have no inline tooltip; tied scores still produce strict ordinal
+ranks (a pre-existing, disclosed backend tie-break inconsistency across 3 different API routes, documented in
+the methods doc, not changed this pass since it is a backend methodology question outside this UX pass's
+scope).
+
+**Not pushed, not merged, not deployed** -- branch remains `ux/health-equity-redesign`, 7 commits ahead of
+the third pass's `a10a76f` (6 implementation commits plus this governance-update commit).
+
+**Next action for this thread:** the branch is complete and ready for review. Nothing further is planned
+unless the repository owner requests changes, wants it merged, or wants any of the disclosed limitations
+addressed as a follow-up.
+
+**Current running processes (supersedes the third-pass note below):** `next dev` on :3000 was restarted
+manually mid-pass after the previous session's process was found stale (`preview_start` failed with a
+sandbox `getcwd` permission error unrelated to the app itself; worked around by starting `next dev` directly
+via Bash with `PATH="/usr/local/opt/node@22/bin:$PATH"`, since `preview_start`'s own wrapper script could not
+be invoked). `uvicorn` on :8000 was left running from the prior session and remained healthy throughout.
+Both are left running at the end of this pass.
+
+---
+
+## Prior work: Product-wide health-equity UX consolidation and visual polish (third pass, same branch, not on `main`)
 
 Triggered by stakeholder review (Tara Sreekrishnan) finding the product still read as a technical
 analytics dashboard rather than an intuitive public-interest mapping product, referencing Tree

@@ -318,6 +318,45 @@ Most of this phase's original scope was delivered under the redirected Phase 9 a
 
 **Gate (third pass): PASS.** Five commits on the same branch (terminology core, Explore rebuild, remaining-pages terminology, e2e fixes, docs/screenshots), plus this governance-update commit. Not pushed, not merged, not deployed.
 
+### Fourth pass — Final score, map-context, and product-intuitiveness pass
+
+- [x] Scientific trace of the 0-100 composite score (formula, bounds, direction, scenario dependence,
+      comparison universe, missing-data behavior, uncertainty, rank/percentile treatment, ties) completed
+      and documented in `docs/methods/screening-score-interpretation.md` before any visual elevation (DEC-078).
+- [x] Canonical `ScreeningScore` component (`packages/ui/src/ScreeningScore.tsx`) established as the single
+      formatting/presentation path for the score, replacing 5 independently-rounded frontend call sites plus
+      one backend service (DEC-079).
+- [x] Score re-elevated as the dominant visual element of the selected-tract headline, reversing the third
+      pass's deemphasis, per stakeholder feedback that a screening/prioritization tool needs one objective
+      number (DEC-078). Non-causal disclaimer remains unconditionally visible.
+- [x] Real map basemap added (OpenFreeMap, free/keyless) — the map previously had no basemap at all, not just
+      hidden labels. City/road/water labels render above the choropleth via `beforeId` layer insertion;
+      verified live at county, mid, and tract zoom (DEC-080).
+- [x] A real React-Strict-Mode/remote-style-URL map-readiness bug found and fixed (`idle` + `isStyleLoaded()`
+      as redundant signals alongside `load`).
+- [x] Hover/selection interaction model redesigned after evaluating 3 alternatives: sidebar-docked "Quick
+      preview" for the no-selection state (map stays fully unobscured); a shrunk `TinyHoverCallout` for
+      hovering a different tract while one is already selected (never erases the open profile).
+- [x] Top-3 driving factors gained a visual `PercentileBar` track, matching the domain-summary rows.
+- [x] Score consistency applied across Prioritize (table + decision memo), Explore's tract-comparison panel,
+      Advocate's backend evidence service, and Validate's methods panel.
+- [x] Two real, independently-corroborated bugs found by 3 blind cold-subagent usability reviewers (screenshots
+      only, no implementation context) and fixed: a concern-band/rounding mismatch (three tracts all showing
+      "75/100" but two different band labels) and confusing "higher than 100% of tracts" ceiling phrasing
+      (DEC-079).
+- [x] Full verification gate: frontend lint/typecheck/98 unit tests, backend ruff/mypy/470 pytest, production
+      build (zero new dependencies), full Playwright suite (both projects) **456 total, 426 passed, 30
+      skipped, 0 failed**. One axe flake isolated and confirmed non-reproducible (3 clean re-runs) before
+      being excluded.
+- [x] `docs/design/final-score-map-and-intuitiveness-review.md` — every screenshot inspected, map/hover
+      decisions with evaluated alternatives, score-consistency audit, all usability findings (fixed and
+      disclosed), exact verification numbers, known limitations disclosed honestly.
+
+**Gate (fourth pass): PASS.** Six commits on the same branch (canonical score + methods doc, map basemap +
+hover/selection, headline elevation + factor visuals, score consistency across remaining surfaces, e2e/unit
+test fixes, usability review + visual verification), plus this governance-update commit. Not pushed, not
+merged, not deployed.
+
 ---
 
 ## Cross-cutting acceptance items (apply across phases, tracked here for visibility)
