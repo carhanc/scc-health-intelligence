@@ -14,6 +14,8 @@ import {
   SkeletonText,
   EmptyState,
   Button,
+  ScreeningScore,
+  SCREENING_SCORE_LABEL,
 } from "@scc-health/ui";
 import { api, ApiError, type CustomDomainContribution, type StabilityLabel } from "@/lib/api";
 import { domainLabel } from "@/lib/labels";
@@ -133,8 +135,15 @@ export function ResultsPanel({
   const columns: ColumnDef<RankedRow, unknown>[] = [
     {
       id: "rank",
-      header: "Rank",
-      cell: ({ row }) => row.index + 1,
+      // Always this tract's position under the active weighting's score
+      // ranking (rank 1 = highest screening concern) -- fixed to that
+      // score order regardless of which column the table is currently
+      // sorted by, since "rank" names a fact about the tract, not the
+      // table's current row order. `rows` arrives from the API already
+      // sorted score-descending (nulls last), so the original array
+      // index is this stable score rank by construction.
+      header: "Score rank",
+      cell: ({ row }) => `#${row.index + 1}`,
     },
     {
       id: "tract",
@@ -144,14 +153,9 @@ export function ResultsPanel({
     },
     {
       id: "score",
-      header: "Combined priority score",
+      header: SCREENING_SCORE_LABEL,
       accessorFn: (r) => r.score ?? -1,
-      cell: ({ row }) =>
-        row.original.score !== null ? (
-          <span className="font-semibold">{row.original.score.toFixed(1)}</span>
-        ) : (
-          <span className="text-[var(--color-text-tertiary)]">Not available</span>
-        ),
+      cell: ({ row }) => <ScreeningScore score={row.original.score} mode="compact" />,
     },
     {
       id: "coverage",
@@ -200,9 +204,17 @@ export function ResultsPanel({
   return (
     <div className="space-y-3">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        {scoredRows.length} of {rows.length} tracts have a combined priority score under this weighting.
+        {scoredRows.length} of {rows.length} tracts have a {SCREENING_SCORE_LABEL.toLowerCase()} under this weighting.
         {unscoredCount > 0 && ` ${unscoredCount} tract(s) have too little data for this weighting and are excluded, not shown as zero.`}
         {dataMode && <> <DataModeBadge mode={dataMode} /></>}
+      </p>
+      {/* Blind usability review (docs/design/final-score-map-and-
+          intuitiveness-review.md) found the 0-100 direction was only
+          ever stated on the tract-detail page, not here where the score
+          first appears as a sortable column -- restated here so rank #1
+          is unambiguous without visiting another page. */}
+      <p className="text-xs text-[var(--color-text-tertiary)]">
+        Rank #1 is the tract with the highest screening concern. 0 = lower screening concern, 100 = higher.
       </p>
 
       {expandedRow && (
@@ -218,7 +230,7 @@ export function ResultsPanel({
       <DataTable
         data={visibleRows}
         columns={columns}
-        caption="Ranked geographies by combined priority score"
+        caption={`Ranked geographies by ${SCREENING_SCORE_LABEL.toLowerCase()}`}
         initialSorting={[{ id: "score", desc: true }]}
         getRowId={(r) => r.tract_geoid_2020}
       />

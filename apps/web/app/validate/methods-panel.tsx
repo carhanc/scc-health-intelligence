@@ -16,7 +16,14 @@ export function MethodsPanel() {
   return (
     <div className="space-y-6">
       <Card>
-        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">How a combined score is built</h2>
+        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          How the health equity screening score is built
+        </h2>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          The 0-100 number shown throughout this platform (Explore, Prioritize, Compare, Advocate) is a screening
+          and prioritization signal, not a direct measurement of health equity: 0 means lower overlapping
+          screening concern, 100 means higher, and a low score does not certify a place as healthy or equitable.
+        </p>
         <ol className="mt-2 space-y-2 text-sm text-[var(--color-text-secondary)]">
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">1. Metric.</strong> Each published
@@ -26,14 +33,15 @@ export function MethodsPanel() {
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">2. Subdomain, then domain.</strong>{" "}
             Related metrics average into a subdomain, then subdomains average into one of five domains (health
-            burden, access barriers, environmental burden, resource accessibility, workforce shortage). A tract
+            needs, access barriers, environmental conditions, community resources, workforce shortage). A tract
             missing too many subdomains gets no domain score at all -- never a zero standing in for missing data.
           </li>
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">3. Scenario weighting.</strong> A
-            named scenario (or a custom weighting on the Prioritize page) combines the five domain scores into one
-            0-100 combined priority score, using a weighted average. A domain missing for a tract has its weight
-            excluded and the rest renormalized, not treated as zero -- see &quot;coverage_fraction&quot; on any score.
+            named screening view (or a custom weighting on the Prioritize page) combines the five domain scores
+            into one 0-100 health equity screening score, using a weighted average. A domain missing for a tract
+            has its weight excluded and the rest renormalized, not treated as zero -- see
+            &quot;coverage_fraction&quot; on any score.
           </li>
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">4. Uncertainty and sensitivity.</strong>{" "}

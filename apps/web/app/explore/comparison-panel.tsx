@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, LoadingRegion, SkeletonText, ErrorState, PercentileBar } from "@scc-health/ui";
+import { Button, LoadingRegion, SkeletonText, ErrorState, PercentileBar, ScreeningScore } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { SearchPanel } from "./search-panel";
 import type { SelectedGeography } from "./selection";
@@ -123,11 +123,11 @@ function ComparisonResult({
       <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
         <div>
           <p className="font-medium text-[var(--color-text-primary)]">Tract {tractA}</p>
-          <p className="tabular-nums text-2xl font-semibold">{a.score !== null ? Math.round(a.score) : "—"}</p>
+          <ScreeningScore score={a.score} mode="compact" />
         </div>
         <div>
           <p className="font-medium text-[var(--color-text-primary)]">Tract {tractB}</p>
-          <p className="tabular-nums text-2xl font-semibold">{b.score !== null ? Math.round(b.score) : "—"}</p>
+          <ScreeningScore score={b.score} mode="compact" />
         </div>
       </div>
 
