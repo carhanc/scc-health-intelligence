@@ -1,4 +1,7 @@
 import type { DomainKey, TractBoundaryFeatureProperties } from "@/lib/api";
+import { concernBandLabel } from "@scc-health/ui";
+
+export { concernBandLabel };
 
 export type MapLayerId = "score" | DomainKey | "confidence";
 
@@ -79,27 +82,6 @@ export function getMapLayer(id: MapLayerId): MapLayerDef {
 
 export function isMapLayerId(value: string | null): value is MapLayerId {
   return !!value && MAP_LAYERS.some((l) => l.id === value);
-}
-
-const CONCERN_BANDS: { min: number; label: string }[] = [
-  { min: 75, label: "high" },
-  { min: 50, label: "moderate-to-high" },
-  { min: 25, label: "moderate-to-low" },
-  { min: 0, label: "lower" },
-];
-
-/** Shared with the domain-breakdown panel so the map hover card and the
- * selected-geography panel never describe the same value two different
- * ways. `noun` names what's being described ("combined concern", "health
- * burden", "confidence", ...) -- the band word ("high"/"lower") always
- * describes the raw value's own magnitude, never inverted by direction:
- * a 90% coverage value is genuinely "high confidence" in plain language,
- * not "lower confidence" read backwards. Direction only ever changes
- * which end of the color scale a value maps to (buildFillColorExpression),
- * never the word used to describe the number itself. */
-export function concernBandLabel(value: number, noun: string): string {
-  const band = CONCERN_BANDS.find((b) => value >= b.min)?.label ?? "";
-  return band ? `${band} ${noun}` : noun;
 }
 
 /** A short, direction-explicit comparison sentence for a single domain

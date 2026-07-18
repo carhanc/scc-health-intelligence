@@ -18,6 +18,9 @@ import {
   MetricDirectionLabel,
   GlossaryTerm,
   MobileBottomSheet,
+  ScreeningScore,
+  formatScreeningScore,
+  SCREENING_SCORE_LABEL,
 } from "@scc-health/ui";
 import {
   api,
@@ -185,10 +188,10 @@ function MobileCollapsedSummary({
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{resolvedName ?? "Loading…"}</p>
         {explanation?.score != null ? (
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            {concernBandLabel(explanation.score, "combined concern")}
+          <div className="text-xs text-[var(--color-text-secondary)]">
+            <ScreeningScore score={explanation.score} mode="compact" />
             {mc?.median_rank != null && <> · #{Math.round(mc.median_rank)} countywide</>}
-          </p>
+          </div>
         ) : (
           <p className="text-xs text-[var(--color-text-secondary)]">Tap to view its full profile</p>
         )}
@@ -371,10 +374,6 @@ function GeographyLoadError({
   );
 }
 
-function scoreBandLabel(score: number): string {
-  return concernBandLabel(score, "combined concern");
-}
-
 function TractDetail({
   tractGeoid,
   scenarioId,
@@ -497,39 +496,39 @@ function TractDetail({
         </div>
       </div>
 
-      {/* HEADLINE -- the dominant visual is the plain-language concern
-          band and county comparison, not the raw 0-100 number (docs/
-          design/health-equity-product-consolidation.md's "headline
-          result" requirement). The scenario-dependent raw score moves to
-          the "How this was calculated" disclosure below, as secondary
-          information. */}
+      {/* HEADLINE -- the canonical 0-100 health equity screening score is
+          the dominant visual (docs/design/final-score-map-and-
+          intuitiveness-review.md's "one objective headline number"
+          requirement, reversing the prior pass's decision to
+          deemphasize it): the product screens and prioritizes areas, and
+          a user needs one consistently calculated number to anchor on.
+          Rendered through the single shared ScreeningScore component so
+          this exact number, rounding, and comparison sentence are never
+          computed a second, different way elsewhere (map callout,
+          Prioritize, Compare, Advocate, exports all use the same
+          component/formatter). */}
       <div className="mt-4">
-        {explanation.score !== null ? (
-          <>
-            <p className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-[1.75rem]">
-              {capitalize(scoreBandLabel(explanation.score))}
-            </p>
-            {comparisonPercentile !== null && totalTracts !== null && (
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                Higher than <strong className="text-[var(--color-text-primary)]">{comparisonPercentile}%</strong> of{" "}
-                {totalTracts} Santa Clara County tracts
-              </p>
-            )}
-            <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">{explanation.scenario_label} screening view</p>
-            {/* Kept always visible, deliberately not folded into the
-                collapsed disclosures -- CLAUDE.md's non-negotiable rule
-                against labeling a screening score as a causal claim
-                applies to the headline itself, not just the detail a
-                reader may never expand. */}
-            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-              A screening signal, not a prediction or a causal claim.
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {"There isn't enough data to compute a combined score for this tract under this scenario."}
-          </p>
-        )}
+        {/* scenarioLabel is the scenario's display name alone (e.g.
+            "Health equity overview"), not suffixed with "screening view"
+            -- that literal phrase would collide with the actual
+            "Screening view" <select> control's accessible name, since
+            Playwright/assistive-tech label matching is substring-based
+            and this component's own accessible name would otherwise
+            contain it too. */}
+        <ScreeningScore
+          score={explanation.score}
+          comparisonPercentile={comparisonPercentile}
+          totalTracts={totalTracts}
+          scenarioLabel={explanation.scenario_label}
+        />
+        {/* Kept always visible, deliberately not folded into the
+            collapsed disclosures -- CLAUDE.md's non-negotiable rule
+            against labeling a screening score as a causal claim applies
+            to the headline itself, not just the detail a reader may
+            never expand. */}
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+          This is a screening signal for closer review, not a diagnosis or causal conclusion.
+        </p>
       </div>
 
       {/* DOMAIN SUMMARY -- every domain, simple rows, county-relative
@@ -678,10 +677,6 @@ function TractDetail({
   );
 }
 
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
 /** One domain, reduced to what a first-time reader needs: the label, an
  * accessible percentile bar, and a plain-language comparison phrase
  * that always states the concern direction explicitly -- never a bare
@@ -720,13 +715,17 @@ function SimpleDriverRow({ metric }: { metric: MetricContribution }) {
       <p className="text-sm text-[var(--color-text-secondary)]">
         {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
         {metric.percentile !== null && (
-          <>
-            {" "}
-            · higher than <span className="tabular-nums">{Math.round(metric.percentile)}%</span> of county tracts
-          </>
+          <> · {domainComparisonPhrase(metric.percentile).toLowerCase()}</>
         )}
       </p>
-      <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">{metric.plain_language_definition}</p>
+      {/* A compact visual track, not just text -- docs/design/final-
+          score-map-and-intuitiveness-review.md's "what is shaping this
+          score" requirement asks for an immediate visual marker per
+          factor, not only a sentence. Reuses the same PercentileBar the
+          domain-summary rows already use, so a factor and a domain read
+          as the same kind of thing at a glance. */}
+      <PercentileBar percentile={metric.percentile} label={`${metric.label} county percentile`} />
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{metric.plain_language_definition}</p>
     </li>
   );
 }
@@ -800,10 +799,12 @@ function ScoreSummary({
           compact confidence line -- not repeated here to avoid the
           exact badge and title text appearing twice on the same page. */}
       <p className="text-3xl font-semibold tabular-nums text-[var(--color-text-primary)]">
-        {explanation.score !== null ? Math.round(explanation.score) : "—"}
+        {formatScreeningScore(explanation.score)}
         <span className="text-base font-normal text-[var(--color-text-secondary)]">/100</span>
       </p>
-      <p className="text-xs text-[var(--color-text-secondary)]">Combined concern score, this scenario only</p>
+      <p className="text-xs text-[var(--color-text-secondary)]">
+        {SCREENING_SCORE_LABEL}, this scenario only -- the same figure shown above, recomputed here with its exact inputs.
+      </p>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
