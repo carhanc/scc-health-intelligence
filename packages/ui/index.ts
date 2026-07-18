@@ -38,6 +38,8 @@ export { HowCalculatedDisclosure } from "./src/HowCalculatedDisclosure";
 export { GuidedNextStep } from "./src/GuidedNextStep";
 export { MobileBottomSheet } from "./src/MobileBottomSheet";
 export { GlossaryTerm } from "./src/GlossaryTerm";
+export { StepIndicator } from "./src/StepIndicator";
+export type { Step } from "./src/StepIndicator";
 
 export {
   ScreeningScore,
