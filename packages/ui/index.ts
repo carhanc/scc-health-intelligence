@@ -40,6 +40,16 @@ export { MobileBottomSheet } from "./src/MobileBottomSheet";
 export { GlossaryTerm } from "./src/GlossaryTerm";
 
 export {
+  ScreeningScore,
+  SCREENING_SCORE_LABEL,
+  formatScreeningScore,
+  concernBandFor,
+  concernBandLabel,
+  screeningComparisonSentence,
+} from "./src/ScreeningScore";
+export type { ScreeningScoreProps, ConcernBand } from "./src/ScreeningScore";
+
+export {
   CHART_PALETTE,
   CONCERN_SCALE,
   CONCERN_NO_DATA_COLOR,
