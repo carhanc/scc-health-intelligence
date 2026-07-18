@@ -65,7 +65,7 @@ export function SearchPanel({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={compact ? "Search another place…" : "e.g. Sunnyvale, District 3, 06085500100"}
-            className="flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
+            className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
           />
           <button
             type="submit"

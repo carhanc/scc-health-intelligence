@@ -606,7 +606,7 @@ function TractDetail({
           geography={{
             geographyType: "tract",
             geoid: profile.tract_geoid_2020,
-            displayName: `Tract ${profile.tract_geoid_2020}`,
+            displayName: profile.name_long,
           }}
           scenarioId={scenarioId}
         />

@@ -131,7 +131,7 @@ function TractSection() {
     },
     {
       id: "advocate",
-      header: "Advocate",
+      header: "Add to project",
       cell: ({ row }) => (
         <UseInAdvocateButton
           geography={{
@@ -139,7 +139,13 @@ function TractSection() {
             geoid: row.original.tract_geoid_2020,
             displayName: tractNames.get(row.original.tract_geoid_2020) ?? row.original.tract_geoid_2020,
           }}
-          label="Use"
+          // Shorter alternative label, not the default "Add to advocacy
+          // project" -- this is a dense per-row table cell with limited
+          // width, unlike the other 5 call sites' standalone buttons.
+          // Still an unambiguous action verb, unlike the prior bare "Use"
+          // (which an e2e test comment flagged as risking collision with
+          // a column-sort button of a similar name).
+          label="Add to Advocate"
         />
       ),
     },
