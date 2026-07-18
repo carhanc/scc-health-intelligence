@@ -925,4 +925,64 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-081 — Rebuild Advocate as a 4-stage guided project dashboard, reusing the existing workspace data model and business logic unchanged
+
+**Context:** Stakeholder feedback identified that Advocate, while functionally correct, exposed internal/technical vocabulary throughout its normal interface (matched evidence, evidence bundle, output type, generate, Export/Import JSON, configuration hash) and presented as a single dense page rather than a task the user could understand and complete. A pre-implementation research pass (`docs/design/advocate-intuitive-workspace-research.md`) audited every route, component, and cross-page entry point before any code changed, per this project's established "explore first, plan second, implement third" discipline.
+
+**Decision:** Rebuild the page as a 4-stage dashboard (Project → Evidence → Draft → Review & share) via a single `activeStage` client-side state variable with freely-clickable step navigation, not a gated wizard — every stage reads from the same always-fully-populated `AdvocacyWorkspace`, so moving between stages never discards work. The underlying `AdvocacyWorkspace` IndexedDB schema, its field names, and every existing CRUD handler (`handleSelectGeography`, `handleToggleEvidence`, `handleDraftCreated`, etc.) are reused unchanged — this pass is a presentation-layer rebuild, not a data-model rewrite.
+
+**Rationale:** The task's underlying business logic (evidence matching, deterministic brief generation, IndexedDB persistence) was already correct and well-tested; the actual problem was information architecture and terminology, not calculation or storage. Reusing the existing handlers verbatim means the redesign can't introduce a silent calculation regression, and satisfies the explicit constraint that backup/export files and internal schema keys must not change shape merely to match new UI labels (see DEC-083).
+
+**Consequences:** A new `apps/web/lib/advocacy-terms.ts` module (`ADVOCACY_TERMS`) is the single source of plain-language strings for the whole page and every cross-page entry point, replacing what were previously several independent, ad hoc label strings — see DEC-082. `packages/ui/src/StepIndicator.tsx` is a new shared component (step list with current/complete/upcoming state, communicated through icon shape and text together, never color alone).
+
+---
+
+### DEC-082 — Centralize plain-language terminology and evidence-status labels in one module; fix a real 4th `data_status` value found only by finally rendering it through real logic
+
+**Context:** Terms like "matched evidence," "evidence bundle," "Generate," and raw `data_status` values ("observed"/"modeled"/"suppressed") were previously either shown verbatim or handled by an incomplete, independently-drifting 3-value mapping in `apps/web/lib/glossary.ts`. Live testing during this pass (creating a project, selecting evidence, generating a draft against the real backend) surfaced a genuine backend/frontend contract gap: `apps/api/.../advocacy_evidence.py` legitimately returns a 4th `data_status` value, `"derived"` (used for averaged/composite evidence, including the health equity screening score itself), which neither the frontend's `DataStatus` type nor any existing label mapping accounted for — the evidence card was rendering the bare word "derived" as if it were already plain English.
+
+**Decision:** `apps/web/lib/advocacy-terms.ts` centralizes both the terminology map (`ADVOCACY_TERMS`) and the `data_status` → plain-language label/definition functions (`dataStatusLabel`, `dataStatusDefinition`), now covering all 4 real backend values. `DataStatus` in `apps/web/lib/api.ts` is widened to include `"derived"`. The now-superseded, now-provably-incomplete 3-value copy in `glossary.ts` is removed (confirmed via grep to have no other callers) rather than left to drift independently.
+
+**Rationale:** A single source of truth for this mapping means a future 5th `data_status` value can only be missed in one place, and makes the omission visible (a bare fallback string) rather than silently wrong. This is the same "centralize once, no independently-drifting copies" pattern already used for `ScreeningScore` (DEC-079).
+
+**Consequences:** No backend calculation or field changed — this is a purely additive frontend type/label fix for a value the backend was already, correctly, returning.
+
+---
+
+### DEC-083 — Real, typed backup-import error path, replacing an always-succeeds-silently import that could produce an unexplained placeholder project
+
+**Context:** The prior `importWorkspaceJson` always returned a `AdvocacyWorkspace` (via `migrateWorkspace`, which defaults every missing/invalid field), even for a file that was not valid JSON at all or was JSON of the wrong shape (a bare array, string, or number) — silently producing a placeholder project with no error shown to the user, undermining a real "restore a project backup" user action with a genuine failure mode.
+
+**Decision:** `importWorkspaceBackup` (`apps/web/lib/workspace/storage.ts`) now returns a discriminated union, `BackupImportResult = { ok: true; workspace } | { ok: false; reason: "unparseable" | "not_a_project" }`. A file that fails `JSON.parse` outright, or parses to a non-object (array/string/number), is now a reported, plain-language error (`ADVOCACY_TERMS.unparseableBackupError` / `invalidBackupError`, both ending in "Nothing was changed."). A file that *is* a plausible-but-old-shape object still recovers gracefully through the existing `migrateWorkspace` field-by-field defaulting — backward compatibility for genuinely old exports is fully preserved.
+
+**Rationale:** The task's own explicit, simultaneous requirements — "show real errors" and "never silently delete unsupported fields, fail safely" — are both satisfiable at once because they apply to two different failure classes: a file that isn't a backup at all (new, real error) versus a file that is an old-but-recognizable backup (unchanged, safe recovery). Conflating them was the actual bug.
+
+**Consequences:** `apps/web/test/workspace-storage.test.ts` gained explicit tests for both new failure branches and confirms the graceful-recovery branch is unaffected.
+
+---
+
+### DEC-084 — Heal missing schema fields on every ordinary workspace read, not only on backup import
+
+**Context:** Found live during this pass's verification: `getWorkspace`/`listWorkspaces` (`apps/web/lib/workspace/storage.ts`) returned the raw IndexedDB record as-is, with no field-defaulting — `migrateWorkspace`'s safe-defaulting logic was only ever invoked on the backup-*import* path. A record written to IndexedDB before a schema field existed (e.g. `titleIsUserSet`, `projectGoal`, both added earlier this pass) is read back missing that field entirely, not just falsy. Confirmed concretely: a real pre-existing project created earlier in this session's own live testing exported with `titleIsUserSet` and `projectGoal` genuinely absent from its JSON — meaning `titleIsUserSet` evaluated as falsy forever, which would silently re-trigger the auto-title-suggestion logic (DEC-081's title-suggestion feature) on every future edit to that project, overwriting a name the user believed was permanently theirs.
+
+**Decision:** `getWorkspace` and `listWorkspaces` now run every record through the same `migrateWorkspace` defaulting logic via a new `healWorkspaceShape` wrapper, which additionally restores the record's real `updatedAt` afterward (since `migrateWorkspace` always stamps a fresh one, correct for an actual import/save but not for a plain read — this would otherwise have silently corrupted `listWorkspaces`' most-recently-updated sort order and misreported "last saved" time on every visit). The healed shape is not written back to storage on read; it's naturally persisted next time the workspace is actually edited and saved.
+
+**Rationale:** CLAUDE.md and this task's explicit migration requirements ("preserve existing IndexedDB projects... any schema change must be additive, safely defaulted, never silently drop fields") apply to every read path a schema change can reach, not only the one path (backup import) that happened to already have defaulting logic. This is exactly the kind of "silent, only-reproducible-with-a-pre-existing-record" bug that unit tests written against only freshly-created objects would never catch — reproduced here with a raw IndexedDB `put()` bypassing `saveWorkspace`, matching what a genuinely old record looks like.
+
+**Consequences:** Two new regression tests in `workspace-storage.test.ts` cover both the general healing behavior and the `updatedAt`-preservation requirement specifically (a record with a deliberately old `updatedAt` must read back with that same value, not a freshly re-stamped one).
+
+---
+
+### DEC-085 — Resume a returning project at its furthest-reached stage; fix a real display-name inconsistency in one cross-page handoff
+
+**Context:** `activeStage` (the guided-dashboard's current step) always initialized to `"project"` on every load, switch, or backup restore, regardless of how much of the project was already filled in — found live: reloading a project that already had a place, audience, and evidence selected dropped the user back on the empty search form, with the summary panel's own "Next" guidance simultaneously (and wrongly) suggesting "Choose a place..." Separately, Explore's tract-detail "Add to advocacy project" button hardcoded `displayName: \`Tract ${geoid}\`` even though the same component already fetches and displays a nicer `profile.name_long` for its own page heading — a real, avoidable cross-page geography-naming inconsistency (Prioritize and Explore's place/district views use a human-readable name; this one tract view didn't, unlike Access Lab and Utilization, which don't have a nicer name available from their own API responses at all and were left as a disclosed, backend-scoped limitation).
+
+**Decision:** A new `resumeStageFor(workspace)` helper (`apps/web/app/advocate/advocate-client.tsx`) computes the first stage that still needs input (place missing → Project; evidence missing → Evidence; otherwise → Draft, since a generated draft is never persisted and can't be resumed into Review directly) and is applied uniformly on initial mount, project switch, and backup import. Explore's tract-detail handoff now passes `displayName: profile.name_long` instead of the raw-GEOID string.
+
+**Rationale:** A dashboard whose own stated purpose is "every value helps continue the task" (per the guided-dashboard model, DEC-081) cannot silently contradict itself by defaulting to the start of a task that in fact is already partway done. The display-name fix was a one-line, zero-risk correction using data the component already had in hand — not a new fetch, not a backend change.
+
+**Consequences:** Access Lab's tract-summary API response has no name field at all (`TractAccessSummaryResponse` — confirmed by reading its schema), so its "Tract <GEOID>" label is left as a disclosed, out-of-scope limitation requiring a backend schema addition, not fixed this pass. e2e coverage (`advocate-core.spec.ts`'s "reloading the browser resumes..." test) now asserts the resumed stage directly rather than only the underlying data.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

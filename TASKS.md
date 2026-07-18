@@ -359,6 +359,53 @@ merged, not deployed.
 
 ---
 
+## Fifth pass: Advocate workspace comprehension, dashboard, and cross-page integration redesign
+
+Triggered by stakeholder feedback that Advocate exposed internal/technical vocabulary (matched evidence,
+evidence bundle, output type, Generate, Export/Import JSON, configuration hash) throughout its normal
+interface and read as a single dense page rather than an understandable task.
+
+- [x] Research: inspected the complete Advocate route/every child component, browser-local persistence,
+      import/export, all 6 real output types, document upload/extraction, every cross-page "Use in
+      Advocate" entry point, and every Advocate test — `docs/design/advocate-intuitive-workspace-
+      research.md`.
+- [x] Established a centralized plain-language terminology module (`apps/web/lib/advocacy-terms.ts`) and
+      the additive `titleIsUserSet`/`projectGoal` schema fields (backward-compatible, safely defaulted).
+- [x] Rebuilt Advocate as a 4-stage guided project dashboard (Project/Evidence/Draft/Review & share,
+      `packages/ui/src/StepIndicator.tsx`) with freely-clickable step navigation, reusing all existing
+      business-logic handlers unchanged (DEC-081).
+- [x] Simplified evidence cards (plain-language theme grouping, include/remove controls, plain-language
+      data-status labels/definitions), evidence selection UX, and the document-upload flow ("Find useful
+      evidence in a document," plain no-match copy, non-technical injection warnings).
+- [x] Redesigned output selection ("What do you want to create?"), draft creation (calm readiness
+      checklist, deterministic-only framing), the draft/citations preview (document-style, "View sources
+      and limitations" disclosure only where the draft body doesn't already include it), and backup/
+      restore (moved into an unobtrusive "Project options" menu, real typed error path for a genuinely
+      invalid file, DEC-083).
+- [x] Unified the "Add to advocacy project" CTA and its plain-language arrival confirmation across every
+      contributing page (Explore, Prioritize, Access Lab, Utilization); added a project picker when
+      evidence is added to an existing multi-project state.
+- [x] Full verification gate: frontend lint/typecheck/**103 unit tests** (2 new regression tests for a
+      real field-healing bug, DEC-084); backend pytest **192/192** (advocacy/document-specific 54/54);
+      full Advocate e2e suite (3 spec files, near-total rewrites for the new flow/terminology) passing on
+      both `desktop-chromium` and `mobile-chromium`; live manual verification of the full place → evidence
+      → draft → review flow, document upload (real match and real no-match cases), backup download/
+      restore round-trip (including a corrupted-file case), project switching, and the mobile collapsed-
+      summary-panel toggle.
+- [x] Four real bugs found and fixed during live verification (not usability-review findings): an
+      unhandled 4th backend `data_status` value (`"derived"`) rendering as a bare untranslated word
+      (DEC-082); `getWorkspace`/`listWorkspaces` never healing a pre-existing record missing a newer
+      schema field, which would have silently overwritten a legacy project's title forever (DEC-084, the
+      most significant defect found this pass); the guided dashboard always resuming a returning project
+      at the first stage regardless of progress already made (DEC-085); a cross-page handoff using a raw
+      GEOID display name when a nicer name was already available in the same component (DEC-085).
+- [ ] Blind usability review (3 independent cold subagents) and visual-review doc.
+- [ ] Commits, and the explicitly-authorized push to `origin/ux/health-equity-redesign`.
+
+**Gate (fifth pass): IN PROGRESS.**
+
+---
+
 ## Cross-cutting acceptance items (apply across phases, tracked here for visibility)
 
 - [ ] No all-null production metric column at any point after Phase 3. **Phase 4 evidence:** `analytics_audits.py` checks resource/workforce columns aren't all-null; all 25 metrics show 100% coverage live.

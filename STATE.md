@@ -1,8 +1,63 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-18 (Final score, map-context, and product-intuitiveness pass — fourth pass on branch `ux/health-equity-redesign`, not merged to `main`)
+**Last updated:** 2026-07-18 (Advocate workspace comprehension, dashboard, and cross-page integration redesign — fifth pass on branch `ux/health-equity-redesign`, not merged to `main`)
 
-## Most recent work: Final score, map-context, and product-intuitiveness pass (fourth pass, same branch, not on `main`)
+## Most recent work: Advocate workspace comprehension, dashboard, and cross-page integration redesign (fifth pass, same branch, not on `main`)
+
+Triggered by stakeholder feedback that Advocate, while functionally correct, exposed internal/technical
+vocabulary throughout its normal interface (matched evidence, evidence bundle, output type, Generate,
+Export/Import JSON, configuration hash) and read as a single dense page rather than a task a
+non-technical user could understand and complete. Research (`docs/design/advocate-intuitive-workspace-
+research.md`) preceded implementation, per this project's established discipline.
+
+**What changed, concretely:** rebuilt Advocate as a 4-stage guided dashboard (Project → Evidence → Draft
+→ Review & share, `packages/ui/src/StepIndicator.tsx`) with freely-clickable step navigation, not a
+gated wizard, reusing the existing `AdvocacyWorkspace` IndexedDB schema and every existing business-logic
+handler unchanged (DEC-081); centralized all plain-language terminology and evidence data-status labels
+in one new module, `apps/web/lib/advocacy-terms.ts` (DEC-082); replaced the old always-succeeds-silently
+backup import with a real, typed error path for a genuinely invalid file while fully preserving graceful
+recovery for old-but-plausible backups (DEC-083); unified the "Add to advocacy project" CTA and its
+plain-language arrival confirmation across every contributing page (Explore, Prioritize, Access Lab,
+Utilization); redesigned evidence cards (plain-language theme grouping, include/remove controls, "Why
+this matters" disclosures), the document-upload flow ("Find useful evidence in a document," no-match
+copy, prompt-injection warnings), the output-type picker, draft creation, the draft/citations preview,
+and the backup/restore UI (moved into an unobtrusive "Project options" menu, never saying "JSON" in a
+primary label).
+
+**Four real bugs found and fixed during live verification** (not usability-review findings): (1) a 4th
+backend `data_status` value, `"derived"`, was rendering as the bare untranslated word "derived" on an
+evidence card — the frontend's type and label mapping only accounted for 3 of the 4 real values (DEC-082);
+(2) `getWorkspace`/`listWorkspaces` never applied the existing safe-field-defaulting logic that only ran
+on backup import, so a pre-existing project missing a newly-added schema field (`titleIsUserSet`) would
+have had its title silently overwritten by the auto-suggestion logic on its next edit, forever — the
+single most significant defect found this pass (DEC-084); (3) the guided dashboard always resumed a
+reloaded, switched, or restored project at the first ("Project") stage regardless of how much of the
+project already existed, contradicting its own "Next" guidance text (DEC-085); (4) Explore's tract-detail
+"Add to advocacy project" handoff hardcoded a raw-GEOID display name even though the same component
+already had a nicer human-readable name in hand for its own page heading (DEC-085).
+
+**Full research:** `docs/design/advocate-intuitive-workspace-research.md`. **Full verification evidence:**
+`docs/design/advocate-intuitive-workspace-visual-review.md`. **Key decisions:** `DECISIONS.md` DEC-081
+through DEC-085.
+
+**Verification, all live-run this session:** frontend unit 103/103 (17 files, 2 new regression tests for
+the field-healing fix); frontend lint/typecheck clean; backend pytest 192/192 (advocacy/document-specific:
+54/54); full Advocate e2e suite (`advocate-core.spec.ts`, `advocate-cross-page.spec.ts`,
+`advocate-document.spec.ts`, near-total rewrites for the new multi-stage flow and terminology) passing on
+both `desktop-chromium` and `mobile-chromium`; live manual verification via the Claude Browser pane of the
+full place → evidence → draft → review flow, document upload (including a real no-match case and a real
+extracted-passage case), backup download/restore round-trip (including an intentionally-corrupted file),
+project switching, and the mobile collapsed-summary-panel toggle.
+
+**Not pushed, not merged, not deployed** — branch remains `ux/health-equity-redesign`.
+
+**Next action for this thread:** blind usability review (3 independent cold subagents), visual-review
+doc, commits, and the explicitly-authorized final push to `origin/ux/health-equity-redesign` (not `main`,
+no merge, no deploy).
+
+---
+
+## Prior work: Final score, map-context, and product-intuitiveness pass (fourth pass, same branch, not on `main`)
 
 Triggered by stakeholder feedback on the third pass's redesign: three fundamental problems remained --
 (1) the product had deemphasized the 0-100 composite score too far for a tool whose job is screening and

@@ -362,6 +362,16 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Status:** `open` -- this is the repository owner's decision to make (e.g. MIT, Apache 2.0, or a decision to keep the code proprietary/unlicensed); not something this assistant can decide on the owner's behalf.
 
+## RISK-037 — Access Lab and Utilization's "Add to advocacy project" handoff uses a raw-GEOID display name, not a human-readable place name
+
+**Category:** UX consistency / plain-language presentation. **Likelihood:** Confirmed by design — `TractAccessSummaryResponse` (`apps/web/lib/api.ts`) has no human-readable name field at all, so `access-summary-panel.tsx` and Utilization's `geographic-panel.tsx` construct `` `Tract ${tractGeoid}` `` for the evidence handoff's `displayName`, unlike Explore's tract-detail view and Prioritize's ranked-results row, both of which have (and, after this pass, both correctly use) a real `name_long`/`name`-style field.
+
+**Impact:** Low — the resulting Advocate project still functions correctly and the raw GEOID is a real, valid identifier, not a fabricated or incorrect one; the effect is purely a presentation inconsistency (a project's "Place" field can read "Tract 06085500100" instead of a nicer "Census Tract 5001" style name), and CLAUDE.md's leading-zero/geographic-identifier-integrity rule is unaffected either way.
+
+**Mitigation:** None applied this pass — fixing it would require adding a name field to `TractAccessSummaryResponse` (and Utilization's equivalent response), a backend API-response schema change judged out of scope for a frontend-only Advocate redesign pass. Explore's tract-detail handoff, which *did* already have the nicer name available and was simply not using it, was fixed (DEC-085) since that required no backend change.
+
+**Status:** `open`, low priority — revisit if either endpoint's response schema is touched for an unrelated reason, or as a small, independent, backend-inclusive follow-up.
+
 ---
 
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*
