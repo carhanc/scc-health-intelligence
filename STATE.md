@@ -1,8 +1,73 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-17 (Explore health-equity comprehension pass — second pass on branch `ux/health-equity-redesign`, not merged to `main`)
+**Last updated:** 2026-07-17 (Product-wide health-equity UX consolidation pass — third pass on branch `ux/health-equity-redesign`, not merged to `main`)
 
-## Most recent work: Explore health-equity comprehension pass (second pass, same branch, not on `main`)
+## Most recent work: Product-wide health-equity UX consolidation and visual polish (third pass, same branch, not on `main`)
+
+Triggered by stakeholder review (Tara Sreekrishnan) finding the product still read as a technical
+analytics dashboard rather than an intuitive public-interest mapping product, referencing Tree
+Equity Score's National Explorer as an interaction/hierarchy reference only (not for branding, code,
+icons, or layout). Adds **5 new commits** on top of the second pass's `2279b60`/`902cedb`:
+
+1. `c6474c3` — terminology consolidation core (default scenario label/description, domain labels).
+2. `76253d9` — Explore rebuilt as a map-dominant sidebar layout; selected profile simplified.
+3. `a40109b` — remaining pages (Overview, Prioritize, Access Lab, Utilization, Validate, Advocate,
+   Copilot, Data) reframed with plain-language purpose sentences.
+4. `3af3b3a` — e2e suite fixed for the consolidated terminology/layout/disclosure structure.
+5. `8e253c7` — research doc, visual-review doc, and refreshed screenshots.
+
+**What changed, concretely:** the default scenario's user-facing name went from "Balanced overview"
+to "Health equity overview" (presentation-layer rename only — `scenario_id`/weights untouched,
+DEC-076); domain display labels renamed centrally in `labels.ts`; Explore's 3-column dashboard
+became a 2-surface map-dominant layout (~380px sidebar + map filling ~72% of content width, up from
+~26%); a collision-aware quadrant-positioned hover inspector and a minimal selected-tract map
+callout replaced the old dense hover tooltip; the selected-tract profile now shows only geography,
+headline concern band, county comparison, an always-visible non-causal disclaimer (DEC-077), a
+5-domain summary, and the top-3 plain-language drivers above the fold, with all raw contributions,
+uncertainty, stability methodology, and full sources moved behind labeled, collapsed disclosures
+(not removed); the mobile bottom sheet inherited this hierarchy for free via the shared component
+tree.
+
+**Two independent cold usability-review subagents** (screenshots + purpose + 8 comprehension
+questions only, no implementation explanation) drove two real fixes: a two-different-percentile-
+numbers trust problem between the map callout and the sidebar (resolved by dropping the redundant
+number from the map UI) and an ambiguous "near the county middle" comparison phrase. **One
+self-caught issue**, found via a failing test rather than proactive re-review: the mandatory
+non-causal disclaimer (CLAUDE.md's priority-1 truthfulness rule) became non-always-visible when
+`ScoreSummary` moved behind a disclosure — fixed by adding a permanently visible line to the
+headline block (DEC-077).
+
+**Full research:** `docs/design/health-equity-product-consolidation.md`. **Full verification
+evidence:** `docs/design/health-equity-product-visual-review.md`. **Key decisions:** `DECISIONS.md`
+DEC-076/DEC-077.
+
+**Verification, all live-run this session:** frontend unit 98/98 (17 files); frontend lint/typecheck
+clean; backend+pipeline+scripts pytest 470/470; backend ruff/mypy clean; production build clean
+(Node 22 required — see Notes below — zero new runtime dependencies, largest client chunk is the
+pre-existing MapLibre GL bundle at ~1.0MB); full Playwright suite (`desktop-chromium` +
+`mobile-chromium`) **456 total, 426 passed, 30 skipped, 0 failed**, exit code 0 — this includes axe
+accessibility checks across every route/state and the 6-breakpoint responsive suite
+(`e2e/responsive.spec.ts`), not run as separate ad-hoc checks; secret scan and oversized-file scan
+both clean; `DATA_MANIFEST.json`'s working-tree diff confirmed as pure `retrieved_at` timestamp
+churn (60 changed lines, zero non-timestamp fields) and excluded from every commit this pass.
+
+**Known limitation, disclosed not hidden:** the Claude Browser pane's synthetic `hover` action could
+not reliably reproduce the map's hover-card behavior against the MapLibre WebGL canvas (a tooling
+limitation — canvas feature-hover state depends on real incremental `mousemove` events a single
+teleported synthetic hover doesn't always produce). Relied on the existing real-Chromium Playwright
+coverage (`e2e/usability-tasks.spec.ts`, passing) as the authoritative check instead, consistent with
+this project's established jsdom/real-browser divergence pattern.
+
+**Not pushed, not merged, not deployed** — branch remains `ux/health-equity-redesign`, 5 commits
+ahead of the second pass's `902cedb`.
+
+**Next action for this thread:** the branch is complete and ready for review. Nothing further is
+planned unless the repository owner requests changes, wants it merged, or wants any of the disclosed
+limitations (§7 of the visual-review doc) addressed as a follow-up.
+
+---
+
+## Prior work: Explore health-equity comprehension pass (second pass, same branch, not on `main`)
 
 `main` is unchanged since the Phase 9 correction pass described below. Branch `ux/health-equity-redesign` (still not pushed, not merged, not deployed) now has **7 commits**: the original 5-commit UX redesign (see the section immediately below) plus 2 new commits from a focused second pass centered on Explore-page comprehension, selected-geography storytelling, driving-factor explanation accuracy, and a new mobile bottom-sheet pattern for the selected-geography profile.
 
@@ -113,10 +178,18 @@ Only after that real deployment is live and smoke-tested does it make sense to c
 
 ## Current running processes
 
-None. All dev/API servers started during this session were stopped cleanly.
+`next dev` on :3000 and `uvicorn` on :8000 are left running at the end of this third pass (both
+started by Playwright's own `webServer` config during the verification gate). Restart cleanly from
+the repository root with `make dev` if either is stopped, per the caution in the second-pass note
+below.
 
 ## Notes for continuation
 
+- **Third-pass note:** Node version — this machine's default `node` is v20.16 (too old; the repo
+  requires `>=22`, per `.nvmrc`/`package.json`). No `nvm`/`fnm`/`volta` is on PATH; Homebrew's
+  `node@22` is installed but not linked. Prefix any `pnpm`/`node` command with
+  `PATH="/usr/local/opt/node@22/bin:$PATH"` (same fix as the second-pass note below, confirmed still
+  necessary this pass).
 - **Second-pass note:** dev servers (`uvicorn` on :8000, `next dev` on :3000) were left running at the end of this pass. **Always start/restart the backend from the repository root**, never from `apps/web` or another subdirectory — `.env.local`'s `SCC_HEALTH_WAREHOUSE_PATH` is a relative path, and starting `uvicorn` from the wrong cwd makes it silently (and correctly, per its own truthful-fallback design) fall back to the demo warehouse, which lacks Phase-4 analytics tables, producing real 503s on every analytics-dependent endpoint. Diagnose with `curl http://localhost:8000/api/v1/warehouse-status` (`"data_mode"` should read `"live"`, not `"demo"`) if analytics endpoints ever start 503ing unexpectedly. `make dev` (`Makefile`'s `dev-api`/`dev-web` targets) always runs from the repo root correctly and is the preferred way to start both servers.
 - Toolchain: node@22 via Homebrew (`/usr/local/opt/node@22`), not on default PATH — `export PATH="/usr/local/opt/node@22/bin:$PATH"` before any pnpm/node command. **New this pass:** forgetting this causes `make lint`/etc. to run under the system's default Node (v20), which fails opaquely with `ERR_UNKNOWN_BUILTIN_MODULE` inside pnpm's own internals — not an informative error; if you see that, check `node --version` first.
 - `actionlint` and `shellcheck` are now installed via Homebrew on this machine (not a project dependency, a local dev tool) — re-run `actionlint .github/workflows/*.yml` after any future workflow-file edit.

@@ -303,6 +303,21 @@ Most of this phase's original scope was delivered under the redirected Phase 9 a
 
 **Gate (second pass): PASS.** Two commits on the same branch, not pushed, not merged, not deployed.
 
+### Third pass — Product-wide health-equity UX consolidation and visual polish
+
+- [x] Research phase: official reference-product review for interaction/hierarchy principles only (Tree Equity Score National Explorer, CA Healthy Places Index, Health Equity Tracker, County Health Rankings), current 10-item Explore problem inventory, target product narrative, desktop/mobile wireframes, terminology rules — `docs/design/health-equity-product-consolidation.md`.
+- [x] Terminology consolidation: default scenario renamed "Health equity overview" (presentation-layer only, `scenario_id`/weights unchanged, DEC-076); domain display labels renamed centrally in `labels.ts`, cascading to Explore/Prioritize/Validate with no string duplication.
+- [x] Explore rebuilt as a 2-surface map-dominant layout: ~380px sidebar + map filling the remaining width (~72% of content width at 1440px, up from ~26%); compact 2-row header; collision-aware quadrant-positioned hover inspector; minimal selected-tract map callout; "Reset view" control.
+- [x] Selected-tract profile simplified: above-the-fold now geography → headline concern band → county comparison → always-visible non-causal disclaimer (DEC-077) → 5-domain summary → top-3 plain-language drivers; raw contributions, uncertainty, stability methodology, and full sources moved behind labeled, collapsed disclosures, not removed.
+- [x] Mobile bottom sheet inherits the identical simplified hierarchy for free (same component tree) — no separate mobile-specific content work required.
+- [x] Remaining pages (Overview, Prioritize, Access Lab, Utilization, Validate, Advocate, Copilot, Data) reframed with plain-language purpose sentences and pathway-oriented task framing, all existing routes/functionality preserved.
+- [x] Two independent cold usability-review subagents run after implementation, given only screenshots + purpose + the 8 required comprehension questions; findings (not approval) drove two real fixes: a two-different-percentile-numbers trust problem (resolved by dropping the redundant map-UI number) and an ambiguous "near the county middle" comparison phrase.
+- [x] One self-caught truthfulness-rule issue: the non-causal disclaimer became non-always-visible when moved behind a disclosure; caught via a failing test, fixed by adding a permanently visible headline line (DEC-077).
+- [x] Full verification gate: frontend unit 98/98, frontend lint/typecheck clean, backend+pipeline+scripts pytest 470/470, backend ruff/mypy clean, production build clean (zero new dependencies), full Playwright suite (both desktop-chromium and mobile-chromium projects) **456 total, 426 passed, 30 skipped, 0 failed**, axe accessibility coverage across every route/state (part of the same suite), responsive suite passing at all 6 required breakpoints including the updated 1024px desktop-sidebar boundary, secret scan clean, oversized-file scan clean.
+- [x] `docs/design/health-equity-product-visual-review.md` — screenshots inspected, live-interaction checks, every fix documented, e2e regressions found/fixed disclosed, one known tooling limitation (MCP browser synthetic hover events vs. real-Chromium Playwright) disclosed rather than silently worked around.
+
+**Gate (third pass): PASS.** Five commits on the same branch (terminology core, Explore rebuild, remaining-pages terminology, e2e fixes, docs/screenshots), plus this governance-update commit. Not pushed, not merged, not deployed.
+
 ---
 
 ## Cross-cutting acceptance items (apply across phases, tracked here for visibility)

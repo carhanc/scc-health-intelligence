@@ -865,4 +865,28 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+### DEC-076 — Rename the default scenario's display label and domain display labels through the existing central config, rather than introducing a new "product terminology" layer
+
+**Context:** Stakeholder review (Tara Sreekrishnan) found the product's terminology still read as an internal analytics tool rather than a public-interest mapping product: "Balanced overview" for the default scenario name did not communicate purpose, and the map's "Priorities" control label was ambiguous. `docs/design/health-equity-product-consolidation.md` (this pass's research doc) audited every consumer of both strings before changing either.
+
+**Decision:** Change exactly two existing central sources of truth, add no new ones. `config/scenarios.yml`'s `default_integrated_screen_v1.label` becomes "Health equity overview" and its `description` becomes plain language describing the four domains it balances; `scenario_id` and `weights` are untouched, confirmed via `grep -rn '"Balanced overview"' apps/api/src apps/web/app apps/web/lib packages/ui/src` returning zero matches before the change (no application logic depended on the literal string, only display). `apps/web/lib/labels.ts`'s existing `DOMAIN_LABELS` map is updated the same way (`health_burden` -> "Health needs", `environmental_burden` -> "Environmental conditions", `resource_accessibility` -> "Community resources"), cascading to every consumer of `domainLabel()` (Explore, Prioritize, Validate) with no per-page string duplication. The Explore "Priorities" control is relabeled "Screening view" directly in `explore-client.tsx`.
+
+**Rationale:** Both `scenarios.yml`'s `label`/`description` fields and `labels.ts`'s `domainLabel()` function already existed specifically as the presentation-layer indirection this kind of rename requires — introducing a second, parallel "display terminology" config would have duplicated that indirection for no benefit and created two places a future rename could drift out of sync.
+
+**Consequences:** `apps/web/test/labels.test.ts` and every e2e assertion that referenced the old strings (`"Balanced overview"`, `"Priorities"`, `"Health burden"`, `"Resource accessibility"`) were updated in the same pass (see the e2e-fix commit on this branch). Any future default-scenario or domain rename should go through these same two files, not a new mechanism.
+
+---
+
+### DEC-077 — Explore's selected-tract profile hides technical detail behind progressive disclosure, but the non-causal disclaimer is duplicated into the always-visible headline rather than relying on disclosure alone
+
+**Context:** This pass's consolidation restructured `TractDetail` so raw weighted-point contributions, uncertainty intervals, stability methodology, and full source citations move behind collapsed `<details>` sections, per the explicit goal of showing a plain-language result first. `ScoreSummary` (moved inside the new "How this was calculated" disclosure) already carried this project's mandatory "not a prediction or a causal claim" sentence (CLAUDE.md: never label a heuristic/association/correlation as causal impact — a non-negotiable, priority-1 rule). Moving `ScoreSummary` behind a closed-by-default disclosure would have made that sentence not-always-visible, which a failing `usability-tasks.spec.ts` assertion caught during this pass's own verification (not a proactive re-read).
+
+**Decision:** Add a short, always-visible line to the headline block itself — "A screening signal, not a prediction or a causal claim." — and remove the now-duplicate clause from `ScoreSummary`'s (collapsed) text, keeping only its unique second sentence there. Progressive disclosure is applied to every other technical detail without exception, but this one disclosure-worthy-looking sentence is deliberately kept outside any `<details>`.
+
+**Rationale:** CLAUDE.md's non-causal-framing rule is listed above UX/cosmetic preferences in this project's own priority order (data integrity/truthfulness first). Progressive disclosure is a UX technique for managing what is *optional* to read; a truthfulness disclaimer required by project policy is not optional information a user might reasonably skip, so it does not belong exclusively behind a click a reader may never make.
+
+**Consequences:** Any future change to the headline block must preserve this line outside of any collapsed section; `usability-tasks.spec.ts`'s existing assertion for this text (originally written against the pre-consolidation layout) continues to serve as the regression guard, now checking the headline location instead of the old `ScoreSummary` location.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*
