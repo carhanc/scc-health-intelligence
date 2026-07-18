@@ -2,16 +2,17 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SegmentedControl, SkeletonText } from "@scc-health/ui";
-import { api } from "@/lib/api";
+import { SegmentedControl, SkeletonText, ScreeningScore } from "@scc-health/ui";
+import { api, type TractBoundaryFeatureProperties } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { SearchPanel } from "./search-panel";
 import { ExploreTable } from "./explore-table";
 import { GeographyDetail, MobileSelectedSheet } from "./geography-detail";
 import { ComparisonPanel } from "./comparison-panel";
 import { parseSelectedGeographyFromParams, type SelectedGeography } from "./selection";
+import { MAP_LAYERS } from "./layers";
 
 const ExploreMap = dynamic(() => import("./explore-map").then((m) => m.ExploreMap), {
   ssr: false,
@@ -35,6 +36,13 @@ export function ExploreClient() {
   // activate at a narrower breakpoint than before -- more devices get
   // the map-dominant desktop experience, not just very wide screens.
   const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
+
+  // Lifted from ExploreMap so the sidebar's "Quick preview" can render
+  // hovered-tract data while nothing is selected -- in that state the
+  // map itself stays completely unobscured (no floating hover card),
+  // per docs/design/final-score-map-and-intuitiveness-review.md's
+  // hover/selection interaction model.
+  const [hoveredTract, setHoveredTract] = useState<TractBoundaryFeatureProperties | null>(null);
 
   // Only a well-formed, in-county canonical GEOID is ever treated as a
   // real selection -- this is what stops a malformed or hand-edited URL
@@ -133,6 +141,11 @@ export function ExploreClient() {
       <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
         <div className="order-1 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:pr-1">
           <SearchPanel selected={selected} onSelect={handleGeographySelect} compact={!!selected} />
+          {!selected && view === "map" && (
+            <div className="mt-4">
+              <QuickPreview properties={hoveredTract} />
+            </div>
+          )}
           {isDesktopLayout ? (
             <div className="mt-4">
               <GeographyDetail
@@ -157,7 +170,12 @@ export function ExploreClient() {
 
         <div className="order-2">
           {view === "map" ? (
-            <ExploreMap scenarioId={scenarioId} selected={selected} onSelect={handleGeographySelect} />
+            <ExploreMap
+              scenarioId={scenarioId}
+              selected={selected}
+              onSelect={handleGeographySelect}
+              onHoverChange={setHoveredTract}
+            />
           ) : (
             <ExploreTable
               scenarioId={scenarioId}
@@ -185,6 +203,56 @@ export function ExploreClient() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/** The no-selection hover surface: hovering a tract on the map updates
+ * this sidebar panel instead of a floating card over the map itself, so
+ * the map stays completely unobscured while nothing is selected
+ * (docs/design/final-score-map-and-intuitiveness-review.md's hover
+ * interaction model -- chosen over a full floating inspector after
+ * comparing both against a hybrid used once something *is* selected,
+ * see TinyHoverCallout in explore-map.tsx). Contains only what's needed
+ * for a first glance: name, the canonical score, concern band, top two
+ * domains, a confidence flag when coverage is thin, and a prompt toward
+ * the full profile -- never the complete driver analysis, which stays
+ * one click away. */
+function QuickPreview({ properties }: { properties: TractBoundaryFeatureProperties | null }) {
+  if (!properties) {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+        Quick preview -- point at a shaded tract on the map to see its screening score here.
+      </div>
+    );
+  }
+
+  const topDomains = MAP_LAYERS.filter((l) => l.id !== "score" && l.id !== "confidence")
+    .map((l) => ({ label: l.label, value: l.getValue(properties) }))
+    .filter((d): d is { label: string; value: number } => d.value !== null)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 2);
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">Quick preview</p>
+      <p className="mt-1 truncate text-sm font-semibold text-[var(--color-text-primary)]">{properties.name}</p>
+      {properties.score !== null ? (
+        <>
+          <ScreeningScore score={properties.score} mode="compact" className="mt-1" />
+          {topDomains.length > 0 && (
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              Top factors: {topDomains.map((d) => d.label.toLowerCase()).join(", ")}
+            </p>
+          )}
+          {properties.coverage_fraction !== null && properties.coverage_fraction < 0.7 && (
+            <p className="mt-1 text-xs text-[var(--color-caution-strong)]">Limited data for this tract</p>
+          )}
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">No score for this scenario</p>
+      )}
+      <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">Select the tract for its full profile.</p>
     </div>
   );
 }

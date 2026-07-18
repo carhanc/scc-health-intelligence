@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { useQuery } from "@tanstack/react-query";
-import { LoadingRegion, SkeletonText, ErrorState, CONCERN_SCALE, CONCERN_NO_DATA_COLOR } from "@scc-health/ui";
+import { LoadingRegion, SkeletonText, ErrorState, CONCERN_SCALE, CONCERN_NO_DATA_COLOR, ScreeningScore } from "@scc-health/ui";
 import { api, ApiError, type TractBoundaryFeatureProperties } from "@/lib/api";
 import { isValidGeographyId, type SelectedGeography } from "./selection";
 import { MAP_LAYERS, getMapLayer, concernBandLabel, type MapLayerId } from "./layers";
@@ -16,6 +16,30 @@ const NO_DATA_HATCH_LAYER = "tract-no-data-hatch";
 const NO_DATA_HATCH_IMAGE = "no-data-hatch";
 const PLACE_OUTLINE_SOURCE = "selected-place-boundary";
 const PLACE_OUTLINE_LAYER = "selected-place-outline";
+
+/** OpenFreeMap's free, keyless, OSM-derived "positron" style -- a muted
+ * light basemap (roads, water, county/city context, and place labels)
+ * chosen specifically because its low-saturation palette keeps the
+ * concern-gradient choropleth legible on top of it (docs/design/
+ * final-score-map-and-intuitiveness-review.md §2). No API key or paid
+ * tier required (CLAUDE.md: "core functionality must work without paid
+ * API keys"); self-hostable if this ever needs to move in-house. Data is
+ * © OpenStreetMap contributors, tiles © OpenFreeMap / OpenMapTiles --
+ * attributed via the map's own AttributionControl below, not omitted. */
+const BASEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+
+/** The basemap's own first symbol (text/label) layer. Every tract-fill,
+ * hatch, outline, and selection layer is inserted with `beforeId` set to
+ * this id so city/road/water labels always render above the choropleth
+ * instead of being covered by it -- verified against the fetched style
+ * (55 layers; `waterway_line_label` is the first of five `place`-source
+ * symbol layers including `label_city`/`label_town`, min-zoom 3-9, so
+ * major cities are already labeled at county zoom without needing a
+ * separate custom label layer). If OpenFreeMap ever changes this layer
+ * id, `addLayer(..., beforeId)` silently falls back to "on top of
+ * everything" (MapLibre's documented behavior for an unknown beforeId
+ * is to throw, so this is guarded at the call site instead). */
+const BASEMAP_FIRST_LABEL_LAYER = "waterway_line_label";
 
 /** A diagonal-hatch tile so "no score for this scenario" reads as
  * structurally distinct from the concern gradient, not just one shade
@@ -98,10 +122,17 @@ export function ExploreMap({
   scenarioId,
   selected,
   onSelect,
+  onHoverChange,
 }: {
   scenarioId: string;
   selected: SelectedGeography | null;
   onSelect: (selection: SelectedGeography) => void;
+  /** Lifts hover state to the parent so the no-selection sidebar can
+   * render a "Quick preview" there instead of a floating map card
+   * (docs/design/final-score-map-and-intuitiveness-review.md's hover
+   * interaction model -- the map itself stays completely unobscured
+   * while nothing is selected). */
+  onHoverChange?: (properties: TractBoundaryFeatureProperties | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -119,6 +150,8 @@ export function ExploreMap({
   const [clickError, setClickError] = useState<string | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onHoverChangeRef = useRef(onHoverChange);
+  onHoverChangeRef.current = onHoverChange;
   const layerDef = getMapLayer(activeLayer);
 
   const boundariesQuery = useQuery({
@@ -173,19 +206,33 @@ export function ExploreMap({
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: {
-        version: 8,
-        sources: {},
-        layers: [
-          { id: "bg", type: "background", paint: { "background-color": "#eceae5" } },
-        ],
-      },
+      style: BASEMAP_STYLE_URL,
       center: [-121.85, 37.25],
       zoom: 9,
       attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("load", () => setMapReady(true));
+    // Real map data requires real attribution. OpenFreeMap's vector tile
+    // source already reports its own "OpenFreeMap © OpenMapTiles Data
+    // from OpenStreetMap" credit via the tile source's own metadata, so a
+    // plain AttributionControl (compact, so it collapses to an "i" icon
+    // rather than competing with the map controls) picks that up
+    // automatically -- adding a second, hand-written credit string here
+    // duplicated it verbatim instead of supplementing it.
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    // `load` alone proved unreliable under React Strict Mode's dev-only
+    // double mount/cleanup/mount cycle once the style became a remote
+    // URL (fetching a style over the network, then getting torn down
+    // mid-fetch by Strict Mode's throwaway first pass, appears to leave
+    // that map instance's `load` promise chain from ever resolving even
+    // though the second, real instance still renders tiles correctly) --
+    // `idle` (fires whenever the map has no pending style/tile work left)
+    // and a synchronous `isStyleLoaded()` check both back it up so
+    // readiness is detected via whichever signal actually fires first.
+    const markReady = () => setMapReady(true);
+    map.once("load", markReady);
+    map.once("idle", markReady);
+    if (map.isStyleLoaded()) markReady();
     mapRef.current = map;
     return () => {
       map.remove();
@@ -208,31 +255,53 @@ export function ExploreMap({
     } else {
       map.addSource("tracts", { type: "geojson", data: geojson as GeoJSON.FeatureCollection });
 
-      map.addLayer({
-        id: FILL_LAYER,
-        type: "fill",
-        source: "tracts",
-        paint: {
-          "fill-color": buildFillColorExpression("score"),
-          "fill-opacity": 0.85,
+      // Every tract layer is inserted *below* the basemap's own first
+      // label layer, so city/road/water names always render on top of
+      // the choropleth instead of being covered by it (the reported "just
+      // colored polygons, not a real map" problem). Falls back to "on
+      // top" only if the basemap's layer id is ever missing (defensive;
+      // MapLibre throws on an unknown beforeId rather than ignoring it).
+      const beforeId = map.getLayer(BASEMAP_FIRST_LABEL_LAYER) ? BASEMAP_FIRST_LABEL_LAYER : undefined;
+
+      map.addLayer(
+        {
+          id: FILL_LAYER,
+          type: "fill",
+          source: "tracts",
+          paint: {
+            "fill-color": buildFillColorExpression("score"),
+            "fill-opacity": 0.75,
+          },
         },
-      });
+        beforeId,
+      );
       if (!map.hasImage(NO_DATA_HATCH_IMAGE)) {
         map.addImage(NO_DATA_HATCH_IMAGE, createNoDataHatchPattern());
       }
-      map.addLayer({
-        id: NO_DATA_HATCH_LAYER,
-        type: "fill",
-        source: "tracts",
-        filter: buildNullFilterExpression("score"),
-        paint: { "fill-pattern": NO_DATA_HATCH_IMAGE, "fill-opacity": 0.9 },
-      });
-      map.addLayer({
-        id: LINE_LAYER,
-        type: "line",
-        source: "tracts",
-        paint: { "line-color": "#ffffff", "line-width": 0.5 },
-      });
+      map.addLayer(
+        {
+          id: NO_DATA_HATCH_LAYER,
+          type: "fill",
+          source: "tracts",
+          filter: buildNullFilterExpression("score"),
+          paint: { "fill-pattern": NO_DATA_HATCH_IMAGE, "fill-opacity": 0.85 },
+        },
+        beforeId,
+      );
+      map.addLayer(
+        {
+          id: LINE_LAYER,
+          type: "line",
+          source: "tracts",
+          paint: { "line-color": "#ffffff", "line-width": 0.5 },
+        },
+        beforeId,
+      );
+      // The selected-tract outline is deliberately appended last (no
+      // beforeId) -- it must stay visually distinct even where a city or
+      // road label sits over the same tract, per this pass's map
+      // acceptance criteria ("selected boundaries remain visible around
+      // labels").
       map.addLayer({
         id: SELECTED_LAYER,
         type: "line",
@@ -245,7 +314,9 @@ export function ExploreMap({
         map.getCanvas().style.cursor = "pointer";
         const feature = e.features?.[0];
         if (feature) {
-          setHoverInfo(feature.properties as unknown as TractBoundaryFeatureProperties);
+          const properties = feature.properties as unknown as TractBoundaryFeatureProperties;
+          setHoverInfo(properties);
+          onHoverChangeRef.current?.(properties);
           const rect = map.getContainer().getBoundingClientRect();
           const xFrac = (e.point.x) / rect.width;
           const yFrac = (e.point.y) / rect.height;
@@ -256,6 +327,7 @@ export function ExploreMap({
       map.on("mouseleave", FILL_LAYER, () => {
         map.getCanvas().style.cursor = "";
         setHoverInfo(null);
+        onHoverChangeRef.current?.(null);
       });
       map.on("click", FILL_LAYER, (e) => {
         const feature = e.features?.[0];
@@ -447,10 +519,24 @@ export function ExploreMap({
           Reset view
         </button>
 
-        {hoverInfo && (
-          <MapHoverCard properties={hoverInfo} layerDef={layerDef} quadrant={hoverQuadrant} />
+        {/* Two different hover treatments depending on selection state
+            (docs/design/final-score-map-and-intuitiveness-review.md's
+            hover/selection interaction model, chosen after evaluating a
+            sidebar-docked preview, a full collision-aware floating
+            inspector, and this hybrid against each other):
+            - No selection: the map stays *completely* unobscured -- no
+              floating card at all. Hover data is instead lifted to the
+              sidebar's "Quick preview" via onHoverChange, which is the
+              primary comprehension surface in this state.
+            - A tract is selected: hovering a *different* tract must not
+              erase the selected profile sitting in the sidebar, so a
+              small, non-interactive, name-plus-concern-band-only callout
+              (deliberately smaller than the old always-on hover card)
+              previews the hovered tract right on the map instead. */}
+        {selected?.geographyType === "tract" && hoverInfo && hoverInfo.tract_geoid_2020 !== selected.geoid && (
+          <TinyHoverCallout properties={hoverInfo} layerDef={layerDef} quadrant={hoverQuadrant} />
         )}
-        {selected?.geographyType === "tract" && !hoverInfo && (
+        {selected?.geographyType === "tract" && (!hoverInfo || hoverInfo.tract_geoid_2020 === selected.geoid) && (
           <SelectedMapCallout
             geoid={selected.geoid}
             displayName={selected.displayName}
@@ -483,17 +569,18 @@ const QUADRANT_POSITION: Record<"tl" | "tr" | "bl" | "br", string> = {
   br: "right-3 bottom-3",
 };
 
-/** A compact, collision-aware hover inspector (docs/design/
- * health-equity-product-consolidation.md's hover-redesign requirement):
- * renders in whichever map corner is diagonally opposite the cursor
- * (`quadrant`, computed from the raw mousemove event in the parent), so
- * it never sits on top of the polygon actually being inspected. Never
- * the complete driver analysis -- name, concern label, comparison, top
- * two domain signals, a confidence flag when coverage is thin, and a
- * prompt toward the full profile. `aria-hidden` + `pointer-events-none`
- * since it's decorative and duplicates data already reachable via the
+/** A genuinely tiny, non-interactive callout previewing a *hovered*
+ * tract while a *different* tract is selected (docs/design/final-score-
+ * map-and-intuitiveness-review.md's hover/selection interaction model).
+ * Deliberately much smaller than the old always-on hover card it
+ * replaces -- with a profile already open in the sidebar, this only
+ * needs to answer "what's this other tract roughly like," not repeat
+ * the sidebar's job. Renders in whichever map corner is diagonally
+ * opposite the cursor (`quadrant`) so it never sits on top of the
+ * polygon being inspected. `aria-hidden` + `pointer-events-none` since
+ * it's decorative and duplicates data already reachable via the
  * accessible table. */
-function MapHoverCard({
+function TinyHoverCallout({
   properties,
   layerDef,
   quadrant,
@@ -503,47 +590,27 @@ function MapHoverCard({
   quadrant: "tl" | "tr" | "bl" | "br";
 }) {
   const value = layerDef.getValue(properties);
-  const topDomains = MAP_LAYERS.filter((l) => l.id !== "score" && l.id !== "confidence")
-    .map((l) => ({ label: l.label, value: l.getValue(properties) }))
-    .filter((d): d is { label: string; value: number } => d.value !== null)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 2);
-
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none absolute z-10 w-[240px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)] ${QUADRANT_POSITION[quadrant]}`}
+      className={`pointer-events-none absolute z-10 max-w-[180px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs shadow-[var(--shadow-md)] ${QUADRANT_POSITION[quadrant]}`}
     >
       <p className="truncate font-semibold text-[var(--color-text-primary)]">{properties.name}</p>
+      {/* The score layer shows the actual 0-100 value (safe -- it's the
+          same `properties.score` the sidebar's `explanation.score` reads,
+          not a second computation of it). No *percentile* or *rank*
+          number appears here on any layer -- see docs/methods/screening-
+          score-interpretation.md §9 for why only one canonical percentile
+          source exists, and it's not this one. */}
       {value !== null ? (
-        <>
-          {/* Deliberately no percentile number here -- the map's
-              countywide rank is computed client-side from raw layer
-              values (deterministic), while the selected-profile panel's
-              percentile comes from the Monte Carlo median rank
-              (uncertainty-aware). Both are legitimate but answer
-              slightly different questions, and a cold usability review
-              independently caught the resulting "82% vs 83%" mismatch
-              as a real trust-breaking inconsistency when both were
-              shown for the same tract at once. The concern band alone
-              is accurate under either method; the full profile is one
-              click away for the exact number. */}
-          <p className="text-[var(--color-text-secondary)]">
-            {concernBandLabel(value, layerDef.label.toLowerCase())}
-          </p>
-          {topDomains.length > 0 && (
-            <p className="mt-0.5 text-[var(--color-text-tertiary)]">
-              Top: {topDomains.map((d) => d.label).join(", ")}
-            </p>
-          )}
-          {properties.coverage_fraction !== null && properties.coverage_fraction < 0.7 && (
-            <p className="mt-0.5 text-[var(--color-caution-strong)]">Limited data for this tract</p>
-          )}
-        </>
+        layerDef.id === "score" ? (
+          <ScreeningScore score={value} mode="compact" />
+        ) : (
+          <p className="text-[var(--color-text-secondary)]">{concernBandLabel(value, layerDef.label.toLowerCase())}</p>
+        )
       ) : (
         <p className="text-[var(--color-text-secondary)]">No score for this scenario</p>
       )}
-      <p className="mt-1 text-[var(--color-text-tertiary)]">Select for full profile</p>
     </div>
   );
 }
@@ -553,12 +620,19 @@ function MapHoverCard({
  * score map bubble: a quick "what am I looking at" anchor while the
  * user is panning/zooming, without duplicating the sidebar's full
  * profile. Hidden while a hover card is showing (both anchor to map
- * corners; only one needs to be visible at a time). Shows the concern
- * band only, deliberately no percentile number -- see the matching
- * comment in `MapHoverCard` on why showing this tract's map-computed
- * percentile next to the sidebar's Monte-Carlo-based one produced two
- * different numbers for "the same fact," caught independently by two
- * cold usability reviews as a real trust problem. */
+ * corners; only one needs to be visible at a time).
+ *
+ * Shows the canonical 0-100 score itself only when the active map layer
+ * *is* the composite score -- that value comes from the same
+ * `properties.score` field the sidebar's `explanation.score` reads (both
+ * trace back to the same `analytics.scenario_scores.score` row for this
+ * tract/scenario, docs/methods/screening-score-interpretation.md), so
+ * there is no risk of it disagreeing with the sidebar the way the
+ * deterministic map-rank percentile did (that number was removed
+ * entirely, not just hidden here -- see MapHoverCard's comment). For any
+ * other layer (a single domain, or confidence) this shows only the
+ * concern band, since a domain percentile is a different statistic from
+ * the screening score and must never be labeled as if it were one. */
 function SelectedMapCallout({
   geoid,
   displayName,
@@ -573,11 +647,13 @@ function SelectedMapCallout({
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[220px] rounded-[var(--radius-md)] border border-[var(--color-interactive)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)]">
       <p className="truncate font-semibold text-[var(--color-text-primary)]">{displayName || `Tract ${geoid}`}</p>
-      <p className="text-[var(--color-text-secondary)]">
-        {concernValue !== null
-          ? capitalize(concernBandLabel(concernValue, layerDef.label.toLowerCase()))
-          : "Selected"}
-      </p>
+      {layerDef.id === "score" ? (
+        <ScreeningScore score={concernValue} mode="compact" />
+      ) : (
+        <p className="text-[var(--color-text-secondary)]">
+          {concernValue !== null ? capitalize(concernBandLabel(concernValue, layerDef.label.toLowerCase())) : "Selected"}
+        </p>
+      )}
     </div>
   );
 }
