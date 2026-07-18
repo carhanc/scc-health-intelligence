@@ -212,9 +212,9 @@ export function AdvocateClient() {
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Advocate</h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          Prepare for a public meeting: find the strongest evidence for a place or issue, generate
-          questions and a brief, and export a complete, cited packet -- all saved locally in your
-          browser, never on a server.
+          Turn health-equity evidence into action: find the strongest evidence for a place or issue,
+          generate questions and a brief, and export a complete, cited packet -- all saved locally in
+          your browser, never on a server.
         </p>
       </div>
 

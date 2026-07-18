@@ -54,8 +54,10 @@ export function AccessLabClient() {
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Access Lab</h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          See how far a neighborhood is from care, by real walking and driving routes and by scheduled transit, and
-          where a mobile clinic might help the most people. Distances and travel times are{" "}
+          Understand access to care and essential resources -- access barriers are one part of the
+          health-equity profile, not the whole picture. See how far a neighborhood is from care, by real
+          walking and driving routes and by scheduled transit, and where a mobile clinic might help the most
+          people. Distances and travel times are{" "}
           <GlossaryTerm definition={GLOSSARY.modeledEstimate}>
             <strong className="font-semibold text-[var(--color-text-primary)]">modeled estimates</strong>
           </GlossaryTerm>

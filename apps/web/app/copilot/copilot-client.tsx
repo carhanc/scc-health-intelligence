@@ -63,9 +63,9 @@ export function CopilotClient() {
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Copilot</h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          Ask a question in plain language and get a grounded, cited answer. Every number comes
-          from this platform&apos;s own analytics -- the assistant only drafts prose from evidence
-          it was actually given, never invents a statistic or a source.
+          Understand and communicate the evidence: ask a question in plain language and get a grounded,
+          cited answer. Every number comes from this platform&apos;s own analytics -- the assistant only
+          drafts prose from evidence it was actually given, never invents a statistic or a source.
         </p>
         {statusQuery.data && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-secondary)]">

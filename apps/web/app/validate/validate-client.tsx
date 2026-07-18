@@ -42,10 +42,10 @@ export function ValidateClient() {
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Validate</h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          How trustworthy is this platform&apos;s data and methods? This page is for anyone checking this
-          platform&apos;s work -- what data goes in, how a score is built, how uncertain it is, whether it
-          holds up against independent checks, and what it still cannot tell you. Plain-language summaries
-          come first; the exact numbers behind them are always one click away.
+          Trust, methods, and data quality -- can you trust what you&apos;re seeing, and what are its
+          limits? What data goes in, how a score is built, how uncertain it is, whether it holds up
+          against independent checks, and what it still cannot tell you. Plain-language summaries come
+          first; the exact numbers behind them are always one click away.
         </p>
       </div>
 

@@ -69,18 +69,19 @@ export function PrioritizeClient() {
   return (
     <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Prioritize</h1>
+        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">
+          Identify health-equity priorities
+        </h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          Choose a priority lens or set your own weighting to see which communities the data suggests
-          looking at first, how confident that ranking is, and what changes under a different lens.
-          Every score here is a{" "}
-          <strong className="font-semibold text-[var(--color-text-primary)]">screening tool</strong>, not a
-          prediction or a guarantee that any specific intervention would help.
+          A ranked screening tool, not a prediction or a guarantee that any specific intervention would help.
         </p>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <div className="order-2 space-y-5 lg:order-1">
+          <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            Adjust what the screening emphasizes
+          </h2>
           <ScenarioSelector
             selectedScenarioId={scenarioId}
             onSelect={(id) => updateParams({ scenario: id === "default_integrated_screen_v1" ? null : id, weights: null })}

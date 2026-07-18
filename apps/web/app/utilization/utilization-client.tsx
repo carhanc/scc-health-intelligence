@@ -37,8 +37,8 @@ export function UtilizationClient() {
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Utilization</h1>
         <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          How Santa Clara County residents actually use emergency-department care -- by facility, by
-          place, and over time. Figures here are{" "}
+          See how health services are being used -- how Santa Clara County residents actually use
+          emergency-department care, by facility, by place, and over time. Figures here are{" "}
           <strong className="font-semibold text-[var(--color-text-primary)]">observed</strong> counts at
           their real published geography (county, facility, or patient ZIP code) unless a table is
           explicitly labeled <strong className="font-semibold text-[var(--color-text-primary)]">modeled</strong> --
