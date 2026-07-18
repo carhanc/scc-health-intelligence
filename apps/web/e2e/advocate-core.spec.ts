@@ -1,174 +1,208 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
-test.describe("Advocate -- core workspace workflow", () => {
-  test("starting from Sunnyvale surfaces real, cited evidence", async ({ page }) => {
-    await page.goto("/advocate");
-    await expect(page.getByRole("heading", { name: "Advocate", level: 1 })).toBeVisible();
+/** Starts a brand-new project from the landing state and picks a place,
+ * landing on the Evidence stage with real evidence loaded -- the entry
+ * flow every core-workflow test below builds on. */
+async function startProjectFromPlace(page: Page, placeQuery: string) {
+  await page.goto("/advocate");
+  await expect(page.getByRole("heading", { name: "Start an advocacy project" })).toBeVisible();
+  await page.getByLabel("Find a place").fill(placeQuery);
+  await page.getByRole("button", { name: "Search" }).click();
+  const result = page.getByRole("button", { name: new RegExp(placeQuery, "i") }).first();
+  await expect(result).toBeVisible({ timeout: 10_000 });
+  await result.click();
+  await expect(page.getByRole("button", { name: /^Evidence,/ })).toBeVisible({ timeout: 5_000 });
+  await page.getByRole("button", { name: /^Evidence,/ }).click();
+  await expect(page.getByText(/facts? found for/)).toBeVisible({ timeout: 15_000 });
+}
 
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    const result = page.getByRole("button", { name: /Sunnyvale/ }).first();
-    await expect(result).toBeVisible({ timeout: 10_000 });
-    await result.click();
+/** Selecting an evidence card relocates its checkbox into a different
+ * list ("Evidence you're using"), which unmounts the original DOM node --
+ * a plain `.first().check()` re-resolves against a shifting target and
+ * spins through the whole list. Reading the label once (a query, not an
+ * action) and clicking a name-anchored locator exactly once avoids that
+ * retry loop. Returns the plain-language evidence label that was
+ * selected, so callers can assert on it later if needed. */
+async function selectNthAvailableEvidenceItem(page: Page, index: number): Promise<string> {
+  const includeCheckboxes = page.locator('input[type="checkbox"][aria-label^="Include"]');
+  const fullLabel = await includeCheckboxes.nth(index).getAttribute("aria-label");
+  if (!fullLabel) throw new Error(`No unselected evidence checkbox at index ${index}`);
+  await page.getByRole("checkbox", { name: fullLabel, exact: true }).click();
+  // fullLabel is "Include <item label> in this project" -- return just
+  // the item label for readable assertions.
+  return fullLabel.replace(/^Include /, "").replace(/ in this project$/, "");
+}
 
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-    // Every evidence card must show a real publisher, not a placeholder.
+async function selectFirstAvailableEvidenceItem(page: Page): Promise<string> {
+  return selectNthAvailableEvidenceItem(page, 0);
+}
+
+test.describe("Advocate -- core project workflow", () => {
+  test("starting from Sunnyvale surfaces real, cited evidence in plain language", async ({ page }) => {
+    await startProjectFromPlace(page, "Sunnyvale");
+    await expect(page.getByRole("heading", { name: "Evidence for this project" })).toBeVisible();
+    // A real publisher and a plain-language "Calculated estimate" /
+    // "Modeled estimate" status badge must appear -- never a raw
+    // internal data_status word like "derived" or "modeled" shown bare.
     await expect(page.getByText(/Centers for Disease Control/).first()).toBeVisible();
+    await expect(page.getByText(/Calculated estimate|Modeled estimate|Reported measurement/).first()).toBeVisible();
   });
 
-  test("selecting and removing evidence updates the count", async ({ page }) => {
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Gilroy");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Gilroy/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-
-    const checkboxes = page.locator('input[type="checkbox"][aria-label^="Include"]');
-    await checkboxes.first().check();
-    await expect(page.getByText("1 selected.")).toBeVisible();
-    await checkboxes.first().uncheck();
-    await expect(page.getByText("0 selected.")).toBeVisible();
-  });
-
-  test("reordering selected evidence with the up/down controls changes export order", async ({
+  test("selecting and removing evidence updates the plain-language count and moves the card between sections", async ({
     page,
   }) => {
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Gilroy");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Gilroy/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+    await startProjectFromPlace(page, "Gilroy");
 
-    const checkboxes = page.locator('input[type="checkbox"][aria-label^="Include"]');
-    await checkboxes.nth(0).check();
-    await checkboxes.nth(1).check();
+    const label = await selectFirstAvailableEvidenceItem(page);
+    await expect(page.getByRole("heading", { name: "Evidence you're using" })).toBeVisible();
+    await expect(page.getByText("1 fact selected").first()).toBeVisible();
 
-    const selectedHeading = page.getByText("Selected, in export order");
+    await page.getByRole("checkbox", { name: `Remove ${label} from this project`, exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Evidence you're using" })).not.toBeVisible();
+  });
+
+  test("reordering selected evidence with the up/down controls changes its order", async ({ page }) => {
+    await startProjectFromPlace(page, "Gilroy");
+
+    await selectNthAvailableEvidenceItem(page, 0);
+    await selectNthAvailableEvidenceItem(page, 0); // the list shifts after each selection
+
+    const selectedHeading = page.getByRole("heading", { name: "Evidence you're using" });
     await expect(selectedHeading).toBeVisible();
-    const firstLabelBefore = await page
-      .locator("text=Selected, in export order")
-      .locator("xpath=following::ul[1]//li[1]")
-      .innerText();
+    const firstLabelBefore = await selectedHeading.locator("xpath=following::ul[1]//li[1]").innerText();
 
     await page.getByRole("button", { name: /Move .* later/ }).first().click();
-    await page.waitForTimeout(300);
 
-    const firstLabelAfter = await page
-      .locator("text=Selected, in export order")
-      .locator("xpath=following::ul[1]//li[1]")
-      .innerText();
+    const firstLabelAfter = await selectedHeading.locator("xpath=following::ul[1]//li[1]").innerText();
     expect(firstLabelAfter).not.toBe(firstLabelBefore);
   });
 
-  test("generating a one-page brief produces cited, non-causal content", async ({ page }) => {
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+  test("creating a one-page brief produces cited, non-causal content with no raw internal identifiers", async ({
+    page,
+  }) => {
+    await startProjectFromPlace(page, "Sunnyvale");
+    await selectFirstAvailableEvidenceItem(page);
 
-    const checkboxes = page.locator('input[type="checkbox"][aria-label^="Include"]');
-    await checkboxes.first().check();
-    await page.getByRole("button", { name: "Generate" }).click();
+    await page.getByRole("button", { name: /^Draft,/ }).click();
+    await expect(page.getByRole("heading", { name: "What do you want to create?" })).toBeVisible();
+    await page.getByRole("button", { name: "Create draft" }).click();
 
     await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("What does the evidence not prove?")).toBeVisible();
-    await expect(page.getByText(/screening tool|not a prediction|guarantee/i).first()).toBeVisible();
-    await expect(page.getByText(/Configuration hash:/)).toBeVisible();
+    await expect(
+      page.getByText("This draft organizes screening evidence. It does not prove causation or make a final policy determination."),
+    ).toBeVisible();
+    // The old internal "Configuration hash: <hex>" footer must never
+    // appear in the normal interface (docs/design/advocate-intuitive-
+    // workspace-research.md -- no raw internal identifiers in the UI).
+    await expect(page.getByText(/Configuration hash:/)).not.toBeVisible();
   });
 
   test("deterministic meeting questions are generated from real evidence", async ({ page }) => {
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-
-    await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
-    await page.getByRole("button", { name: "Generate" }).click();
+    await startProjectFromPlace(page, "Sunnyvale");
+    await selectFirstAvailableEvidenceItem(page);
+    await page.getByRole("button", { name: /^Draft,/ }).click();
+    await page.getByRole("button", { name: "Create draft" }).click();
     await expect(page.getByText("Questions for decision-makers")).toBeVisible({ timeout: 15_000 });
   });
 
-  test("exporting and reopening a workspace preserves its state", async ({ page }) => {
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+  test("every generated factual claim traces to a real, cited source -- never a bare uncited statement", async ({
+    page,
+  }) => {
+    await startProjectFromPlace(page, "Sunnyvale");
+    await selectNthAvailableEvidenceItem(page, 0);
+    await selectNthAvailableEvidenceItem(page, 0);
+    await page.getByRole("button", { name: /^Draft,/ }).click();
+    await page.getByRole("button", { name: "Create draft" }).click();
 
+    await expect(page.getByText(/facts? · \d+ sources? · all selected claims have citations/)).toBeVisible({
+      timeout: 15_000,
+    });
+    const sourcesText = await page.locator("#advocate-output-print-area").innerText();
+    expect(sourcesText).toContain("Centers for Disease Control");
+    expect(sourcesText).toMatch(/retrieved|release/);
+  });
+
+  test("downloading a project backup and restoring it preserves the project's state", async ({ page }) => {
+    await startProjectFromPlace(page, "Sunnyvale");
+    await selectFirstAvailableEvidenceItem(page);
+
+    await page.getByText("Project options").click();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export JSON" }).click();
+    await page.getByRole("button", { name: "Download project backup" }).click();
     const download = await downloadPromise;
-    const path = await download.path();
-    expect(path).toBeTruthy();
+    const filePath = await download.path();
+    expect(filePath).toBeTruthy();
 
-    // Start a brand-new workspace, then import the exported one back in.
-    await page.getByRole("button", { name: "New" }).click();
-    await expect(page.getByText("Choose a place above to see matched evidence.")).toBeVisible();
+    await page.getByRole("button", { name: "+ Start a new project" }).click();
+    await expect(page.getByRole("heading", { name: "Start an advocacy project" })).toBeVisible();
 
     const fileChooserPromise = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Import JSON" }).click();
+    await page.getByText("Project options").click();
+    await page.getByRole("button", { name: "Restore a project backup" }).click();
     const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles(path!);
-    await page.waitForTimeout(1000);
+    await fileChooser.setFiles(filePath!);
 
-    const bodyText = await page.locator("body").innerText();
-    expect(bodyText).toContain("Sunnyvale");
+    // Two projects now exist (the empty landing one plus the restored
+    // Sunnyvale one), so the project switcher renders as a labeled
+    // <select> ("Switch project") rather than a plain title -- and the
+    // summary panel's own heading is collapsed behind an explicit toggle
+    // on narrow viewports, so check the select's selected option
+    // directly instead of relying on a heading that isn't always shown.
+    await expect(page.locator("#project-switcher option:checked")).toHaveText(/Sunnyvale/, {
+      timeout: 10_000,
+    });
+    await expect(page.getByText("1 fact selected").first()).toBeVisible();
   });
 
-  test("reloading the browser retains the active workspace's local work", async ({ page }) => {
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Gilroy");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Gilroy/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-    await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
-    await page.waitForTimeout(1200); // allow the 500ms autosave debounce to fire
-
-    await page.reload({ waitUntil: "networkidle" });
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("1 selected.")).toBeVisible();
-  });
-
-  test("every generated factual claim traces to a real evidence item with a citation", async ({
+  test("restoring a file that isn't a valid backup shows a plain-language error, not a stack trace", async ({
     page,
   }) => {
     await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+    await page.getByText("Project options").click();
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Restore a project backup" }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
+      name: "not-a-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from("{ this is not valid JSON"),
+    });
 
-    const checkboxes = page.locator('input[type="checkbox"][aria-label^="Include"]');
-    await checkboxes.nth(0).check();
-    await checkboxes.nth(1).check();
-    await page.getByRole("button", { name: "Generate" }).click();
-    await expect(page.getByText("Sources and limitations")).toBeVisible({ timeout: 15_000 });
-
-    // Every evidence-derived claim in "Sources and limitations" cites a
-    // real publisher and vintage -- never a bare, uncited statement.
-    const sourcesText = await page
-      .locator("text=Sources and limitations")
-      .locator("xpath=following-sibling::p[1]")
-      .innerText();
-    expect(sourcesText).toContain("Centers for Disease Control");
-    expect(sourcesText).toMatch(/retrieved/);
+    await expect(
+      page.getByText("This file isn't a valid Advocate project backup. It couldn't be read as a backup file at all. Nothing was changed."),
+    ).toBeVisible({ timeout: 5_000 });
   });
 
-  test("no console errors across the full geography-to-brief workflow", async ({ page }) => {
+  test("reloading the browser resumes at the furthest stage already reached, not the empty entry form", async ({
+    page,
+  }) => {
+    await startProjectFromPlace(page, "Gilroy");
+    await selectFirstAvailableEvidenceItem(page);
+    await page.waitForTimeout(1200); // allow the 500ms autosave debounce to fire
+
+    await page.reload({ waitUntil: "networkidle" });
+    // A project that already has a place and evidence must resume on the
+    // Draft stage, not silently reset to the empty search form -- a real
+    // bug found and fixed during this pass (advocate-client.tsx
+    // resumeStageFor).
+    await expect(page.getByRole("heading", { name: "What do you want to create?" })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText("1 fact selected").first()).toBeVisible();
+  });
+
+  test("no console errors across the full place-to-draft workflow", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (err) => errors.push(err.message));
     page.on("console", (msg) => {
       if (msg.type() === "error") errors.push(msg.text());
     });
 
-    await page.goto("/advocate");
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-    await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
-    await page.getByRole("button", { name: "Generate" }).click();
+    await startProjectFromPlace(page, "Sunnyvale");
+    await selectFirstAvailableEvidenceItem(page);
+    await page.getByRole("button", { name: /^Draft,/ }).click();
+    await page.getByRole("button", { name: "Create draft" }).click();
     await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
 
     expect(errors).toEqual([]);

@@ -52,6 +52,23 @@ def test_generate_sections_includes_all_required_sections() -> None:
     assert required.issubset(sections.keys())
 
 
+def test_generate_sections_formats_a_full_iso_timestamp_retrieved_at_as_a_plain_date() -> None:
+    # Found via live usability review of the Advocate redesign pass: some
+    # evidence items' retrieved_at comes straight from a data manifest as
+    # a full ISO 8601 timestamp with microseconds and a timezone offset,
+    # which read as a raw, machine-generated string once it landed in
+    # generated document text -- other retrieved_at values are already
+    # short human-written strings and must pass through unchanged.
+    item = _metric_evidence(retrieved_at="2026-07-15T03:38:38.049106+00:00")
+    sections = generate_sections("Sunnyvale city", None, [item], "")
+    assert "retrieved 2026-07-15)" in sections["sources_and_limitations"]
+    assert "03:38:38" not in sections["sources_and_limitations"]
+
+    passthrough_item = _metric_evidence(retrieved_at="computed at analytics build time")
+    passthrough_sections = generate_sections("Sunnyvale city", None, [passthrough_item], "")
+    assert "retrieved computed at analytics build time)" in passthrough_sections["sources_and_limitations"]
+
+
 def test_generate_sections_never_omits_evidence_from_the_supports_section() -> None:
     item = _metric_evidence()
     sections = generate_sections("Census Tract 5001", None, [item], "")
