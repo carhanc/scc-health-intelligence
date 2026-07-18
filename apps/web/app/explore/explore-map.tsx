@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingRegion, SkeletonText, ErrorState, CONCERN_SCALE, CONCERN_NO_DATA_COLOR } from "@scc-health/ui";
@@ -105,9 +105,17 @@ export function ExploreMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const fitBoundsRef = useRef<(() => void) | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [activeLayer, setActiveLayer] = useState<MapLayerId>("score");
   const [hoverInfo, setHoverInfo] = useState<TractBoundaryFeatureProperties | null>(null);
+  // Which screen quadrant the cursor is in when hovering -- the hover
+  // card renders in the *opposite* quadrant so it never sits on top of
+  // the polygon actually being inspected (docs/design/
+  // health-equity-product-consolidation.md's "collision-aware hover
+  // inspector" requirement). Recomputed only on mousemove over the fill
+  // layer, not on every animation frame.
+  const [hoverQuadrant, setHoverQuadrant] = useState<"tl" | "tr" | "bl" | "br">("br");
   const [clickError, setClickError] = useState<string | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -119,27 +127,6 @@ export function ExploreMap({
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
-
-  // Countywide rank/percentile for the hover card, computed once from the
-  // single already-fetched boundaries payload -- never a per-hover
-  // request. Recomputed only when the active layer or the data itself
-  // changes, not on every mouse move (docs/design/
-  // explore-health-equity-research.md §10 performance requirement).
-  const layerRanking = useMemo(() => {
-    const features = boundariesQuery.data?.features ?? [];
-    const ranked = features
-      .map((f) => ({ geoid: f.properties.tract_geoid_2020, value: layerDef.getValue(f.properties) }))
-      .filter((r): r is { geoid: string; value: number } => r.value !== null)
-      .sort((a, b) => (layerDef.direction === "higher-worse" ? b.value - a.value : a.value - b.value));
-    const rankMap = new Map<string, { rank: number; percentile: number }>();
-    ranked.forEach((r, i) => {
-      const rank = i + 1;
-      const percentile =
-        ranked.length > 1 ? Math.round(((ranked.length - rank) / (ranked.length - 1)) * 100) : 100;
-      rankMap.set(r.geoid, { rank, percentile });
-    });
-    return { rankMap, total: ranked.length };
-  }, [boundariesQuery.data, layerDef]);
 
   // A city, district, ZIP-code area, or county has no single point on the
   // map -- without this, a user who searches "Sunnyvale" gets a profile
@@ -259,6 +246,11 @@ export function ExploreMap({
         const feature = e.features?.[0];
         if (feature) {
           setHoverInfo(feature.properties as unknown as TractBoundaryFeatureProperties);
+          const rect = map.getContainer().getBoundingClientRect();
+          const xFrac = (e.point.x) / rect.width;
+          const yFrac = (e.point.y) / rect.height;
+          // Render in the quadrant diagonally opposite the cursor.
+          setHoverQuadrant(`${yFrac < 0.5 ? "b" : "t"}${xFrac < 0.5 ? "r" : "l"}` as "tl" | "tr" | "bl" | "br");
         }
       });
       map.on("mouseleave", FILL_LAYER, () => {
@@ -291,7 +283,13 @@ export function ExploreMap({
           const coords = flattenCoordinates(feature.geometry);
           for (const [lng, lat] of coords) bounds.extend([lng, lat]);
         }
-        if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 24, duration: 0 });
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { padding: 24, duration: 0 });
+          // Captured once, reused by the "Reset view" control -- refitting
+          // the same countywide bounds is a pure map-state reset, no new
+          // request (the geometry is already the loaded source's data).
+          fitBoundsRef.current = () => map.fitBounds(bounds, { padding: 24, duration: 300 });
+        }
       } catch {
         // geometry shape unexpected; keep default center/zoom
       }
@@ -389,42 +387,79 @@ export function ExploreMap({
     );
   }
 
+  const selectedFeature =
+    selected?.geographyType === "tract"
+      ? boundariesQuery.data?.features.find((f) => f.properties.tract_geoid_2020 === selected.geoid)
+      : undefined;
+  const selectedConcernValue = selectedFeature ? layerDef.getValue(selectedFeature.properties) : null;
+
   return (
     <div className="relative">
-      <label className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium text-[var(--color-text-primary)]">Map layer</span>
-        <select
-          value={activeLayer}
-          onChange={(e) => setActiveLayer(e.target.value as MapLayerId)}
-          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
-        >
-          {MAP_LAYERS.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.label}
-            </option>
-          ))}
-        </select>
-        <span className="text-xs text-[var(--color-text-secondary)]">{layerDef.description}</span>
-      </label>
-      {activeLayer !== "score" && (
-        <p className="mb-2 text-xs text-[var(--color-text-tertiary)]">
-          Viewing the {layerDef.label} layer. The accessible table view and the selected-place profile below always
-          show the full combined score alongside every domain, regardless of which map layer is active.
-        </p>
-      )}
-      {boundariesQuery.isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-surface)]">
-          <LoadingRegion label="Loading map data">
-            <SkeletonText lines={3} className="w-48" />
-          </LoadingRegion>
+      {/* The map itself is the primary surface (docs/design/
+          health-equity-product-consolidation.md §4) -- it fills the
+          available height rather than a small fixed box, while staying
+          bounded so a shorter laptop screen never has to scroll inside
+          the map to find its own legend/controls. */}
+      <div className="relative h-[calc(100vh-260px)] min-h-[480px] max-h-[820px] w-full">
+        {boundariesQuery.isLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-surface)]">
+            <LoadingRegion label="Loading map data">
+              <SkeletonText lines={3} className="w-48" />
+            </LoadingRegion>
+          </div>
+        )}
+        <div
+          ref={containerRef}
+          role="application"
+          aria-label={`Map of Santa Clara County census tracts, shaded by ${layerDef.label.toLowerCase()}. A fully accessible table with the same data is available in the table view.`}
+          className="h-full w-full rounded-[var(--radius-lg)] border border-[var(--color-border)]"
+        />
+
+        {/* Compact floating layer control -- a full-width label/select/
+            description row above the map (the prior layout) cost real
+            vertical space the map itself should have. */}
+        <div className="absolute left-3 top-3 z-10 max-w-[200px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 px-2.5 py-2 shadow-[var(--shadow-sm)] backdrop-blur-sm">
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="font-medium text-[var(--color-text-primary)]">Map view</span>
+            <select
+              value={activeLayer}
+              onChange={(e) => setActiveLayer(e.target.value as MapLayerId)}
+              className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
+            >
+              {MAP_LAYERS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-1 text-[11px] leading-snug text-[var(--color-text-secondary)]">{layerDef.description}</p>
         </div>
-      )}
-      <div
-        ref={containerRef}
-        role="application"
-        aria-label={`Map of Santa Clara County census tracts, shaded by ${layerDef.label.toLowerCase()}. A fully accessible table with the same data is available in the table view.`}
-        className="h-[480px] w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] sm:h-[560px]"
-      />
+
+        {/* Reset view -- pairs with MapLibre's own zoom controls
+            (top-right); a distinct, always-reachable "back to the whole
+            county" affordance, not just repeated scroll-to-zoom-out. */}
+        <button
+          type="button"
+          onClick={() => fitBoundsRef.current?.()}
+          className="absolute right-3 top-[92px] z-10 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)]/95 px-2.5 py-1.5 text-xs font-medium text-[var(--color-text-primary)] shadow-[var(--shadow-sm)] backdrop-blur-sm hover:bg-[var(--color-surface-sunken)]"
+        >
+          Reset view
+        </button>
+
+        {hoverInfo && (
+          <MapHoverCard properties={hoverInfo} layerDef={layerDef} quadrant={hoverQuadrant} />
+        )}
+        {selected?.geographyType === "tract" && !hoverInfo && (
+          <SelectedMapCallout
+            geoid={selected.geoid}
+            displayName={selected.displayName}
+            concernValue={selectedConcernValue}
+            layerDef={layerDef}
+          />
+        )}
+      </div>
+
       {clickError && (
         <p role="alert" className="mt-2 text-xs text-[var(--color-alert)]">
           {clickError}
@@ -436,32 +471,38 @@ export function ExploreMap({
           score.
         </p>
       )}
-      {hoverInfo && (
-        <MapHoverCard properties={hoverInfo} layerDef={layerDef} ranking={layerRanking} />
-      )}
       <MapLegend layerDef={layerDef} />
     </div>
   );
 }
 
-/** Concise on purpose (docs/design/explore-health-equity-research.md §5.5
- * point 5 -- "do not overload the hover tooltip with the complete driver
- * analysis"): name, a plain-language concern label, countywide rank
- * (computed client-side, no request), the top domain, a confidence flag
- * when coverage is thin, and a prompt toward the full profile. `aria-hidden`
+const QUADRANT_POSITION: Record<"tl" | "tr" | "bl" | "br", string> = {
+  tl: "left-3 top-3",
+  tr: "right-3 top-3",
+  bl: "left-3 bottom-3",
+  br: "right-3 bottom-3",
+};
+
+/** A compact, collision-aware hover inspector (docs/design/
+ * health-equity-product-consolidation.md's hover-redesign requirement):
+ * renders in whichever map corner is diagonally opposite the cursor
+ * (`quadrant`, computed from the raw mousemove event in the parent), so
+ * it never sits on top of the polygon actually being inspected. Never
+ * the complete driver analysis -- name, concern label, comparison, top
+ * two domain signals, a confidence flag when coverage is thin, and a
+ * prompt toward the full profile. `aria-hidden` + `pointer-events-none`
  * since it's decorative and duplicates data already reachable via the
- * accessible table -- consistent with the pre-existing convention here. */
+ * accessible table. */
 function MapHoverCard({
   properties,
   layerDef,
-  ranking,
+  quadrant,
 }: {
   properties: TractBoundaryFeatureProperties;
   layerDef: ReturnType<typeof getMapLayer>;
-  ranking: { rankMap: Map<string, { rank: number; percentile: number }>; total: number };
+  quadrant: "tl" | "tr" | "bl" | "br";
 }) {
   const value = layerDef.getValue(properties);
-  const rankInfo = ranking.rankMap.get(properties.tract_geoid_2020);
   const topDomains = MAP_LAYERS.filter((l) => l.id !== "score" && l.id !== "confidence")
     .map((l) => ({ label: l.label, value: l.getValue(properties) }))
     .filter((d): d is { label: string; value: number } => d.value !== null)
@@ -471,26 +512,32 @@ function MapHoverCard({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute left-3 top-3 z-10 max-w-[220px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)]"
+      className={`pointer-events-none absolute z-10 w-[240px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)] ${QUADRANT_POSITION[quadrant]}`}
     >
-      <p className="font-semibold text-[var(--color-text-primary)]">{properties.name}</p>
+      <p className="truncate font-semibold text-[var(--color-text-primary)]">{properties.name}</p>
       {value !== null ? (
         <>
+          {/* Deliberately no percentile number here -- the map's
+              countywide rank is computed client-side from raw layer
+              values (deterministic), while the selected-profile panel's
+              percentile comes from the Monte Carlo median rank
+              (uncertainty-aware). Both are legitimate but answer
+              slightly different questions, and a cold usability review
+              independently caught the resulting "82% vs 83%" mismatch
+              as a real trust-breaking inconsistency when both were
+              shown for the same tract at once. The concern band alone
+              is accurate under either method; the full profile is one
+              click away for the exact number. */}
           <p className="text-[var(--color-text-secondary)]">
             {concernBandLabel(value, layerDef.label.toLowerCase())}
           </p>
-          {rankInfo && (
-            <p className="text-[var(--color-text-secondary)]">
-              Higher than {rankInfo.percentile}% of {ranking.total} tracts (#{rankInfo.rank})
-            </p>
-          )}
           {topDomains.length > 0 && (
-            <p className="text-[var(--color-text-tertiary)]">
-              Top domain{topDomains.length > 1 ? "s" : ""}: {topDomains.map((d) => d.label).join(", ")}
+            <p className="mt-0.5 text-[var(--color-text-tertiary)]">
+              Top: {topDomains.map((d) => d.label).join(", ")}
             </p>
           )}
           {properties.coverage_fraction !== null && properties.coverage_fraction < 0.7 && (
-            <p className="text-[var(--color-caution-strong)]">Limited data for this tract</p>
+            <p className="mt-0.5 text-[var(--color-caution-strong)]">Limited data for this tract</p>
           )}
         </>
       ) : (
@@ -499,6 +546,44 @@ function MapHoverCard({
       <p className="mt-1 text-[var(--color-text-tertiary)]">Select for full profile</p>
     </div>
   );
+}
+
+/** A minimal, persistent callout for the currently *selected* tract --
+ * similar in purpose (not appearance) to Tree Equity Score's selected-
+ * score map bubble: a quick "what am I looking at" anchor while the
+ * user is panning/zooming, without duplicating the sidebar's full
+ * profile. Hidden while a hover card is showing (both anchor to map
+ * corners; only one needs to be visible at a time). Shows the concern
+ * band only, deliberately no percentile number -- see the matching
+ * comment in `MapHoverCard` on why showing this tract's map-computed
+ * percentile next to the sidebar's Monte-Carlo-based one produced two
+ * different numbers for "the same fact," caught independently by two
+ * cold usability reviews as a real trust problem. */
+function SelectedMapCallout({
+  geoid,
+  displayName,
+  concernValue,
+  layerDef,
+}: {
+  geoid: string;
+  displayName: string;
+  concernValue: number | null;
+  layerDef: ReturnType<typeof getMapLayer>;
+}) {
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[220px] rounded-[var(--radius-md)] border border-[var(--color-interactive)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)]">
+      <p className="truncate font-semibold text-[var(--color-text-primary)]">{displayName || `Tract ${geoid}`}</p>
+      <p className="text-[var(--color-text-secondary)]">
+        {concernValue !== null
+          ? capitalize(concernBandLabel(concernValue, layerDef.label.toLowerCase()))
+          : "Selected"}
+      </p>
+    </div>
+  );
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function MapLegend({ layerDef }: { layerDef: ReturnType<typeof getMapLayer> }) {

@@ -30,7 +30,7 @@ import type { SelectedGeography } from "./selection";
 import { domainLabel } from "@/lib/labels";
 import { GLOSSARY } from "@/lib/glossary";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
-import { concernBandLabel } from "./layers";
+import { concernBandLabel, domainComparisonPhrase } from "./layers";
 
 export function GeographyDetail({
   selected,
@@ -445,21 +445,15 @@ function TractDetail({
   const totalTracts = boundariesQuery.data?.features.length ?? null;
 
   // Ranked by CONTRIBUTION (percentile x this scenario's actual weight
-  // for that domain) -- not by raw domain_score/percentile. A domain can
-  // have the single highest percentile in the tract yet contribute less
-  // to the composite score than a domain with a merely-moderate
-  // percentile if the scenario weights it more heavily. Sorting by
-  // domain_score alone (the previous implementation) silently agreed
-  // with contribution-sorting only by coincidence under this platform's
-  // one equally-weighted scenario, and would misidentify the top driver
+  // for that metric) -- not by raw percentile alone. A metric can have
+  // the single highest percentile in the tract yet contribute less to
+  // the composite score than one with a merely-moderate percentile if
+  // the scenario weights its domain more heavily. Sorting by percentile
+  // alone (the pre-DEC-074 implementation) silently agreed with
+  // contribution-sorting only by coincidence under this platform's one
+  // equally-weighted scenario, and would misidentify the top driver
   // under any of the other 7, unequally-weighted scenarios -- verified
   // live and documented in docs/design/explore-health-equity-research.md §2/§7.
-  const rankedDomains = [...explanation.domains]
-    .filter((d) => d.contribution !== null)
-    .sort((a, b) => (b.contribution ?? 0) - (a.contribution ?? 0));
-  const topDomain = rankedDomains[0];
-  const lowestDomain = rankedDomains[rankedDomains.length - 1];
-
   const rankedMetrics = explanation.domains
     .flatMap((d) => d.metrics)
     .filter((m) => m.contribution !== null)
@@ -483,7 +477,15 @@ function TractDetail({
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={onClearSelection}
+        className="text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+      >
+        ← Clear selection
+      </button>
+
+      <div className="mt-2 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-interactive)]">
             Health Equity Screening Profile
@@ -493,56 +495,53 @@ function TractDetail({
             {profile.name_long} · <DataModeBadge mode={profile.data_mode} />
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={onCompare}>
-          Compare
-        </Button>
       </div>
 
-      {/* Headline result + comparison */}
-      {explanation.score !== null && comparisonPercentile !== null && totalTracts !== null && (
-        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-          Higher than <strong className="text-[var(--color-text-primary)]">{comparisonPercentile}%</strong> of{" "}
-          {totalTracts} Santa Clara County tracts, under the <strong>{explanation.scenario_label}</strong> scenario.
-        </p>
-      )}
-
-      {/* Plain-language interpretation */}
-      <p className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] p-3 text-sm text-[var(--color-text-primary)]">
+      {/* HEADLINE -- the dominant visual is the plain-language concern
+          band and county comparison, not the raw 0-100 number (docs/
+          design/health-equity-product-consolidation.md's "headline
+          result" requirement). The scenario-dependent raw score moves to
+          the "How this was calculated" disclosure below, as secondary
+          information. */}
+      <div className="mt-4">
         {explanation.score !== null ? (
           <>
-            This tract shows <strong>{scoreBandLabel(explanation.score)}</strong> under the current scenario
-            {topDomain ? (
-              <>
-                , contributed to primarily by <strong>{domainLabel(topDomain.domain).toLowerCase()}</strong> (
-                {(topDomain.contribution ?? 0).toFixed(1)} of {explanation.score.toFixed(1)} points)
-              </>
-            ) : null}
-            {lowestDomain && topDomain && lowestDomain.domain !== topDomain.domain ? (
-              <>
-                . Its <strong>{domainLabel(lowestDomain.domain).toLowerCase()}</strong> profile is comparatively
-                closer to the county middle
-              </>
-            ) : null}
-            . This is a screening signal describing how this tract's own scenario-weighted score was built, not a
-            claim about what caused any underlying condition.
+            <p className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-[1.75rem]">
+              {capitalize(scoreBandLabel(explanation.score))}
+            </p>
+            {comparisonPercentile !== null && totalTracts !== null && (
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                Higher than <strong className="text-[var(--color-text-primary)]">{comparisonPercentile}%</strong> of{" "}
+                {totalTracts} Santa Clara County tracts
+              </p>
+            )}
+            <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">{explanation.scenario_label} screening view</p>
+            {/* Kept always visible, deliberately not folded into the
+                collapsed disclosures -- CLAUDE.md's non-negotiable rule
+                against labeling a screening score as a causal claim
+                applies to the headline itself, not just the detail a
+                reader may never expand. */}
+            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+              A screening signal, not a prediction or a causal claim.
+            </p>
           </>
         ) : (
-          "There isn't enough data to compute a combined score for this tract under this scenario."
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {"There isn't enough data to compute a combined score for this tract under this scenario."}
+          </p>
         )}
-      </p>
+      </div>
 
-      {/* Scenario score, uncertainty, confidence */}
-      <ScoreSummary explanation={explanation} totalTracts={totalTracts} />
-
-      {/* Domain breakdown */}
-      <div className="mt-6">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">What's driving this score</h3>
-        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-          Every domain below can be expanded to see the exact metrics, raw values, and sources behind it.
-        </p>
-        <div className="mt-3 space-y-2">
+      {/* DOMAIN SUMMARY -- every domain, simple rows, county-relative
+          comparison phrases instead of raw decimals or "domain score"
+          language. */}
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          Conditions that may shape health equity here
+        </h3>
+        <div className="mt-2.5 space-y-3">
           {explanation.domains.map((domain) => (
-            <DomainDisclosure key={domain.domain} domain={domain} />
+            <DomainSummaryRow key={domain.domain} domain={domain} />
           ))}
         </div>
         {explanation.domains_missing.length > 0 && (
@@ -552,50 +551,58 @@ function TractDetail({
         )}
       </div>
 
-      {/* Why this area appears here -- ranked specific drivers */}
+      {/* TOP 3 DRIVERS -- plain-language first; the full ranked list with
+          point contributions, weights, sources, and limitations moves to
+          "See all factors" below. */}
       {rankedMetrics.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Why this area appears here</h3>
-          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-            The individual measures contributing the most to this tract's score, ranked by how many points each
-            contributed.
-          </p>
-          <ul className="mt-3 space-y-3">
-            {rankedMetrics.slice(0, 5).map((metric) => (
-              <DriverRow
-                key={metric.metric_id}
-                metric={metric}
-                isStrongDriver={(metric.contribution ?? 0) >= meanMetricContribution * 1.5}
-              />
+        <div className="mt-5">
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">What is shaping this profile?</h3>
+          <ul className="mt-2 space-y-2.5" aria-label="Top factors shaping this profile">
+            {rankedMetrics.slice(0, 3).map((metric) => (
+              <SimpleDriverRow key={metric.metric_id} metric={metric} />
             ))}
           </ul>
-          {missingMetrics.length > 0 && (
-            <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] p-3">
-              <p className="text-xs font-medium text-[var(--color-text-secondary)]">Insufficient data</p>
-              <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
-                No data for this tract: {missingMetrics.map((m) => m.label).join(", ")}. Not counted as zero or
-                averaged in from elsewhere -- simply excluded from this score.
-              </p>
-            </div>
+          <details className="mt-2.5 group">
+            <summary className="cursor-pointer text-xs font-medium text-[var(--color-interactive)]">
+              See all factors
+            </summary>
+            <ul className="mt-3 space-y-3 border-t border-[var(--color-border)] pt-3">
+              {rankedMetrics.map((metric) => (
+                <DriverRow
+                  key={metric.metric_id}
+                  metric={metric}
+                  isStrongDriver={(metric.contribution ?? 0) >= meanMetricContribution * 1.5}
+                />
+              ))}
+            </ul>
+            {missingMetrics.length > 0 && (
+              <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] p-3">
+                <p className="text-xs font-medium text-[var(--color-text-secondary)]">Insufficient data</p>
+                <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+                  No data for this tract: {missingMetrics.map((m) => m.label).join(", ")}. Not counted as zero or
+                  averaged in from elsewhere -- simply excluded from this score.
+                </p>
+              </div>
+            )}
+          </details>
+        </div>
+      )}
+
+      {/* CONFIDENCE -- one compact line above the fold; the full
+          stability/uncertainty methodology moves to a disclosure. */}
+      {(explanation.stability_label || explanation.data_confidence) && (
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
+          {explanation.stability_label && <StabilityBadge label={explanation.stability_label} />}
+          {explanation.data_confidence && (
+            <span className="text-[var(--color-text-secondary)]">
+              Data confidence: {Math.round(explanation.data_confidence.confidence_score * 100)}%
+            </span>
           )}
         </div>
       )}
 
-      {/* What this does not mean */}
-      <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">What this does not mean</h3>
-        <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-[var(--color-text-secondary)]">
-          <li>This screening result is not a diagnosis of this tract or the people who live there.</li>
-          <li>It does not prove that any factor shown here causes any other.</li>
-          <li>It does not by itself determine eligibility for any funding or program.</li>
-          <li>Community context and lived experience are still necessary to act on this information.</li>
-        </ul>
-      </div>
-
+      {/* ACTIONS -- one primary action, the rest secondary. */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" onClick={() => setEvidenceOpen(true)}>
-          View sources &amp; evidence
-        </Button>
         <UseInAdvocateButton
           geography={{
             geographyType: "tract",
@@ -604,6 +611,9 @@ function TractDetail({
           }}
           scenarioId={scenarioId}
         />
+        <Button variant="secondary" size="sm" onClick={onCompare}>
+          Compare
+        </Button>
         <CopyLinkButton />
       </div>
 
@@ -616,10 +626,108 @@ function TractDetail({
         </Link>
       </GuidedNextStep>
 
+      {/* PROGRESSIVE DISCLOSURE -- everything a methodology report needs,
+          none of it required to understand the headline result. */}
+      <div className="mt-6 space-y-2">
+        <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-primary)]">
+            Domain breakdown
+          </summary>
+          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+            Every domain below can be expanded to see the exact metrics, raw values, and sources behind it.
+          </p>
+          <div className="mt-3 space-y-2">
+            {explanation.domains.map((domain) => (
+              <DomainDisclosure key={domain.domain} domain={domain} />
+            ))}
+          </div>
+        </details>
+
+        <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-primary)]">
+            How this was calculated
+          </summary>
+          <ScoreSummary explanation={explanation} totalTracts={totalTracts} />
+        </details>
+
+        <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-primary)]">
+            What this result does not mean
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[var(--color-text-secondary)]">
+            <li>This screening result is not a diagnosis of this tract or the people who live there.</li>
+            <li>It does not prove that any factor shown here causes any other.</li>
+            <li>It does not by itself determine eligibility for any funding or program.</li>
+            <li>Community context and lived experience are still necessary to act on this information.</li>
+          </ul>
+        </details>
+
+        <button
+          type="button"
+          onClick={() => setEvidenceOpen(true)}
+          className="text-sm font-medium text-[var(--color-interactive)] underline underline-offset-2"
+        >
+          View sources &amp; evidence
+        </button>
+      </div>
+
       <Dialog open={evidenceOpen} onClose={() => setEvidenceOpen(false)} title="Sources and evidence" variant="side">
         <EvidenceContent explanation={explanation} />
       </Dialog>
     </div>
+  );
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** One domain, reduced to what a first-time reader needs: the label, an
+ * accessible percentile bar, and a plain-language comparison phrase
+ * that always states the concern direction explicitly -- never a bare
+ * "higher"/"lower" alongside a technical "domain score" number (docs/
+ * design/health-equity-product-consolidation.md's domain-summary
+ * requirement). The full per-metric breakdown (raw values, sources,
+ * limitations) stays one click away in the "Domain breakdown"
+ * disclosure -- this row is deliberately not a duplicate of it. */
+function DomainSummaryRow({ domain }: { domain: DomainContributionDetail }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-medium text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</span>
+        {domain.domain_score === null && <Badge tone="neutral">No data</Badge>}
+      </div>
+      <PercentileBar percentile={domain.domain_score} label={`${domainLabel(domain.domain)} county percentile`} />
+      {domain.domain_score !== null && (
+        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+          {domainComparisonPhrase(domain.domain_score)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** One driver, reduced to what a first-time reader needs to understand
+ * *why* -- never the point-contribution arithmetic ("13.0 of 34.7
+ * points") that belongs in "See all factors" instead. Raw value and
+ * unit remain visible alongside the percentile (CLAUDE.md's "raw value
+ * and unit must be visible alongside percentiles" rule applies at the
+ * metric level regardless of where in the hierarchy a metric appears). */
+function SimpleDriverRow({ metric }: { metric: MetricContribution }) {
+  return (
+    <li>
+      <span className="text-sm font-medium text-[var(--color-text-primary)]">{metric.label}</span>
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
+        {metric.percentile !== null && (
+          <>
+            {" "}
+            · higher than <span className="tabular-nums">{Math.round(metric.percentile)}%</span> of county tracts
+          </>
+        )}
+      </p>
+      <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">{metric.plain_language_definition}</p>
+    </li>
   );
 }
 
@@ -688,16 +796,14 @@ function ScoreSummary({
   const dc = explanation.data_confidence;
   return (
     <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-3xl font-semibold tabular-nums text-[var(--color-text-primary)]">
-            {explanation.score !== null ? Math.round(explanation.score) : "—"}
-            <span className="text-base font-normal text-[var(--color-text-secondary)]">/100</span>
-          </p>
-          <p className="text-xs text-[var(--color-text-secondary)]">Combined concern score, this scenario only</p>
-        </div>
-        {explanation.stability_label && <StabilityBadge label={explanation.stability_label} />}
-      </div>
+      {/* Stability is already shown once, above the fold, in the
+          compact confidence line -- not repeated here to avoid the
+          exact badge and title text appearing twice on the same page. */}
+      <p className="text-3xl font-semibold tabular-nums text-[var(--color-text-primary)]">
+        {explanation.score !== null ? Math.round(explanation.score) : "—"}
+        <span className="text-base font-normal text-[var(--color-text-secondary)]">/100</span>
+      </p>
+      <p className="text-xs text-[var(--color-text-secondary)]">Combined concern score, this scenario only</p>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
@@ -752,9 +858,8 @@ function ScoreSummary({
       )}
 
       <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-        This is a county-relative screening score, not a prediction or a causal claim. A high score means this
-        tract's profile warrants a closer look under this scenario's priorities -- it does not mean any specific
-        program or intervention would fix it.
+        A high score means this tract&rsquo;s profile warrants a closer look under this scenario&rsquo;s
+        priorities -- it does not mean any specific program or intervention would fix it.
       </p>
     </div>
   );

@@ -31,7 +31,7 @@ export const MAP_LAYERS: MapLayerDef[] = [
   },
   {
     id: "health_burden",
-    label: "Health burden",
+    label: "Health needs",
     description: "Chronic disease, disability, and general health status measures, county-relative.",
     direction: "higher-worse",
     getValue: (p) => p.health_burden_score,
@@ -45,14 +45,14 @@ export const MAP_LAYERS: MapLayerDef[] = [
   },
   {
     id: "environmental_burden",
-    label: "Environmental burden",
+    label: "Environmental conditions",
     description: "Pollution burden and population vulnerability (CalEnviroScreen), county-relative.",
     direction: "higher-worse",
     getValue: (p) => p.environmental_burden_score,
   },
   {
     id: "resource_accessibility",
-    label: "Resource accessibility",
+    label: "Community resources",
     description: "Modeled distance to the nearest clinical care, county-relative.",
     direction: "higher-worse",
     getValue: (p) => p.resource_accessibility_score,
@@ -100,4 +100,20 @@ const CONCERN_BANDS: { min: number; label: string }[] = [
 export function concernBandLabel(value: number, noun: string): string {
   const band = CONCERN_BANDS.find((b) => value >= b.min)?.label ?? "";
   return band ? `${band} ${noun}` : noun;
+}
+
+/** A short, direction-explicit comparison sentence for a single domain
+ * row in the simplified selected-profile summary (docs/design/
+ * health-equity-product-consolidation.md's domain-summary requirement)
+ * -- always states plainly that a higher value means more concern,
+ * never a bare "higher"/"lower" a reader has to guess the meaning of.
+ * Every band names "concern" explicitly, including the middle band --
+ * two independent cold usability reviews both flagged the earlier
+ * "Near the county middle" (no "concern" word) as ambiguous about
+ * whether that was a good or a bad thing. */
+export function domainComparisonPhrase(percentile: number): string {
+  if (percentile >= 75) return "Higher concern than most county tracts";
+  if (percentile >= 50) return "Somewhat higher concern than the county middle";
+  if (percentile >= 25) return "Near typical concern for the county";
+  return "Lower concern than most county tracts";
 }

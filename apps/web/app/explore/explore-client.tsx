@@ -23,14 +23,18 @@ const DEFAULT_SCENARIO_ID = "default_integrated_screen_v1";
 export function ExploreClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Matches the xl breakpoint the 3-column layout itself activates at
-  // (1280px, see the grid comment below) -- below it, a selected
-  // geography opens in a bottom sheet instead of the inline third
-  // column, since the tall inline panel is what pushed the map far down
+  // Matches the lg breakpoint the sidebar+map grid itself activates at
+  // (1024px, see the grid comment below) -- below it, a selected
+  // geography opens in a bottom sheet instead of the inline sidebar
+  // profile, since the tall inline panel is what pushed the map far down
   // the page on mobile before the first redesign pass (fixed for the
   // *search box* then; the *selected-profile* panel had the same
-  // underlying "very long single column" problem, addressed here).
-  const isDesktopLayout = useMediaQuery("(min-width: 1280px)");
+  // underlying "very long single column" problem, addressed there and
+  // preserved here). The two-surface sidebar+map layout (vs. the prior
+  // three-column one) needs only one fixed-width column, so it can
+  // activate at a narrower breakpoint than before -- more devices get
+  // the map-dominant desktop experience, not just very wide screens.
+  const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
 
   // Only a well-formed, in-county canonical GEOID is ever treated as a
   // real selection -- this is what stops a malformed or hand-edited URL
@@ -73,40 +77,19 @@ export function ExploreClient() {
     updateParams({ geography: null, id: null, compare: null });
   }
 
+  const activeScenario = scenariosQuery.data?.scenarios.find((s) => s.scenario_id === scenarioId);
+
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Explore</h1>
-        <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          Find a city, district, or census tract, see its health, access, and resource picture, and understand why
-          it ranks the way it does.
-        </p>
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="font-medium text-[var(--color-text-primary)]">Priorities</span>
-          <select
-            value={scenarioId}
-            onChange={(e) => updateParams({ scenario: e.target.value })}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
-          >
-            {scenariosQuery.data?.scenarios.map((s) => (
-              <option key={s.scenario_id} value={s.scenario_id}>
-                {s.label}
-              </option>
-            ))}
-            {!scenariosQuery.data && <option value={scenarioId}>Default integrated screen</option>}
-          </select>
-        </label>
-        {scenariosQuery.data && (
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            {scenariosQuery.data.scenarios.find((s) => s.scenario_id === scenarioId)?.description}
-          </p>
-        )}
-      </div>
-
-      <div className="mt-4 flex items-center justify-between gap-3">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
+      {/* Compact header -- a page title, the scenario picker (this is the
+          one control that changes the computed score itself, so it
+          belongs at page level, not buried in the sidebar), and the
+          Map/Table toggle, in place of the prior six stacked
+          label+control+description rows a user had to read past before
+          any map content appeared (docs/design/
+          health-equity-product-consolidation.md §2/§7). */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)] sm:text-2xl">Explore health equity</h1>
         <SegmentedControl
           label="View"
           value={view}
@@ -118,21 +101,58 @@ export function ExploreClient() {
         />
       </div>
 
-      {/* The 3-column layout needs 320px + 380px of fixed-width columns
-          plus gaps and padding on top of the desktop nav sidebar --
-          that doesn't fit at 1024px (a required responsive breakpoint),
-          so the 3-column grid activates at xl (1280px) instead of lg;
-          1024-1279px gets the same stacked single-column layout as
-          tablet/mobile, which stays fully usable at that width. */}
-      <div className="mt-4 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)_380px]">
-        {/* Below xl, "Find a place" must render before the map -- the
-            primary interaction (searching/selecting) belongs above a
-            tall map, not buried under it (docs/design/
-            health-equity-ux-redesign.md §3/§9.2, verified live: at
-            mobile widths the map previously rendered first, pushing the
-            search box below a large empty-looking map). */}
-        <div className="order-1">
-          <SearchPanel selected={selected} onSelect={handleGeographySelect} />
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="font-medium text-[var(--color-text-primary)]">Screening view</span>
+          <select
+            value={scenarioId}
+            onChange={(e) => updateParams({ scenario: e.target.value })}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
+          >
+            {scenariosQuery.data?.scenarios.map((s) => (
+              <option key={s.scenario_id} value={s.scenario_id}>
+                {s.label}
+              </option>
+            ))}
+            {!scenariosQuery.data && <option value={scenarioId}>Health equity overview</option>}
+          </select>
+        </label>
+        {activeScenario && (
+          <p className="text-xs text-[var(--color-text-secondary)]">{activeScenario.description}</p>
+        )}
+      </div>
+
+      {/* Two surfaces, not three: a sidebar (search + guide, or search +
+          selected profile) and the map, which now gets the large
+          majority of the horizontal space instead of a narrow middle
+          column (docs/design/health-equity-product-consolidation.md §4).
+          The sidebar needs real width for the selected profile's driver
+          rows to stay legible, so this activates at lg (1024px) --
+          narrower than the prior 3-column layout could, since there's
+          only one fixed-width column now, not two. */}
+      <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="order-1 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:pr-1">
+          <SearchPanel selected={selected} onSelect={handleGeographySelect} compact={!!selected} />
+          {isDesktopLayout ? (
+            <div className="mt-4">
+              <GeographyDetail
+                selected={selected}
+                scenarioId={scenarioId}
+                onCompare={() => updateParams({ compare: "1" })}
+                onClearSelection={handleClearSelection}
+                onSelect={handleGeographySelect}
+              />
+            </div>
+          ) : null}
+          {comparing && selected?.geographyType === "tract" && (
+            <div className="mt-4">
+              <ComparisonPanel
+                baseTractGeoid={selected.geoid}
+                scenarioId={scenarioId}
+                onClose={() => updateParams({ compare: null })}
+              />
+            </div>
+          )}
         </div>
 
         <div className="order-2">
@@ -146,36 +166,25 @@ export function ExploreClient() {
             />
           )}
         </div>
-
-        <div className="order-3">
-          {isDesktopLayout ? (
-            <GeographyDetail
-              selected={selected}
-              scenarioId={scenarioId}
-              onCompare={() => updateParams({ compare: "1" })}
-              onClearSelection={handleClearSelection}
-              onSelect={handleGeographySelect}
-            />
-          ) : (
-            <MobileSelectedSheet
-              selected={selected}
-              scenarioId={scenarioId}
-              onCompare={() => updateParams({ compare: "1" })}
-              onClearSelection={handleClearSelection}
-              onSelect={handleGeographySelect}
-            />
-          )}
-          {comparing && selected?.geographyType === "tract" && (
-            <div className="mt-4">
-              <ComparisonPanel
-                baseTractGeoid={selected.geoid}
-                scenarioId={scenarioId}
-                onClose={() => updateParams({ compare: null })}
-              />
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Below lg, the sidebar's selected-profile content moves into the
+          mobile bottom sheet instead of the scrolling column above (same
+          split point the mobile-sheet pass already validated); this
+          renders in normal document flow, after the map, matching the
+          existing mobile interaction (map first, collapsed bar beneath
+          it, full profile on demand). */}
+      {!isDesktopLayout && (
+        <div className="mt-4">
+          <MobileSelectedSheet
+            selected={selected}
+            scenarioId={scenarioId}
+            onCompare={() => updateParams({ compare: "1" })}
+            onClearSelection={handleClearSelection}
+            onSelect={handleGeographySelect}
+          />
+        </div>
+      )}
     </div>
   );
 }

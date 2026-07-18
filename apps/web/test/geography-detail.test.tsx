@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GeographyDetail } from "@/app/explore/geography-detail";
 import { api } from "@/lib/api";
@@ -79,7 +79,14 @@ const dataLimitedExplanation: ScoreExplanationResponse = {
       ],
     },
   ],
-  domains_missing: ["Environmental burden", "Resource accessibility"],
+  // Real snake_case domain keys, matching what the backend actually
+  // returns (`scenario_scores.py`'s `missing` list is built from
+  // `scenario.weights` keys, e.g. "environmental_burden") -- the
+  // fixture previously used already-formatted English words here,
+  // which happened to survive `domainLabel`'s humanize-fallback
+  // unchanged and masked that this fixture didn't match the real API
+  // contract.
+  domains_missing: ["environmental_burden", "resource_accessibility"],
   stability_label: "Data-limited",
   data_confidence: null,
   monte_carlo: null,
@@ -133,7 +140,7 @@ describe("GeographyDetail (tract, missing data)", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText(/Environmental burden, Resource accessibility/)).toBeInTheDocument(),
+      expect(screen.getByText(/Environmental conditions, Community resources/)).toBeInTheDocument(),
     );
   });
 
@@ -227,13 +234,21 @@ describe("GeographyDetail (tract, missing data)", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("Why this area appears here")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText("Insufficient data")).toBeInTheDocument());
     expect(screen.getByText(/Obesity rate/)).toBeInTheDocument();
     // Not counted as zero or silently folded in as a real driver row --
     // only the one real, present metric appears as a driver <li>.
-    const driverItems = screen.getAllByRole("listitem").filter((li) => li.textContent?.includes("Contributed"));
+    // Scoped to the top-driver list's own accessible name rather than
+    // a page-wide listitem query, since jsdom does not reliably apply
+    // the UA stylesheet rule hiding a closed <details>'s content from
+    // the accessibility tree the way a real browser does (unrelated
+    // <li>s inside the collapsed "What this result does not mean"
+    // disclosure would otherwise also match).
+    const topDriverList = screen.getByRole("list", { name: "Top factors shaping this profile" });
+    const driverItems = within(topDriverList).getAllByRole("listitem");
     expect(driverItems).toHaveLength(1);
     expect(driverItems[0]?.textContent).toContain("Diabetes prevalence");
+    expect(driverItems[0]?.textContent).not.toContain("Obesity rate");
   });
 });

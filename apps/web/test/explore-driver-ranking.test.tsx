@@ -207,7 +207,7 @@ const domainsFixture: DomainListResponse = {
 };
 
 describe("TractDetail driver ranking (DEC-074 regression)", () => {
-  it("names the domain with the largest CONTRIBUTION as the driver, not the domain with the highest raw percentile", async () => {
+  it("names the metric with the largest CONTRIBUTION as the top driver, not the metric with the highest raw percentile", async () => {
     vi.mocked(api.getTractProfile).mockResolvedValue(profileFixture);
     vi.mocked(api.explainScore).mockResolvedValue(unequalWeightExplanation);
     vi.mocked(api.getAllTractBoundaries).mockResolvedValue(boundariesFixture);
@@ -223,18 +223,18 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
       />,
     );
 
-    // Contribution-based (correct): Access barriers contributed 35 of
-    // 39.5 points -- far more than Environmental burden's 4.5, even
-    // though Environmental burden has the higher raw percentile (90 vs
-    // 70). The interpretation sentence must name Access barriers.
-    await waitFor(() => expect(screen.getByText(/contributed to primarily by/)).toBeInTheDocument());
-    const interpretation = screen.getByText(/contributed to primarily by/).closest("p")!;
-    expect(interpretation.textContent).toMatch(/access barriers/i);
-    expect(interpretation.textContent).not.toMatch(/driven mainly by environmental burden/i);
-
+    // Contribution-based (correct): the access-barriers metric
+    // contributed 35 of 39.5 points -- far more than the environmental
+    // metric's 4.5, even though the environmental metric has the higher
+    // raw percentile (90 vs 70). The simplified "What is shaping this
+    // profile?" top-driver list (docs/design/
+    // health-equity-product-consolidation.md) must name it first.
+    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
+    const driverItems = screen.getAllByRole("listitem");
+    expect(driverItems[0]?.textContent).toMatch(/Moderate-percentile, highest-weight metric/);
     // The old, buggy sort (by domain_score/percentile) would have picked
-    // Environmental burden (90) here -- explicitly assert it did not.
-    expect(interpretation.textContent?.toLowerCase().indexOf("access barriers")).toBeGreaterThan(-1);
+    // the environmental metric (90) first -- explicitly assert it did not.
+    expect(driverItems[0]?.textContent).not.toMatch(/Highest-percentile, lowest-weight metric/);
   });
 
   it("ranks the specific-drivers list by contribution, with the largest contributor first", async () => {
@@ -253,11 +253,11 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("Why this area appears here")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
     // Driver rows are the only <li> elements on this page (DomainDisclosure's
     // metric rows are plain <div>s) -- scoping to listitem role avoids also
     // matching the same metric labels rendered inside the (separate,
-    // domain_score-ordered) "What's driving this score" disclosures above.
+    // domain_score-ordered) "Domain breakdown" disclosure.
     const driverListItems = screen.getAllByRole("listitem");
     const driverLabels = driverListItems.map((el) => el.textContent ?? "");
     const highWeightIndex = driverLabels.findIndex((t) => t.includes("Moderate-percentile, highest-weight"));

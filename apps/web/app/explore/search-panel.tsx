@@ -17,9 +17,16 @@ const TYPE_LABEL: Record<GeographyType, string> = {
 export function SearchPanel({
   onSelect,
   selected,
+  compact = false,
 }: {
   onSelect: (selection: SelectedGeography) => void;
   selected: SelectedGeography | null;
+  /** Once a geography is selected, the sidebar becomes the selected
+   * profile -- search must stay reachable ("a compact search affordance
+   * at the top," docs/design/health-equity-product-consolidation.md §4)
+   * without repeating the full first-time heading and helper copy that
+   * State 1 already showed. */
+  compact?: boolean;
 }) {
   const inputId = useId();
   const [inputValue, setInputValue] = useState("");
@@ -40,19 +47,24 @@ export function SearchPanel({
   return (
     <div>
       <form onSubmit={handleSubmit} role="search">
-        <label htmlFor={inputId} className="block text-sm font-medium text-[var(--color-text-primary)]">
+        <label
+          htmlFor={inputId}
+          className={compact ? "sr-only" : "block text-sm font-medium text-[var(--color-text-primary)]"}
+        >
           Find a place
         </label>
-        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-          Search a city, a supervisor district, or a census tract number.
-        </p>
-        <div className="mt-2 flex gap-2">
+        {!compact && (
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            Search a city, a supervisor district, or a census tract number.
+          </p>
+        )}
+        <div className={compact ? "flex gap-2" : "mt-2 flex gap-2"}>
           <input
             id={inputId}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="e.g. Sunnyvale, District 3, 06085500100"
+            placeholder={compact ? "Search another place…" : "e.g. Sunnyvale, District 3, 06085500100"}
             className="flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
           />
           <button
@@ -65,7 +77,7 @@ export function SearchPanel({
       </form>
 
       <div aria-live="polite" className="mt-4">
-        {submittedQuery.length === 0 && (
+        {submittedQuery.length === 0 && !compact && (
           <p className="text-sm text-[var(--color-text-secondary)]">
             Enter a search term above, or select any tract directly on the map.
           </p>
