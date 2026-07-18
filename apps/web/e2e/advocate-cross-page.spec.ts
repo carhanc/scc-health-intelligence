@@ -25,7 +25,7 @@ test.describe("Advocate -- cross-page 'Use in Advocate' integration", () => {
 
   test("starting from a Prioritize recommendation carries the scenario along", async ({ page }) => {
     await page.goto("/prioritize");
-    await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeChecked({
+    await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeChecked({
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: "Show drivers" }).first()).toBeVisible({
@@ -38,7 +38,7 @@ test.describe("Advocate -- cross-page 'Use in Advocate' integration", () => {
     await page.getByRole("button", { name: "Use in Advocate" }).click();
 
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
-    await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeChecked({
+    await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeChecked({
       timeout: 15_000,
     });
   });

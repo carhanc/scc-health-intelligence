@@ -24,7 +24,7 @@ for (const bp of BREAKPOINTS) {
       page,
     }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: /Find where health needs/i })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Understand health equity/i })).toBeVisible({
         timeout: 15_000,
       });
 
@@ -47,13 +47,13 @@ for (const bp of BREAKPOINTS) {
         await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
       }
 
-      await expect(page.getByRole("link", { name: "Explore a community" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Explore the map" })).toBeVisible();
     });
 
     test("Explore: search, view toggle, and scenario selector remain usable", async ({ page }) => {
       await page.goto("/explore");
       await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByLabel("Priorities")).toBeVisible();
+      await expect(page.getByLabel("Screening view")).toBeVisible();
       await expect(page.getByRole("radio", { name: "Map" })).toBeVisible();
       await expect(page.getByRole("radio", { name: "Table" })).toBeVisible();
 
@@ -67,10 +67,10 @@ for (const bp of BREAKPOINTS) {
       await expect(result).toBeVisible({ timeout: 10_000 });
       await result.click();
 
-      // Below the app's own xl (1280px) breakpoint, the selected-tract
+      // Below the app's own lg (1024px) breakpoint, the selected-tract
       // profile opens behind a collapsed summary bar instead of inline
       // (MobileSelectedSheet) -- open it before asserting on the heading.
-      if (bp.width < 1280) {
+      if (bp.width < 1024) {
         await page
           .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
           .click();
@@ -94,16 +94,21 @@ for (const bp of BREAKPOINTS) {
 
     test("Tract detail, comparison, and evidence drawer remain operable", async ({ page }) => {
       await page.goto("/explore?geography=tract&id=06085500100");
-      // Below the app's own xl (1280px) breakpoint, the selected-tract
+      // Below the app's own lg (1024px) breakpoint, the selected-tract
       // profile opens behind a collapsed summary bar instead of inline
       // (MobileSelectedSheet).
-      if (bp.width < 1280) {
+      if (bp.width < 1024) {
         await page
           .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
           .click();
       }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible();
+      // The raw "Combined concern score" caption now lives behind the
+      // collapsed "How this was calculated" disclosure by design (docs/
+      // design/health-equity-product-consolidation.md's headline-result
+      // requirement) -- the always-visible proof of a rendered result is
+      // the plain-language screening-view caption in the headline block.
+      await expect(page.getByText(/screening view$/)).toBeVisible();
 
       await page.getByRole("button", { name: "Compare" }).click();
       // Tapping Compare from inside the mobile sheet closes it first (the
@@ -111,7 +116,7 @@ for (const bp of BREAKPOINTS) {
       // sheet) -- on desktop the inline panel is unaffected either way.
       await expect(page.getByRole("region", { name: "Compare with another place" })).toBeVisible();
 
-      if (bp.width < 1280) {
+      if (bp.width < 1024) {
         await page
           .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
           .click();
@@ -127,14 +132,14 @@ for (const bp of BREAKPOINTS) {
 
     test("Prioritize: scenario selector, custom sliders, and ranked results remain usable", async ({ page }) => {
       await page.goto("/prioritize");
-      await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeVisible({ timeout: 15_000 });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Prioritize must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
       await page.getByRole("radio", { name: "Custom scenario" }).click();
-      await expect(page.getByLabel("Health burden")).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByLabel("Health needs")).toBeVisible({ timeout: 10_000 });
 
       const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);

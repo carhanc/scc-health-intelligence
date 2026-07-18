@@ -3,8 +3,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Prioritize -- scenario selection, custom weighting, results, export", () => {
   test("default view loads a named scenario's ranked results", async ({ page }) => {
     await page.goto("/prioritize");
-    await expect(page.getByRole("heading", { name: "Prioritize", level: 1 })).toBeVisible();
-    await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeChecked({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Identify health-equity priorities", level: 1 })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeChecked({ timeout: 15_000 });
     await expect(page.getByRole("columnheader", { name: /Combined priority score/ })).toBeVisible({
       timeout: 15_000,
     });
@@ -16,8 +16,8 @@ test.describe("Prioritize -- scenario selection, custom weighting, results, expo
     await page.getByRole("radio", { name: "Custom scenario" }).click();
     await expect(page.getByText("Custom priority weighting")).toBeVisible();
 
-    const healthBurdenSlider = page.getByLabel("Health burden");
-    await healthBurdenSlider.fill("80");
+    const healthNeedsSlider = page.getByLabel("Health needs");
+    await healthNeedsSlider.fill("80");
 
     const status = page.getByRole("status").filter({ hasText: "Applied weights" });
     await expect(status).toContainText("Total: 100%", { timeout: 10_000 });
@@ -26,13 +26,13 @@ test.describe("Prioritize -- scenario selection, custom weighting, results, expo
   test("reset to equal weights restores 20% on every domain", async ({ page }) => {
     await page.goto("/prioritize");
     await page.getByRole("radio", { name: "Custom scenario" }).click();
-    await page.getByLabel("Health burden").fill("90");
+    await page.getByLabel("Health needs").fill("90");
 
     const status = page.getByRole("status").filter({ hasText: "Applied weights" });
-    await expect(status).toContainText("Health burden 53%", { timeout: 10_000 });
+    await expect(status).toContainText("Health needs 53%", { timeout: 10_000 });
 
     await page.getByRole("button", { name: "Reset to equal weights" }).click();
-    await expect(status).toContainText("Health burden 20%", { timeout: 10_000 });
+    await expect(status).toContainText("Health needs 20%", { timeout: 10_000 });
   });
 
   test("language access is shown as a real, explained unavailable option", async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe("Prioritize -- scenario selection, custom weighting, results, expo
     });
 
     await page.goto("/prioritize");
-    await expect(page.getByRole("heading", { name: "Prioritize" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Identify health-equity priorities" })).toBeVisible({ timeout: 15_000 });
     await page.getByRole("radio", { name: "Custom scenario" }).click();
     await page.waitForTimeout(1000);
 

@@ -17,8 +17,8 @@ test.describe("Validate -- coverage, methods, uncertainty, validation, limitatio
     await expect(page.getByText("How a combined score is built")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/1\. Metric\./)).toBeVisible();
 
-    await expect(page.getByRole("button", { name: /Health burden/ })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: /Health burden/ }).click();
+    await expect(page.getByRole("button", { name: /Health needs/ })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: /Health needs/ }).click();
     await expect(page.getByText("Source:", { exact: false }).first()).toBeVisible();
   });
 

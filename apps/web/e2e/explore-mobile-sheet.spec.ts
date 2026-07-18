@@ -3,8 +3,8 @@ import { test, expect } from "@playwright/test";
 const KNOWN_TRACT_A = "06085500100";
 
 /**
- * Below the 1280px xl breakpoint, a selected geography's full profile
- * moves from the always-visible third column into a collapsed summary
+ * Below the 1024px lg breakpoint, a selected geography's full profile
+ * moves from the always-visible sidebar into a collapsed summary
  * bar + bottom sheet (MobileSelectedSheet in geography-detail.tsx) --
  * this pass's mobile counterpart to the desktop-only assertions in
  * explore-core.spec.ts, usability-tasks.spec.ts, and
@@ -36,11 +36,16 @@ test.describe("Explore -- mobile collapsed summary and bottom sheet", () => {
     await expect(sheet).toBeVisible({ timeout: 5_000 });
     await expect(sheet.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible();
 
-    // The full content -- domain breakdown and ranked driver list -- is
-    // reachable inside the expanded sheet, not just the headline.
-    await expect(sheet.getByText("What's driving this score")).toBeVisible();
-    await expect(sheet.getByText("Why this area appears here")).toBeVisible();
-    await expect(sheet.locator("li").filter({ hasText: /Contributed .* of this tract's/ }).first()).toBeVisible();
+    // The full content -- domain summary and ranked driver list -- is
+    // reachable inside the expanded sheet, not just the headline. The
+    // detailed per-metric contribution arithmetic lives one click
+    // further behind "See all factors" (docs/design/
+    // health-equity-product-consolidation.md's progressive-disclosure
+    // requirement), so this checks the always-visible simplified driver
+    // row instead of the collapsed detail.
+    await expect(sheet.getByText("Conditions that may shape health equity here")).toBeVisible();
+    await expect(sheet.getByText("What is shaping this profile?")).toBeVisible();
+    await expect(sheet.locator("li").filter({ hasText: /higher than .* of county tracts/ }).first()).toBeVisible();
   });
 
   test("the expanded sheet closes via Escape and via the close button, returning to the collapsed bar", async ({

@@ -54,17 +54,20 @@ test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", ()
     test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
   });
 
-  test("the stability badge and its explanation are visible right next to the score, not buried", async ({
+  test("the stability badge and its explanation are visible right next to the headline result, not buried", async ({
     page,
   }) => {
     await page.goto("/explore?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
 
-    // The stability badge sits immediately beside the score, and its
-    // title attribute carries the plain-language explanation (surfaced
-    // as a native tooltip on hover/focus for sighted and AT users alike)
-    // -- not buried behind an extra click or a separate methods page.
-    await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible();
+    // The stability badge sits in the compact confidence line right
+    // after the top drivers -- above the fold, before any disclosure
+    // needs opening -- and its title attribute carries the
+    // plain-language explanation (surfaced as a native tooltip on
+    // hover/focus for sighted and AT users alike). The raw 0-100 score
+    // number itself is deliberately secondary now (docs/design/
+    // health-equity-product-consolidation.md's headline-result
+    // requirement) and lives behind "How this was calculated" instead.
     const badge = page.locator("span[title]").filter({
       hasText: /^(Robust|Moderately stable|Assumption-sensitive|Data-limited)$/,
     });

@@ -28,7 +28,7 @@ test.describe("Production smoke test", () => {
     });
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /Find where health needs/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Understand health equity/i })).toBeVisible({
       timeout: 20_000,
     });
 
