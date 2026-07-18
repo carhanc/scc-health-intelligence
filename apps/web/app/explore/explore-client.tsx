@@ -6,9 +6,10 @@ import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SegmentedControl, SkeletonText } from "@scc-health/ui";
 import { api } from "@/lib/api";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { SearchPanel } from "./search-panel";
 import { ExploreTable } from "./explore-table";
-import { GeographyDetail } from "./geography-detail";
+import { GeographyDetail, MobileSelectedSheet } from "./geography-detail";
 import { ComparisonPanel } from "./comparison-panel";
 import { parseSelectedGeographyFromParams, type SelectedGeography } from "./selection";
 
@@ -22,6 +23,14 @@ const DEFAULT_SCENARIO_ID = "default_integrated_screen_v1";
 export function ExploreClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Matches the xl breakpoint the 3-column layout itself activates at
+  // (1280px, see the grid comment below) -- below it, a selected
+  // geography opens in a bottom sheet instead of the inline third
+  // column, since the tall inline panel is what pushed the map far down
+  // the page on mobile before the first redesign pass (fixed for the
+  // *search box* then; the *selected-profile* panel had the same
+  // underlying "very long single column" problem, addressed here).
+  const isDesktopLayout = useMediaQuery("(min-width: 1280px)");
 
   // Only a well-formed, in-county canonical GEOID is ever treated as a
   // real selection -- this is what stops a malformed or hand-edited URL
@@ -139,13 +148,23 @@ export function ExploreClient() {
         </div>
 
         <div className="order-3">
-          <GeographyDetail
-            selected={selected}
-            scenarioId={scenarioId}
-            onCompare={() => updateParams({ compare: "1" })}
-            onClearSelection={handleClearSelection}
-            onSelect={handleGeographySelect}
-          />
+          {isDesktopLayout ? (
+            <GeographyDetail
+              selected={selected}
+              scenarioId={scenarioId}
+              onCompare={() => updateParams({ compare: "1" })}
+              onClearSelection={handleClearSelection}
+              onSelect={handleGeographySelect}
+            />
+          ) : (
+            <MobileSelectedSheet
+              selected={selected}
+              scenarioId={scenarioId}
+              onCompare={() => updateParams({ compare: "1" })}
+              onClearSelection={handleClearSelection}
+              onSelect={handleGeographySelect}
+            />
+          )}
           {comparing && selected?.geographyType === "tract" && (
             <div className="mt-4">
               <ComparisonPanel

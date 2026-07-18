@@ -186,3 +186,54 @@ def test_tract_boundaries_join_real_scenario_scores(client: TestClient) -> None:
             "Assumption-sensitive",
             "Data-limited",
         }
+
+
+def test_tract_boundaries_carry_scenario_independent_domain_scores(client: TestClient) -> None:
+    """DEC-073: each feature also carries all 5 domain scores, powering
+    the Explore map's per-domain layer switcher -- these come from
+    analytics.domain_scores, a table with no scenario_id column, so the
+    values must be identical regardless of which scenario_id is passed."""
+    domain_score_keys = [
+        "health_burden_score",
+        "access_barriers_score",
+        "environmental_burden_score",
+        "resource_accessibility_score",
+        "workforce_shortage_score",
+    ]
+
+    response_a = client.get(
+        f"/api/v1/geographies/tracts/boundaries?scenario_id={KNOWN_SCENARIO_ID}"
+    )
+    assert response_a.status_code == 200
+    features_a = {
+        f["properties"]["tract_geoid_2020"]: f["properties"] for f in response_a.json()["features"]
+    }
+
+    for props in features_a.values():
+        for key in domain_score_keys:
+            assert key in props
+            if props[key] is not None:
+                assert 0.0 <= props[key] <= 100.0
+
+    # A tract with a known, live-verified domain-score profile (see
+    # docs/design/explore-health-equity-research.md §3) -- pins the exact
+    # values so a future pipeline change that silently alters domain
+    # scoring is caught here, not just structurally.
+    tract = features_a["06085503112"]
+    assert tract["health_burden_score"] == pytest.approx(84.18304668304668)
+    assert tract["access_barriers_score"] == pytest.approx(94.31818181818181)
+    assert tract["environmental_burden_score"] == pytest.approx(95.57739557739558)
+    assert tract["resource_accessibility_score"] == pytest.approx(19.656019656019655)
+    assert tract["workforce_shortage_score"] == pytest.approx(93.55036855036855)
+
+    # Domain scores must not vary by scenario_id -- verified against a
+    # second, differently-weighted named scenario.
+    response_b = client.get(
+        "/api/v1/geographies/tracts/boundaries?scenario_id=diabetes_prevention_v1"
+    )
+    assert response_b.status_code == 200
+    features_b = {
+        f["properties"]["tract_geoid_2020"]: f["properties"] for f in response_b.json()["features"]
+    }
+    for key in domain_score_keys:
+        assert features_a["06085503112"][key] == features_b["06085503112"][key]

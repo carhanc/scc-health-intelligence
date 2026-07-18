@@ -1,12 +1,13 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingRegion, SkeletonText, ErrorState, CONCERN_SCALE, CONCERN_NO_DATA_COLOR } from "@scc-health/ui";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type TractBoundaryFeatureProperties } from "@/lib/api";
 import { isValidGeographyId, type SelectedGeography } from "./selection";
+import { MAP_LAYERS, getMapLayer, concernBandLabel, type MapLayerId } from "./layers";
 
 const FILL_LAYER = "tract-fill";
 const LINE_LAYER = "tract-outline";
@@ -41,6 +42,49 @@ function createNoDataHatchPattern(): ImageData {
   return ctx.getImageData(0, 0, size, size);
 }
 
+/** The raw MapLibre value expression for a given layer -- "confidence"
+ * is the only derived one (coverage_fraction as a 0-1 fraction, scaled
+ * to the same 0-100 range every other layer already uses). */
+function layerValueExpression(layerId: MapLayerId): any {  // eslint-disable-line @typescript-eslint/no-explicit-any -- MapLibre style expressions are untyped s-expression arrays
+  if (layerId === "confidence") return ["*", ["get", "coverage_fraction"], 100];
+  if (layerId === "score") return ["get", "score"];
+  return ["get", `${layerId}_score`];
+}
+
+/** The expression used to test "is this layer's value missing for this
+ * tract" -- always the raw property, before any confidence-layer scaling
+ * (multiplying null by 100 would still be null, but testing the raw
+ * property directly is clearer and matches every other layer). */
+function layerNullTestExpression(layerId: MapLayerId): any {  // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (layerId === "confidence") return ["get", "coverage_fraction"];
+  if (layerId === "score") return ["get", "score"];
+  return ["get", `${layerId}_score`];
+}
+
+function buildNullFilterExpression(layerId: MapLayerId): any {  // eslint-disable-line @typescript-eslint/no-explicit-any
+  return ["==", layerNullTestExpression(layerId), null];
+}
+
+/** Builds the `fill-color` case expression for a layer. Every layer
+ * shares the same concern gradient (DEC-072) so "red always means more
+ * concerning, teal always means less" holds across every layer -- for a
+ * "higher-better" layer (only Data confidence today) the gradient is
+ * reversed so a high value (good) still lands on the teal end, never
+ * inverting what the colors themselves mean. */
+function buildFillColorExpression(layerId: MapLayerId): any {  // eslint-disable-line @typescript-eslint/no-explicit-any
+  const direction = getMapLayer(layerId).direction;
+  const scale = direction === "higher-better" ? [...CONCERN_SCALE].reverse() : CONCERN_SCALE;
+  const stopCount = scale.length;
+  const stops: (string | number)[] = [];
+  scale.forEach((color, i) => stops.push((i / (stopCount - 1)) * 100, color));
+  return [
+    "case",
+    ["!=", layerNullTestExpression(layerId), null],
+    ["interpolate", ["linear"], layerValueExpression(layerId), ...stops],
+    CONCERN_NO_DATA_COLOR,
+  ];
+}
+
 /**
  * The choropleth shows only the platform's own tract polygons and place
  * labels -- no external basemap tiles (DEC-040). This keeps the map fully
@@ -62,10 +106,12 @@ export function ExploreMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [hoverInfo, setHoverInfo] = useState<{ name: string; score: number | null } | null>(null);
+  const [activeLayer, setActiveLayer] = useState<MapLayerId>("score");
+  const [hoverInfo, setHoverInfo] = useState<TractBoundaryFeatureProperties | null>(null);
   const [clickError, setClickError] = useState<string | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const layerDef = getMapLayer(activeLayer);
 
   const boundariesQuery = useQuery({
     queryKey: ["tract-boundaries", scenarioId],
@@ -73,6 +119,27 @@ export function ExploreMap({
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Countywide rank/percentile for the hover card, computed once from the
+  // single already-fetched boundaries payload -- never a per-hover
+  // request. Recomputed only when the active layer or the data itself
+  // changes, not on every mouse move (docs/design/
+  // explore-health-equity-research.md §10 performance requirement).
+  const layerRanking = useMemo(() => {
+    const features = boundariesQuery.data?.features ?? [];
+    const ranked = features
+      .map((f) => ({ geoid: f.properties.tract_geoid_2020, value: layerDef.getValue(f.properties) }))
+      .filter((r): r is { geoid: string; value: number } => r.value !== null)
+      .sort((a, b) => (layerDef.direction === "higher-worse" ? b.value - a.value : a.value - b.value));
+    const rankMap = new Map<string, { rank: number; percentile: number }>();
+    ranked.forEach((r, i) => {
+      const rank = i + 1;
+      const percentile =
+        ranked.length > 1 ? Math.round(((ranked.length - rank) / (ranked.length - 1)) * 100) : 100;
+      rankMap.set(r.geoid, { rank, percentile });
+    });
+    return { rankMap, total: ranked.length };
+  }, [boundariesQuery.data, layerDef]);
 
   // A city, district, ZIP-code area, or county has no single point on the
   // map -- without this, a user who searches "Sunnyvale" gets a profile
@@ -154,21 +221,12 @@ export function ExploreMap({
     } else {
       map.addSource("tracts", { type: "geojson", data: geojson as GeoJSON.FeatureCollection });
 
-      const stopCount = CONCERN_SCALE.length;
-      const stops: (string | number)[] = [];
-      CONCERN_SCALE.forEach((color, i) => stops.push((i / (stopCount - 1)) * 100, color));
-
       map.addLayer({
         id: FILL_LAYER,
         type: "fill",
         source: "tracts",
         paint: {
-          "fill-color": [
-            "case",
-            ["!=", ["get", "score"], null],
-            ["interpolate", ["linear"], ["get", "score"], ...stops],
-            CONCERN_NO_DATA_COLOR,
-          ],
+          "fill-color": buildFillColorExpression("score"),
           "fill-opacity": 0.85,
         },
       });
@@ -179,7 +237,7 @@ export function ExploreMap({
         id: NO_DATA_HATCH_LAYER,
         type: "fill",
         source: "tracts",
-        filter: ["==", ["get", "score"], null],
+        filter: buildNullFilterExpression("score"),
         paint: { "fill-pattern": NO_DATA_HATCH_IMAGE, "fill-opacity": 0.9 },
       });
       map.addLayer({
@@ -200,10 +258,7 @@ export function ExploreMap({
         map.getCanvas().style.cursor = "pointer";
         const feature = e.features?.[0];
         if (feature) {
-          setHoverInfo({
-            name: feature.properties?.name ?? "Unknown tract",
-            score: feature.properties?.score ?? null,
-          });
+          setHoverInfo(feature.properties as unknown as TractBoundaryFeatureProperties);
         }
       });
       map.on("mouseleave", FILL_LAYER, () => {
@@ -242,6 +297,18 @@ export function ExploreMap({
       }
     }
   }, [mapReady, boundariesQuery.data]);
+
+  // Switching the active layer repaints the already-loaded source with a
+  // different fill-color/filter expression -- no new network request,
+  // since every layer's values are already present on each feature from
+  // the one boundaries fetch (docs/design/explore-health-equity-research.md
+  // §10, DEC-073).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !map.getLayer(FILL_LAYER)) return;
+    map.setPaintProperty(FILL_LAYER, "fill-color", buildFillColorExpression(activeLayer));
+    map.setFilter(NO_DATA_HATCH_LAYER, buildNullFilterExpression(activeLayer));
+  }, [activeLayer, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -324,6 +391,27 @@ export function ExploreMap({
 
   return (
     <div className="relative">
+      <label className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium text-[var(--color-text-primary)]">Map layer</span>
+        <select
+          value={activeLayer}
+          onChange={(e) => setActiveLayer(e.target.value as MapLayerId)}
+          className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
+        >
+          {MAP_LAYERS.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-[var(--color-text-secondary)]">{layerDef.description}</span>
+      </label>
+      {activeLayer !== "score" && (
+        <p className="mb-2 text-xs text-[var(--color-text-tertiary)]">
+          Viewing the {layerDef.label} layer. The accessible table view and the selected-place profile below always
+          show the full combined score alongside every domain, regardless of which map layer is active.
+        </p>
+      )}
       {boundariesQuery.isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-surface)]">
           <LoadingRegion label="Loading map data">
@@ -334,7 +422,7 @@ export function ExploreMap({
       <div
         ref={containerRef}
         role="application"
-        aria-label="Map of Santa Clara County census tracts, shaded by combined concern score. A fully accessible table with the same data is available in the table view."
+        aria-label={`Map of Santa Clara County census tracts, shaded by ${layerDef.label.toLowerCase()}. A fully accessible table with the same data is available in the table view.`}
         className="h-[480px] w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] sm:h-[560px]"
       />
       {clickError && (
@@ -349,33 +437,89 @@ export function ExploreMap({
         </p>
       )}
       {hoverInfo && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-3 z-10 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)]"
-        >
-          <p className="font-semibold text-[var(--color-text-primary)]">{hoverInfo.name}</p>
-          <p className="text-[var(--color-text-secondary)]">
-            {hoverInfo.score !== null ? `Score: ${Math.round(hoverInfo.score)}/100` : "No score for this scenario"}
-          </p>
-        </div>
+        <MapHoverCard properties={hoverInfo} layerDef={layerDef} ranking={layerRanking} />
       )}
-      <MapLegend />
+      <MapLegend layerDef={layerDef} />
     </div>
   );
 }
 
-function MapLegend() {
+/** Concise on purpose (docs/design/explore-health-equity-research.md §5.5
+ * point 5 -- "do not overload the hover tooltip with the complete driver
+ * analysis"): name, a plain-language concern label, countywide rank
+ * (computed client-side, no request), the top domain, a confidence flag
+ * when coverage is thin, and a prompt toward the full profile. `aria-hidden`
+ * since it's decorative and duplicates data already reachable via the
+ * accessible table -- consistent with the pre-existing convention here. */
+function MapHoverCard({
+  properties,
+  layerDef,
+  ranking,
+}: {
+  properties: TractBoundaryFeatureProperties;
+  layerDef: ReturnType<typeof getMapLayer>;
+  ranking: { rankMap: Map<string, { rank: number; percentile: number }>; total: number };
+}) {
+  const value = layerDef.getValue(properties);
+  const rankInfo = ranking.rankMap.get(properties.tract_geoid_2020);
+  const topDomains = MAP_LAYERS.filter((l) => l.id !== "score" && l.id !== "confidence")
+    .map((l) => ({ label: l.label, value: l.getValue(properties) }))
+    .filter((d): d is { label: string; value: number } => d.value !== null)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 2);
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-3 top-3 z-10 max-w-[220px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs shadow-[var(--shadow-md)]"
+    >
+      <p className="font-semibold text-[var(--color-text-primary)]">{properties.name}</p>
+      {value !== null ? (
+        <>
+          <p className="text-[var(--color-text-secondary)]">
+            {concernBandLabel(value, layerDef.label.toLowerCase())}
+          </p>
+          {rankInfo && (
+            <p className="text-[var(--color-text-secondary)]">
+              Higher than {rankInfo.percentile}% of {ranking.total} tracts (#{rankInfo.rank})
+            </p>
+          )}
+          {topDomains.length > 0 && (
+            <p className="text-[var(--color-text-tertiary)]">
+              Top domain{topDomains.length > 1 ? "s" : ""}: {topDomains.map((d) => d.label).join(", ")}
+            </p>
+          )}
+          {properties.coverage_fraction !== null && properties.coverage_fraction < 0.7 && (
+            <p className="text-[var(--color-caution-strong)]">Limited data for this tract</p>
+          )}
+        </>
+      ) : (
+        <p className="text-[var(--color-text-secondary)]">No score for this scenario</p>
+      )}
+      <p className="mt-1 text-[var(--color-text-tertiary)]">Select for full profile</p>
+    </div>
+  );
+}
+
+function MapLegend({ layerDef }: { layerDef: ReturnType<typeof getMapLayer> }) {
+  const scale = layerDef.direction === "higher-better" ? [...CONCERN_SCALE].reverse() : CONCERN_SCALE;
+  const lowLabel = layerDef.direction === "higher-better" ? "Lower confidence" : "Lower concern";
+  const highLabel = layerDef.direction === "higher-better" ? "Higher confidence" : "Higher concern";
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-      <span className="font-medium text-[var(--color-text-primary)]">Combined concern:</span>
+      <span className="font-medium text-[var(--color-text-primary)]">{layerDef.label}:</span>
       <div className="flex items-center gap-1.5">
-        <span>Lower concern</span>
-        <div className="flex h-3 w-32 overflow-hidden rounded-full" role="img" aria-label="Color scale from lower concern (teal) to higher concern (red)">
-          {CONCERN_SCALE.map((color) => (
-            <span key={color} className="h-full flex-1" style={{ backgroundColor: color }} />
+        <span>{lowLabel}</span>
+        <div
+          className="flex h-3 w-32 overflow-hidden rounded-full"
+          role="img"
+          aria-label={`Color scale from ${lowLabel.toLowerCase()} (teal) to ${highLabel.toLowerCase()} (red)`}
+        >
+          {scale.map((color, i) => (
+            <span key={`${color}-${i}`} className="h-full flex-1" style={{ backgroundColor: color }} />
           ))}
         </div>
-        <span>Higher concern</span>
+        <span>{highLabel}</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span

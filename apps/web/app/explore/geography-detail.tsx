@@ -15,16 +15,22 @@ import {
   ErrorState,
   EmptyState,
   GuidedNextStep,
+  MetricDirectionLabel,
+  GlossaryTerm,
+  MobileBottomSheet,
 } from "@scc-health/ui";
 import {
   api,
   ApiError,
   type ScoreExplanationResponse,
   type DomainContributionDetail,
+  type MetricContribution,
 } from "@/lib/api";
 import type { SelectedGeography } from "./selection";
 import { domainLabel } from "@/lib/labels";
+import { GLOSSARY } from "@/lib/glossary";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
+import { concernBandLabel } from "./layers";
 
 export function GeographyDetail({
   selected,
@@ -43,13 +49,250 @@ export function GeographyDetail({
   onSelect: (selection: SelectedGeography) => void;
 }) {
   if (!selected) {
-    return (
-      <EmptyState
-        title="No place selected yet"
-        description="Search for a city, district, or tract, or click a tract on the map, to see its health, access, and resource profile."
-      />
-    );
+    return <ExploreOrientation />;
   }
+  return <SelectedGeographyDetail selected={selected} scenarioId={scenarioId} onCompare={onCompare} onClearSelection={onClearSelection} onSelect={onSelect} />;
+}
+
+/** The mobile equivalent of `GeographyDetail`: a persistent collapsed
+ * summary bar (place, concern category, rank -- reachable without
+ * opening anything) plus a "View full profile" trigger that opens the
+ * exact same `SelectedGeographyDetail` content in a bottom sheet. The
+ * map stays visible above the collapsed bar; opening the sheet is a
+ * real modal (native <dialog>, so a genuine focus trap + Escape-to-close
+ * is appropriate once the map really is covered).
+ *
+ * Deliberately two states (collapsed / expanded), not three -- a third
+ * "intermediate" height with drag-to-resize was in scope per this task's
+ * instructions but was judged, given this pass's time budget, a
+ * meaningfully larger engineering effort (drag physics, snap points, a
+ * keyboard/screen-reader equivalent for the drag gesture) than a
+ * two-state sheet, which already satisfies the collapsed-state content
+ * requirement and the "map stays visible, sheet doesn't trap focus
+ * incorrectly" requirements. Recorded as a real, disclosed scope
+ * decision (see the final report), not a silent omission. */
+export function MobileSelectedSheet({
+  selected,
+  scenarioId,
+  onCompare,
+  onClearSelection,
+  onSelect,
+}: {
+  selected: SelectedGeography | null;
+  scenarioId: string;
+  onCompare: () => void;
+  onClearSelection: () => void;
+  onSelect: (selection: SelectedGeography) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!selected) {
+    return <ExploreOrientation />;
+  }
+
+  return (
+    <div>
+      <MobileCollapsedSummary selected={selected} scenarioId={scenarioId} onExpand={() => setExpanded(true)} />
+      <MobileBottomSheet
+        open={expanded}
+        onClose={() => setExpanded(false)}
+        title={selected.displayName || "Selected place"}
+      >
+        <SelectedGeographyDetail
+          selected={selected}
+          scenarioId={scenarioId}
+          onCompare={() => {
+            // ComparisonPanel renders as a sibling of this sheet in
+            // explore-client.tsx, not inside it -- leaving the sheet open
+            // would strand the comparison workflow behind the modal's
+            // backdrop, genuinely unreachable (live-verified: the sheet
+            // stayed open and covered the newly-rendered panel entirely).
+            setExpanded(false);
+            onCompare();
+          }}
+          onClearSelection={() => {
+            setExpanded(false);
+            onClearSelection();
+          }}
+          onSelect={(next) => {
+            setExpanded(false);
+            onSelect(next);
+          }}
+        />
+      </MobileBottomSheet>
+    </div>
+  );
+}
+
+function MobileCollapsedSummary({
+  selected,
+  scenarioId,
+  onExpand,
+}: {
+  selected: SelectedGeography;
+  scenarioId: string;
+  onExpand: () => void;
+}) {
+  // Same query keys TractDetail/PlaceDetail/DistrictDetail's own queries
+  // use -- TanStack Query dedupes identical in-flight/cached queries
+  // across components, so this never issues a second network request
+  // once the sheet's own SelectedGeographyDetail (mounted alongside this,
+  // per Dialog always rendering its children regardless of open state)
+  // has fetched it.
+  const explainQuery = useQuery({
+    queryKey: ["explain-score", scenarioId, selected.geoid],
+    queryFn: () => api.explainScore(scenarioId, selected.geoid),
+    retry: 1,
+    enabled: selected.geographyType === "tract",
+  });
+  const placeQuery = useQuery({
+    queryKey: ["place-profile", selected.geoid],
+    queryFn: () => api.getPlaceProfile(selected.geoid),
+    retry: 1,
+    enabled: selected.geographyType === "place",
+  });
+  const districtQuery = useQuery({
+    queryKey: ["district-profile", Number(selected.geoid)],
+    queryFn: () => api.getSupervisorDistrictProfile(Number(selected.geoid)),
+    retry: 1,
+    enabled: selected.geographyType === "supervisor_district",
+  });
+
+  const explanation = selected.geographyType === "tract" ? explainQuery.data : undefined;
+  const mc = explanation?.monte_carlo;
+
+  // A place or district selected purely from a URL round-trip carries its
+  // raw GEOID as `displayName` (selection.ts) -- resolved here from the
+  // fetched profile the same way the desktop panel's own heading does, so
+  // the collapsed bar never shows a bare place GEOID like "0668000"
+  // (Phase 6.5's "never show a raw place GEOID" rule, extended to this
+  // pass's new mobile summary).
+  const resolvedName =
+    selected.geographyType === "place"
+      ? placeQuery.data?.name_long
+      : selected.geographyType === "supervisor_district"
+        ? districtQuery.data
+          ? `Supervisor District ${districtQuery.data.district_number}`
+          : undefined
+        : selected.displayName;
+
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left shadow-[var(--shadow-sm)]"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{resolvedName ?? "Loading…"}</p>
+        {explanation?.score != null ? (
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            {concernBandLabel(explanation.score, "combined concern")}
+            {mc?.median_rank != null && <> · #{Math.round(mc.median_rank)} countywide</>}
+          </p>
+        ) : (
+          <p className="text-xs text-[var(--color-text-secondary)]">Tap to view its full profile</p>
+        )}
+      </div>
+      <span aria-hidden="true" className="flex-none text-sm font-medium text-[var(--color-interactive)]">
+        View profile →
+      </span>
+    </button>
+  );
+}
+
+/** Non-modal orientation shown only while nothing is selected -- replaced
+ * entirely by the real profile once a place is picked, never a dismissible
+ * overlay the user has to close (docs/design/explore-health-equity-research.md
+ * §1, the Tree Equity Score National Explorer's permanent numbered
+ * sidebar list is the transferable pattern here, not its wording or
+ * visual design). */
+function ExploreOrientation() {
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        <GlossaryTerm definition={GLOSSARY.healthEquity}>
+          <strong className="font-semibold text-[var(--color-text-primary)]">Health equity</strong>
+        </GlossaryTerm>{" "}
+        means everyone has a fair and just opportunity to reach their highest level of health.{" "}
+        <a
+          href="https://www.cdc.gov/health-disparities-hiv-std-tb-hepatitis/about/index.html"
+          className="text-[var(--color-interactive)] underline underline-offset-2"
+        >
+          CDC definition
+        </a>
+        . This page helps you see where health need, access barriers, and resource gaps overlap across Santa Clara
+        County's{" "}
+        <GlossaryTerm definition={GLOSSARY.censusTract}>census tracts</GlossaryTerm>.
+      </p>
+      <ol className="mt-4 space-y-3 text-sm">
+        <li className="flex gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[var(--color-interactive-subtle)] text-xs font-semibold text-[var(--color-interactive)]"
+          >
+            1
+          </span>
+          <span>
+            <strong className="font-medium text-[var(--color-text-primary)]">Search for a community</strong> by
+            city, ZIP code, supervisor district, or tract number.
+          </span>
+        </li>
+        <li className="flex gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[var(--color-interactive-subtle)] text-xs font-semibold text-[var(--color-interactive)]"
+          >
+            2
+          </span>
+          <span>
+            <strong className="font-medium text-[var(--color-text-primary)]">Select a shaded tract</strong> on the
+            map, or a row in Table view, to open its full profile.
+          </span>
+        </li>
+        <li className="flex gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[var(--color-interactive-subtle)] text-xs font-semibold text-[var(--color-interactive)]"
+          >
+            3
+          </span>
+          <span>
+            <strong className="font-medium text-[var(--color-text-primary)]">Understand what drives the result</strong>{" "}
+            -- every score decomposes into the exact{" "}
+            <GlossaryTerm definition={GLOSSARY.driver}>drivers</GlossaryTerm> behind it, with sources and{" "}
+            <GlossaryTerm definition={GLOSSARY.confidence}>confidence</GlossaryTerm>.
+          </span>
+        </li>
+        <li className="flex gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[var(--color-interactive-subtle)] text-xs font-semibold text-[var(--color-interactive)]"
+          >
+            4
+          </span>
+          <span>
+            <strong className="font-medium text-[var(--color-text-primary)]">Compare or use the evidence</strong> in
+            Prioritize, Advocate, or Copilot.
+          </span>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+function SelectedGeographyDetail({
+  selected,
+  scenarioId,
+  onCompare,
+  onClearSelection,
+  onSelect,
+}: {
+  selected: SelectedGeography;
+  scenarioId: string;
+  onCompare: () => void;
+  onClearSelection: () => void;
+  onSelect: (selection: SelectedGeography) => void;
+}) {
   if (selected.geographyType === "tract") {
     return (
       <TractDetail
@@ -128,15 +371,8 @@ function GeographyLoadError({
   );
 }
 
-const SCORE_BANDS: { min: number; label: string }[] = [
-  { min: 75, label: "high combined concern" },
-  { min: 50, label: "moderate-to-high combined concern" },
-  { min: 25, label: "moderate-to-low combined concern" },
-  { min: 0, label: "lower combined concern" },
-];
-
 function scoreBandLabel(score: number): string {
-  return SCORE_BANDS.find((band) => score >= band.min)?.label ?? "combined concern";
+  return concernBandLabel(score, "combined concern");
 }
 
 function TractDetail({
@@ -161,6 +397,23 @@ function TractDetail({
     queryKey: ["explain-score", scenarioId, tractGeoid],
     queryFn: () => api.explainScore(scenarioId, tractGeoid),
     retry: 1,
+  });
+  // Same query key ExploreMap uses for its boundaries fetch -- reads from
+  // the shared TanStack Query cache instead of a second network request
+  // in the common case where the map is already mounted, giving a real
+  // countywide denominator instead of a hardcoded "408"
+  // (docs/design/explore-health-equity-research.md §4).
+  const boundariesQuery = useQuery({
+    queryKey: ["tract-boundaries", scenarioId],
+    queryFn: () => api.getAllTractBoundaries(scenarioId),
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+  const domainsRegistryQuery = useQuery({
+    queryKey: ["domains-registry"],
+    queryFn: api.getDomains,
+    retry: 1,
+    staleTime: 10 * 60 * 1000,
   });
 
   if (profileQuery.isLoading || explainQuery.isLoading) {
@@ -189,14 +442,52 @@ function TractDetail({
   const explanation = explainQuery.data;
   if (!profile || !explanation) return null;
 
-  const topDomain = [...explanation.domains]
-    .filter((d) => d.domain_score !== null)
-    .sort((a, b) => (b.domain_score ?? 0) - (a.domain_score ?? 0))[0];
+  const totalTracts = boundariesQuery.data?.features.length ?? null;
+
+  // Ranked by CONTRIBUTION (percentile x this scenario's actual weight
+  // for that domain) -- not by raw domain_score/percentile. A domain can
+  // have the single highest percentile in the tract yet contribute less
+  // to the composite score than a domain with a merely-moderate
+  // percentile if the scenario weights it more heavily. Sorting by
+  // domain_score alone (the previous implementation) silently agreed
+  // with contribution-sorting only by coincidence under this platform's
+  // one equally-weighted scenario, and would misidentify the top driver
+  // under any of the other 7, unequally-weighted scenarios -- verified
+  // live and documented in docs/design/explore-health-equity-research.md §2/§7.
+  const rankedDomains = [...explanation.domains]
+    .filter((d) => d.contribution !== null)
+    .sort((a, b) => (b.contribution ?? 0) - (a.contribution ?? 0));
+  const topDomain = rankedDomains[0];
+  const lowestDomain = rankedDomains[rankedDomains.length - 1];
+
+  const rankedMetrics = explanation.domains
+    .flatMap((d) => d.metrics)
+    .filter((m) => m.contribution !== null)
+    .sort((a, b) => (b.contribution ?? 0) - (a.contribution ?? 0));
+  const meanMetricContribution =
+    rankedMetrics.length > 0
+      ? rankedMetrics.reduce((sum, m) => sum + (m.contribution ?? 0), 0) / rankedMetrics.length
+      : 0;
+
+  const presentMetricIds = new Set(rankedMetrics.map((m) => m.metric_id));
+  const missingMetrics = (domainsRegistryQuery.data?.domains ?? [])
+    .filter((d) => explanation.domains.some((ed) => ed.domain === d.domain))
+    .flatMap((d) => d.metrics)
+    .filter((m) => !presentMetricIds.has(m.metric_id));
+
+  const mc = explanation.monte_carlo;
+  const comparisonPercentile =
+    mc?.median_rank != null && totalTracts != null && totalTracts > 1
+      ? Math.round(((totalTracts - mc.median_rank) / (totalTracts - 1)) * 100)
+      : null;
 
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-interactive)]">
+            Health Equity Screening Profile
+          </p>
           <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Tract {profile.tract_geoid_2020}</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {profile.name_long} · <DataModeBadge mode={profile.data_mode} />
@@ -207,28 +498,43 @@ function TractDetail({
         </Button>
       </div>
 
-      {/* A. Plain-language summary */}
-      <p className="mt-3 rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] p-3 text-sm text-[var(--color-text-primary)]">
+      {/* Headline result + comparison */}
+      {explanation.score !== null && comparisonPercentile !== null && totalTracts !== null && (
+        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+          Higher than <strong className="text-[var(--color-text-primary)]">{comparisonPercentile}%</strong> of{" "}
+          {totalTracts} Santa Clara County tracts, under the <strong>{explanation.scenario_label}</strong> scenario.
+        </p>
+      )}
+
+      {/* Plain-language interpretation */}
+      <p className="mt-2 rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] p-3 text-sm text-[var(--color-text-primary)]">
         {explanation.score !== null ? (
           <>
-            Under the <strong>{explanation.scenario_label}</strong> scenario, this tract shows{" "}
-            <strong>{scoreBandLabel(explanation.score)}</strong> relative to the rest of Santa Clara County
+            This tract shows <strong>{scoreBandLabel(explanation.score)}</strong> under the current scenario
             {topDomain ? (
               <>
-                , driven mainly by <strong>{domainLabel(topDomain.domain)}</strong>
+                , contributed to primarily by <strong>{domainLabel(topDomain.domain).toLowerCase()}</strong> (
+                {(topDomain.contribution ?? 0).toFixed(1)} of {explanation.score.toFixed(1)} points)
               </>
             ) : null}
-            .
+            {lowestDomain && topDomain && lowestDomain.domain !== topDomain.domain ? (
+              <>
+                . Its <strong>{domainLabel(lowestDomain.domain).toLowerCase()}</strong> profile is comparatively
+                closer to the county middle
+              </>
+            ) : null}
+            . This is a screening signal describing how this tract's own scenario-weighted score was built, not a
+            claim about what caused any underlying condition.
           </>
         ) : (
           "There isn't enough data to compute a combined score for this tract under this scenario."
         )}
       </p>
 
-      {/* C. Scenario score */}
-      <ScoreSummary explanation={explanation} />
+      {/* Scenario score, uncertainty, confidence */}
+      <ScoreSummary explanation={explanation} totalTracts={totalTracts} />
 
-      {/* D + E. Domain breakdown / driver decomposition */}
+      {/* Domain breakdown */}
       <div className="mt-6">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">What's driving this score</h3>
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
@@ -246,6 +552,46 @@ function TractDetail({
         )}
       </div>
 
+      {/* Why this area appears here -- ranked specific drivers */}
+      {rankedMetrics.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Why this area appears here</h3>
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            The individual measures contributing the most to this tract's score, ranked by how many points each
+            contributed.
+          </p>
+          <ul className="mt-3 space-y-3">
+            {rankedMetrics.slice(0, 5).map((metric) => (
+              <DriverRow
+                key={metric.metric_id}
+                metric={metric}
+                isStrongDriver={(metric.contribution ?? 0) >= meanMetricContribution * 1.5}
+              />
+            ))}
+          </ul>
+          {missingMetrics.length > 0 && (
+            <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] p-3">
+              <p className="text-xs font-medium text-[var(--color-text-secondary)]">Insufficient data</p>
+              <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+                No data for this tract: {missingMetrics.map((m) => m.label).join(", ")}. Not counted as zero or
+                averaged in from elsewhere -- simply excluded from this score.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* What this does not mean */}
+      <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">What this does not mean</h3>
+        <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-[var(--color-text-secondary)]">
+          <li>This screening result is not a diagnosis of this tract or the people who live there.</li>
+          <li>It does not prove that any factor shown here causes any other.</li>
+          <li>It does not by itself determine eligibility for any funding or program.</li>
+          <li>Community context and lived experience are still necessary to act on this information.</li>
+        </ul>
+      </div>
+
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" onClick={() => setEvidenceOpen(true)}>
           View sources &amp; evidence
@@ -258,6 +604,7 @@ function TractDetail({
           }}
           scenarioId={scenarioId}
         />
+        <CopyLinkButton />
       </div>
 
       <GuidedNextStep prompt="What would you like to do next?">
@@ -276,8 +623,69 @@ function TractDetail({
   );
 }
 
-function ScoreSummary({ explanation }: { explanation: ScoreExplanationResponse }) {
+function DriverRow({ metric, isStrongDriver }: { metric: MetricContribution; isStrongDriver: boolean }) {
+  return (
+    <li className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <span className="text-sm font-medium text-[var(--color-text-primary)]">{metric.label}</span>
+        <Badge tone={isStrongDriver ? "interactive" : "neutral"}>
+          {isStrongDriver ? "Strong driver" : "Contributor"}
+        </Badge>
+      </div>
+      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
+        {metric.percentile !== null && (
+          <>
+            {" "}
+            · higher than <span className="tabular-nums">{Math.round(metric.percentile)}%</span> of county tracts
+          </>
+        )}
+      </p>
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+        Contributed <span className="tabular-nums">{(metric.contribution ?? 0).toFixed(1)}</span> of this tract's
+        score points ({Math.round(metric.effective_weight * 100)}% of this scenario's weight for this tract).
+      </p>
+      <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{metric.plain_language_definition}</p>
+      {metric.limitations && (
+        <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">Limitation: {metric.limitations}</p>
+      )}
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{metric.citation}</p>
+    </li>
+  );
+}
+
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch {
+          // Clipboard API unavailable (e.g. insecure context) -- the URL
+          // is already shareable by copying it from the address bar, so
+          // this failing silently doesn't block the underlying task.
+        }
+      }}
+    >
+      {copied ? "Link copied" : "Copy link"}
+    </Button>
+  );
+}
+
+function ScoreSummary({
+  explanation,
+  totalTracts,
+}: {
+  explanation: ScoreExplanationResponse;
+  totalTracts: number | null;
+}) {
   const mc = explanation.monte_carlo;
+  const dc = explanation.data_confidence;
   return (
     <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
       <div className="flex items-center justify-between gap-3">
@@ -308,7 +716,9 @@ function ScoreSummary({ explanation }: { explanation: ScoreExplanationResponse }
         )}
         {mc?.median_rank !== null && mc?.median_rank !== undefined && (
           <div>
-            <dt className="text-xs text-[var(--color-text-secondary)]">Countywide rank (of 408)</dt>
+            <dt className="text-xs text-[var(--color-text-secondary)]">
+              Countywide rank{totalTracts !== null ? ` (of ${totalTracts})` : ""}
+            </dt>
             <dd className="tabular-nums">
               #{Math.round(mc.median_rank)}
               {mc.rank_ci_lower !== null && mc.rank_ci_upper !== null && (
@@ -327,6 +737,19 @@ function ScoreSummary({ explanation }: { explanation: ScoreExplanationResponse }
           </div>
         )}
       </dl>
+
+      {dc && (
+        <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+          Stability and confidence are two different questions: stability is how much this tract's{" "}
+          <em>rank</em> shifts if priorities were weighted differently; confidence ({Math.round(dc.confidence_score * 100)}%) is
+          how complete and precise the underlying data itself is. A tract can be rank-stable and still
+          data-limited if confidence falls below the platform's threshold.{" "}
+          <Link href="/validate" className="text-[var(--color-interactive)] underline underline-offset-2">
+            See full methodology
+          </Link>
+          .
+        </p>
+      )}
 
       <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
         This is a county-relative screening score, not a prediction or a causal claim. A high score means this
@@ -355,6 +778,12 @@ function DomainDisclosure({ domain }: { domain: DomainContributionDetail }) {
           </span>
         </span>
       </summary>
+      {domain.domain_score !== null && (
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+          {concernBandLabel(domain.domain_score, domainLabel(domain.domain).toLowerCase())}, county-relative.{" "}
+          <MetricDirectionLabel direction="higher-is-more-concern" />
+        </p>
+      )}
       <div className="mt-3 space-y-3 border-t border-[var(--color-border)] pt-3">
         {domain.metrics.map((metric) => (
           <div key={metric.metric_id}>
