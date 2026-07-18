@@ -3,10 +3,10 @@ import { domainLabel } from "@/lib/labels";
 
 describe("domainLabel", () => {
   it("converts every known raw domain key to its plain-language label", () => {
-    expect(domainLabel("health_burden")).toBe("Health burden");
+    expect(domainLabel("health_burden")).toBe("Health needs");
     expect(domainLabel("access_barriers")).toBe("Access barriers");
-    expect(domainLabel("environmental_burden")).toBe("Environmental burden");
-    expect(domainLabel("resource_accessibility")).toBe("Resource accessibility");
+    expect(domainLabel("environmental_burden")).toBe("Environmental conditions");
+    expect(domainLabel("resource_accessibility")).toBe("Community resources");
     expect(domainLabel("workforce_shortage")).toBe("Workforce shortage");
   });
 
