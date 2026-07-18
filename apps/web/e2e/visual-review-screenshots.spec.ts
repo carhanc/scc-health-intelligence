@@ -44,7 +44,7 @@ for (const bp of BREAKPOINTS) {
         // collapsed summary bar (MobileSelectedSheet) -- open it so the
         // screenshot captures the actual profile, not just the bar.
         const collapsedButton = page.getByRole("button", {
-          name: /Tap to view its full profile|combined concern/,
+          name: /Tap to view its full profile|concern/,
         });
         if (await collapsedButton.isVisible().catch(() => false)) {
           await collapsedButton.click();

@@ -126,6 +126,6 @@ test.describe("Usability Task 7 -- understand what the platform cannot conclude"
 
     await page.goto("/explore?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/not a prediction or a causal claim/)).toBeVisible();
+    await expect(page.getByText(/not a diagnosis or causal conclusion/)).toBeVisible();
   });
 });

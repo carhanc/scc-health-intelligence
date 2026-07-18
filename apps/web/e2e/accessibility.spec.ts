@@ -303,7 +303,7 @@ test.describe("Keyboard navigation and focus", () => {
       // the full profile (and its own evidence button) becomes reachable.
       // The trailing "View profile ->" cue is aria-hidden, so match the
       // descriptive text that's actually part of the accessible name.
-      const collapsedButton = page.getByRole("button", { name: /Tap to view its full profile|combined concern/ });
+      const collapsedButton = page.getByRole("button", { name: /Tap to view its full profile|concern/ });
       await expect(collapsedButton).toBeVisible({ timeout: 10_000 });
       await collapsedButton.focus();
       await page.keyboard.press("Enter");

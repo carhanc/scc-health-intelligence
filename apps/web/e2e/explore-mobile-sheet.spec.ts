@@ -45,7 +45,7 @@ test.describe("Explore -- mobile collapsed summary and bottom sheet", () => {
     // row instead of the collapsed detail.
     await expect(sheet.getByText("Conditions that may shape health equity here")).toBeVisible();
     await expect(sheet.getByText("What is shaping this profile?")).toBeVisible();
-    await expect(sheet.locator("li").filter({ hasText: /higher than .* of county tracts/ }).first()).toBeVisible();
+    await expect(sheet.locator("li").filter({ hasText: /concern than|concern for the county/ }).first()).toBeVisible();
   });
 
   test("the expanded sheet closes via Escape and via the close button, returning to the collapsed bar", async ({

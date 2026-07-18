@@ -14,7 +14,7 @@ test.describe("Validate -- coverage, methods, uncertainty, validation, limitatio
     page,
   }) => {
     await page.goto("/validate?tab=methods");
-    await expect(page.getByText("How a combined score is built")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("How the health equity screening score is built")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/1\. Metric\./)).toBeVisible();
 
     await expect(page.getByRole("button", { name: /Health needs/ })).toBeVisible({ timeout: 15_000 });

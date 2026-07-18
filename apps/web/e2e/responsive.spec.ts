@@ -72,7 +72,7 @@ for (const bp of BREAKPOINTS) {
       // (MobileSelectedSheet) -- open it before asserting on the heading.
       if (bp.width < 1024) {
         await page
-          .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
+          .getByRole("button", { name: /Tap to view its full profile|concern/ })
           .click();
       }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
@@ -99,7 +99,7 @@ for (const bp of BREAKPOINTS) {
       // (MobileSelectedSheet).
       if (bp.width < 1024) {
         await page
-          .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
+          .getByRole("button", { name: /Tap to view its full profile|concern/ })
           .click();
       }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
@@ -108,7 +108,7 @@ for (const bp of BREAKPOINTS) {
       // design/health-equity-product-consolidation.md's headline-result
       // requirement) -- the always-visible proof of a rendered result is
       // the plain-language screening-view caption in the headline block.
-      await expect(page.getByText(/screening view$/)).toBeVisible();
+      await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Compare" }).click();
       // Tapping Compare from inside the mobile sheet closes it first (the
@@ -118,7 +118,7 @@ for (const bp of BREAKPOINTS) {
 
       if (bp.width < 1024) {
         await page
-          .getByRole("button", { name: /Tap to view its full profile|combined concern/ })
+          .getByRole("button", { name: /Tap to view its full profile|concern/ })
           .click();
       }
       await page.getByRole("button", { name: "View sources & evidence" }).click();

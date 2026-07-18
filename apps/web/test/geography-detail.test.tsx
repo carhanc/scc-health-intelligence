@@ -120,8 +120,12 @@ describe("GeographyDetail (tract, missing data)", () => {
     );
 
     await waitFor(() => expect(screen.getByText(/isn't enough data to compute a combined score/)).toBeInTheDocument());
-    // The score display must render an em dash placeholder, never "0".
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // The score display must render an em dash placeholder, never "0". The
+    // headline ScreeningScore component's own accessible name is the
+    // authoritative check -- both it and the collapsed "How this was
+    // calculated" disclosure legitimately render a second "—" glyph, so a
+    // bare screen.getByText("—") is ambiguous by design here, not a bug.
+    expect(screen.getByRole("img", { name: /screening score: not available/i })).toBeInTheDocument();
     expect(screen.queryByText("0", { selector: "p" })).not.toBeInTheDocument();
   });
 

@@ -5,10 +5,10 @@ test.describe("Prioritize -- scenario selection, custom weighting, results, expo
     await page.goto("/prioritize");
     await expect(page.getByRole("heading", { name: "Identify health-equity priorities", level: 1 })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeChecked({ timeout: 15_000 });
-    await expect(page.getByRole("columnheader", { name: /Combined priority score/ })).toBeVisible({
+    await expect(page.getByRole("columnheader", { name: /Health equity screening score/ })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText(/of 408 tracts have a combined priority score/)).toBeVisible();
+    await expect(page.getByText(/of 408 tracts have a health equity screening score/)).toBeVisible();
   });
 
   test("custom scenario reveals sliders and weights always sum to 100%", async ({ page }) => {

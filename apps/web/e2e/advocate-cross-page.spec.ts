@@ -6,7 +6,7 @@ test.describe("Advocate -- cross-page 'Use in Advocate' integration", () => {
     if (isMobile) {
       // Below the xl breakpoint the profile opens behind a collapsed
       // summary bar (MobileSelectedSheet); open it first.
-      await page.getByRole("button", { name: /Tap to view its full profile|combined concern/ }).click();
+      await page.getByRole("button", { name: /Tap to view its full profile|concern/ }).click();
     }
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({
       timeout: 15_000,

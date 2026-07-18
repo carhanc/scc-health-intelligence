@@ -110,13 +110,15 @@ describe("MobileSelectedSheet", () => {
       />,
     );
 
-    // "high combined concern" and "Census Tract 5005" both legitimately
-    // appear twice -- once in the collapsed summary button, once in the
-    // (always-mounted, per native <dialog>) sheet's own interpretation
-    // text/title -- so this scopes queries to the collapsed button itself
-    // rather than the whole document.
+    // "Census Tract 5005" legitimately appears twice -- once in the
+    // collapsed summary button, once in the (always-mounted, per native
+    // <dialog>) sheet's own interpretation text/title -- so this scopes
+    // queries to the collapsed button itself rather than the whole
+    // document. The collapsed bar shows the canonical score via the
+    // shared ScreeningScore component (compact mode: "85/100 · High
+    // concern"), not a bare concern-band phrase.
     const collapsedButton = screen.getByRole("button", { name: /Census Tract 5005/ });
-    await waitFor(() => expect(within(collapsedButton).getByText(/high combined concern/)).toBeInTheDocument());
+    await waitFor(() => expect(within(collapsedButton).getByText(/High concern/)).toBeInTheDocument());
     expect(within(collapsedButton).getByText(/#3 countywide/)).toBeInTheDocument();
     expect(within(collapsedButton).getByText("Census Tract 5005")).toBeInTheDocument();
   });

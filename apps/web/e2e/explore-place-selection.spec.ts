@@ -49,7 +49,7 @@ test.describe("Explore -- selecting a place pans the map to it", () => {
     // collapsed "How this was calculated" disclosure by design -- the
     // always-visible proof of a rendered result is the plain-language
     // screening-view caption in the headline block.
-    await expect(page.getByText(/screening view$/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("What is shaping this profile?")).toBeVisible();
   });
 });
