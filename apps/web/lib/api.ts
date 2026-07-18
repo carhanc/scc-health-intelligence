@@ -573,7 +573,13 @@ export interface OptimizationScenariosResponse {
 
 // --- Phase 7: Utilization ---
 
-export type DataStatus = "observed" | "modeled" | "suppressed";
+// "derived" is a real, distinct backend value (apps/api's advocacy_evidence.py
+// uses it for averaged/composite evidence, e.g. a value averaged across
+// multiple tracts, or the health equity screening score itself) -- found
+// live during this pass's verification, where it was passing through the
+// frontend's plain-language label function untranslated (see
+// dataStatusLabel in lib/advocacy-terms.ts).
+export type DataStatus = "observed" | "modeled" | "suppressed" | "derived";
 
 export interface CountyTrendPoint {
   breakdown_category: string;

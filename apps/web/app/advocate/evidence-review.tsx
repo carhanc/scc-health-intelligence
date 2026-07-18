@@ -2,19 +2,34 @@
 
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
+import { Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type AdvocacyEvidenceItem } from "@/lib/api";
-import { dataStatusDefinition } from "@/lib/glossary";
+import { dataStatusDefinition, dataStatusLabel } from "@/lib/advocacy-terms";
 import type { SelectedGeography } from "../explore/selection";
 import { CUSTOM_SCENARIO_ID } from "../prioritize/scenario-selector";
 
+/** Plain-language group heading for an evidence item's backend
+ * `category` field (docs/design/advocate-intuitive-workspace-research.md
+ * §9 -- grouped by theme, not shown as an internal category word). The
+ * backend category is the real, already-available grouping signal;
+ * a finer 5-domain split would require attaching a domain to every
+ * individual metric evidence item server-side, which this pass does not
+ * add (no new evidence, no backend calculation change). */
+const GROUP_LABELS: Record<string, string> = {
+  scenario_score: "Health equity screening score",
+  metric: "Health needs and community conditions",
+  access: "Access barriers",
+  resource: "Community resources",
+  utilization: "Service use",
+};
+const GROUP_ORDER = ["scenario_score", "metric", "access", "resource", "utilization"];
+
 /**
- * Step 3 ("Review matched evidence") / step 4 ("Select what matters").
- * Fetches the real evidence bundle for the selected geography+scenario
- * and lets the user select, remove, and reorder which items become part
- * of the workspace -- selection state (including order) lives in the
- * parent workspace's `selectedEvidenceIds` array, not here, so it
- * survives a save/reload.
+ * Evidence stage: fetches the real evidence found for the selected
+ * geography+scenario and lets the user include, remove, and reorder
+ * which facts become part of the project -- selection state (including
+ * order) lives in the parent project's `selectedEvidenceIds` array, not
+ * here, so it survives a save/reload.
  */
 export function EvidenceReview({
   selectedGeography,
@@ -54,7 +69,7 @@ export function EvidenceReview({
   if (!selectedGeography) {
     return (
       <p className="text-sm text-[var(--color-text-secondary)]">
-        Choose a place above to see matched evidence.
+        Choose a place in the Project step to see evidence found for it.
       </p>
     );
   }
@@ -83,18 +98,23 @@ export function EvidenceReview({
     .filter((item): item is AdvocacyEvidenceItem => item !== undefined);
   const unselectedItems = query.data.items.filter((item) => !selectedEvidenceIds.includes(item.evidence_id));
 
+  const unselectedGroups = GROUP_ORDER.map((category) => ({
+    category,
+    label: GROUP_LABELS[category] ?? category,
+    items: unselectedItems.filter((item) => item.category === category),
+  })).filter((g) => g.items.length > 0);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        {query.data.items.length} evidence item(s) found for {query.data.geography_label}.{" "}
-        {selectedEvidenceIds.length} selected. <DataModeBadge mode={query.data.data_mode} />
+        {query.data.items.length} fact{query.data.items.length === 1 ? "" : "s"} found for{" "}
+        {query.data.geography_label}. {selectedEvidenceIds.length} selected.{" "}
+        <DataModeBadge mode={query.data.data_mode} />
       </p>
 
       {selectedItems.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-[var(--color-text-primary)]">
-            Selected, in export order
-          </h3>
+          <h3 className="text-xs font-semibold text-[var(--color-text-primary)]">Evidence you're using</h3>
           <ul className="mt-1.5 space-y-2">
             {selectedItems.map((item, index) => (
               <li key={item.evidence_id}>
@@ -113,18 +133,18 @@ export function EvidenceReview({
         </div>
       )}
 
-      {unselectedItems.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-[var(--color-text-primary)]">Available evidence</h3>
+      {unselectedGroups.map((group) => (
+        <div key={group.category}>
+          <h3 className="text-xs font-semibold text-[var(--color-text-primary)]">{group.label}</h3>
           <ul className="mt-1.5 space-y-2">
-            {unselectedItems.map((item) => (
+            {group.items.map((item) => (
               <li key={item.evidence_id}>
                 <EvidenceCard item={item} isSelected={false} onToggle={() => onToggleEvidence(item)} />
               </li>
             ))}
           </ul>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -143,24 +163,24 @@ function EvidenceCard({
   onMoveDown?: () => void;
 }) {
   return (
-    <Card>
+    <Card className={isSelected ? "border-[var(--color-interactive)]" : ""}>
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={onToggle}
-          aria-label={`Include ${item.label} in this workspace`}
+          aria-label={`${isSelected ? "Remove" : "Include"} ${item.label} ${isSelected ? "from" : "in"} this project`}
           className="mt-1"
         />
         <div className="flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium text-[var(--color-text-primary)]">{item.label}</span>
-            <Badge
-              tone={item.data_status === "modeled" ? "caution" : "neutral"}
+            <span
+              className="rounded-full border border-[var(--color-border-strong)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]"
               title={dataStatusDefinition(item.data_status)}
             >
-              {item.data_status}
-            </Badge>
+              {dataStatusLabel(item.data_status)}
+            </span>
           </div>
           <p className="text-sm text-[var(--color-text-secondary)]">{item.value}</p>
           <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">

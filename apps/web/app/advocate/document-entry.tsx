@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Badge, Button, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type DocumentAnalysisResponse } from "@/lib/api";
+import { ADVOCACY_TERMS } from "@/lib/advocacy-terms";
 
 const UPLOAD_WARNING =
   "Upload only documents you are authorized to use. Do not upload patient records, protected " +
@@ -44,11 +45,12 @@ export function DocumentEntry({
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-        Or start from a meeting document
+        Find useful evidence in a document
       </h2>
       <p className="text-xs text-[var(--color-text-secondary)]">
-        Upload an agenda, staff report, budget memo, minutes, or plain-text/PDF/DOCX document.
-        It is processed once, in memory, and never saved on the server.
+        Upload a PDF, DOCX, or plain-text document -- an agenda, staff report, budget memo, or minutes.
+        The platform will identify passages that may be relevant to your project. Your document is
+        processed temporarily and is not saved.
       </p>
 
       <div className="rounded-[var(--radius-md)] border border-[var(--color-caution)] bg-[var(--color-caution-subtle)] p-3 text-sm text-[var(--color-caution-strong)]">
@@ -103,7 +105,7 @@ export function DocumentEntry({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold text-[var(--color-text-primary)]">
-              Analyzed documents this session
+              Documents reviewed for this project
             </h3>
             <Button size="sm" variant="ghost" onClick={onClearFindings}>
               Clear all uploaded-document data
@@ -140,19 +142,27 @@ function DocumentFindingCard({ finding }: { finding: DocumentAnalysisResponse })
           Geographies mentioned: {finding.detected_geographies.join(", ")}
         </p>
       )}
-      {finding.detected_topics.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {finding.detected_topics.map((topic) => (
-            <li key={topic.topic_id} className="text-xs text-[var(--color-text-secondary)]">
-              <strong className="font-medium text-[var(--color-text-primary)]">{topic.label}</strong>
-              {topic.unavailable_reason
-                ? ` -- ${topic.unavailable_reason}`
-                : topic.scenarios.length > 0
-                  ? ` -- related to the "${topic.scenarios[0]}" priority scenario`
-                  : ""}
-            </li>
-          ))}
-        </ul>
+      {finding.detected_topics.length > 0 ? (
+        <div className="mt-2">
+          <p className="text-xs font-semibold text-[var(--color-text-primary)]">
+            We found {finding.detected_topics.length} potentially relevant passage
+            {finding.detected_topics.length === 1 ? "" : "s"}
+          </p>
+          <ul className="mt-1 space-y-1">
+            {finding.detected_topics.map((topic) => (
+              <li key={topic.topic_id} className="text-xs text-[var(--color-text-secondary)]">
+                <strong className="font-medium text-[var(--color-text-primary)]">{topic.label}</strong>
+                {topic.unavailable_reason
+                  ? ` -- ${topic.unavailable_reason}`
+                  : topic.scenarios.length > 0
+                    ? ` -- related to the "${topic.scenarios[0]}" priority scenario`
+                    : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">{ADVOCACY_TERMS.noRelevantPassages}</p>
       )}
       {finding.structure.agenda_item_headers.length > 0 && (
         <details className="mt-2">

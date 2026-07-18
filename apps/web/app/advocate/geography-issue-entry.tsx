@@ -30,9 +30,7 @@ export function GeographyIssueEntry({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div>
-        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-          1. Choose a place
-        </h2>
+        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Choose a place</h2>
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           Search a city, ZIP code, supervisor district, or census tract -- you never need to
           already know a tract number.
@@ -43,9 +41,7 @@ export function GeographyIssueEntry({
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-          2. Choose the issue
-        </h2>
+        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Choose the issue</h2>
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           Pick a priority lens, or set your own weighting.
         </p>
