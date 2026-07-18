@@ -42,6 +42,13 @@ export interface AdvocacyWorkspace {
   workspaceId: string;
   schemaVersion: number;
   title: string;
+  /** Whether `title` was set by the user (via rename) or is still the
+   * auto-suggested default -- lets the UI keep re-suggesting a better
+   * title as place/goal/output change, without ever overwriting a name
+   * the user actually chose (docs/design/advocate-intuitive-workspace-
+   * research.md §"project naming"). Optional/defaulted for backward
+   * compatibility with workspaces saved before this field existed. */
+  titleIsUserSet: boolean;
   createdAt: string;
   updatedAt: string;
   selectedGeography: SelectedGeographyRef | null;
@@ -54,18 +61,23 @@ export interface AdvocacyWorkspace {
   documentFindings: DocumentAnalysisResponse[];
   userNotes: string;
   targetAudience: string;
+  /** Plain-language answer to "What do you want this document to help
+   * accomplish?" -- new field, additive-only (see migrateWorkspace: an
+   * older saved project or backup without it defaults to ""). */
+  projectGoal: string;
   meetingDetails: MeetingDetails;
   requestedOutputs: string[];
   exportHistory: ExportHistoryEntry[];
   configurationHash: string | null;
 }
 
-export function createEmptyWorkspace(title = "Untitled workspace"): AdvocacyWorkspace {
+export function createEmptyWorkspace(title = "New advocacy project"): AdvocacyWorkspace {
   const now = new Date().toISOString();
   return {
     workspaceId: crypto.randomUUID(),
     schemaVersion: WORKSPACE_SCHEMA_VERSION,
     title,
+    titleIsUserSet: false,
     createdAt: now,
     updatedAt: now,
     selectedGeography: null,
@@ -78,11 +90,26 @@ export function createEmptyWorkspace(title = "Untitled workspace"): AdvocacyWork
     documentFindings: [],
     userNotes: "",
     targetAudience: "commissioner",
+    projectGoal: "",
     meetingDetails: { meetingType: "", meetingDate: null },
     requestedOutputs: [],
     exportHistory: [],
     configurationHash: null,
   };
+}
+
+/** A human-readable project name suggested from real, structured state --
+ * never a raw UUID. Recomputed live as the user fills in place/goal/
+ * output, but only ever applied by the caller while `titleIsUserSet` is
+ * still false, so a name the user actually typed is never overwritten. */
+export function suggestProjectTitle(params: {
+  placeLabel: string | null;
+  outputTypeLabel: string | null;
+}): string {
+  const { placeLabel, outputTypeLabel } = params;
+  if (!placeLabel) return "New advocacy project";
+  if (outputTypeLabel) return `${placeLabel} ${outputTypeLabel.toLowerCase()}`;
+  return `${placeLabel} advocacy project`;
 }
 
 /** Recovers a workspace from parsed JSON of unknown/older shape --
@@ -98,6 +125,7 @@ export function migrateWorkspace(raw: unknown): AdvocacyWorkspace {
     workspaceId: typeof candidate.workspaceId === "string" ? candidate.workspaceId : empty.workspaceId,
     schemaVersion: WORKSPACE_SCHEMA_VERSION,
     title: typeof candidate.title === "string" ? candidate.title : empty.title,
+    titleIsUserSet: typeof candidate.titleIsUserSet === "boolean" ? candidate.titleIsUserSet : true,
     createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : empty.createdAt,
     updatedAt: new Date().toISOString(),
     selectedGeography: candidate.selectedGeography ?? null,
@@ -114,6 +142,7 @@ export function migrateWorkspace(raw: unknown): AdvocacyWorkspace {
     documentFindings: Array.isArray(candidate.documentFindings) ? candidate.documentFindings : [],
     userNotes: typeof candidate.userNotes === "string" ? candidate.userNotes : "",
     targetAudience: typeof candidate.targetAudience === "string" ? candidate.targetAudience : "commissioner",
+    projectGoal: typeof candidate.projectGoal === "string" ? candidate.projectGoal : "",
     meetingDetails: {
       meetingType: candidate.meetingDetails?.meetingType ?? "",
       meetingDate: candidate.meetingDetails?.meetingDate ?? null,

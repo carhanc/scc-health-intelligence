@@ -10,7 +10,7 @@ import {
   duplicateWorkspace,
   exportWorkspaceJson,
   getWorkspace,
-  importWorkspaceJson,
+  importWorkspaceBackup,
   listWorkspaces,
   renameWorkspace,
   saveWorkspace,
@@ -65,6 +65,15 @@ describe("migrateWorkspace", () => {
   it("always normalizes to the current schema version even if the input claims an old one", () => {
     const migrated = migrateWorkspace({ schemaVersion: 0 });
     expect(migrated.schemaVersion).toBe(WORKSPACE_SCHEMA_VERSION);
+  });
+
+  it("defaults titleIsUserSet to true and projectGoal to empty for a pre-existing saved project missing these newer fields", () => {
+    const oldShape = { workspaceId: "abc-123", title: "Old project" };
+    const migrated = migrateWorkspace(oldShape);
+    // A pre-existing project's title is treated as user-set so the
+    // redesigned auto-suggestion logic never silently overwrites it.
+    expect(migrated.titleIsUserSet).toBe(true);
+    expect(migrated.projectGoal).toBe("");
   });
 });
 
@@ -126,18 +135,88 @@ describe("IndexedDB workspace storage", () => {
     expect(retrieved?.title).toBe("New name");
   });
 
-  it("round-trips through export and import JSON", async () => {
+  it("round-trips through a downloaded backup and restore", async () => {
     const ws = createEmptyWorkspace("Exportable");
     ws.userNotes = "A real note.";
     const json = exportWorkspaceJson(ws);
-    const imported = importWorkspaceJson(json);
-    expect(imported.title).toBe("Exportable");
-    expect(imported.userNotes).toBe("A real note.");
+    const result = importWorkspaceBackup(json);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.workspace.title).toBe("Exportable");
+      expect(result.workspace.userNotes).toBe("A real note.");
+    }
   });
 
-  it("importing malformed JSON recovers a usable empty workspace rather than throwing", () => {
-    const imported = importWorkspaceJson("{not valid json");
-    expect(imported.schemaVersion).toBe(WORKSPACE_SCHEMA_VERSION);
-    expect(imported.title).toContain("Recovered");
+  it("restoring a backup that isn't valid JSON at all reports a real error, not a silent placeholder project", () => {
+    const result = importWorkspaceBackup("{not valid json");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("unparseable");
+  });
+
+  it("restoring a backup that parses but isn't an object (a bare array/string/number) also reports a real error", () => {
+    expect(importWorkspaceBackup("[1,2,3]")).toEqual({ ok: false, reason: "not_a_project" });
+    expect(importWorkspaceBackup('"just a string"')).toEqual({ ok: false, reason: "not_a_project" });
+    expect(importWorkspaceBackup("42")).toEqual({ ok: false, reason: "not_a_project" });
+  });
+
+  it("restoring a backup that is a plausible-but-old-shape object still recovers gracefully (backward compatibility preserved)", () => {
+    const result = importWorkspaceBackup(JSON.stringify({ workspaceId: "abc-123", title: "Old backup" }));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.workspace.workspaceId).toBe("abc-123");
+      expect(result.workspace.title).toBe("Old backup");
+      expect(result.workspace.schemaVersion).toBe(WORKSPACE_SCHEMA_VERSION);
+    }
+  });
+
+  // A record already sitting in IndexedDB from before a schema field
+  // existed is missing that field entirely, not just falsy -- IndexedDB
+  // doesn't enforce the AdvocacyWorkspace type at runtime. getWorkspace/
+  // listWorkspaces must heal this on every ordinary read (not only on
+  // backup import), or a pre-existing project's titleIsUserSet stays
+  // undefined forever and its custom name gets silently overwritten by
+  // the auto-title-suggestion logic on the next edit.
+  it("heals a pre-existing IndexedDB record that predates a newer schema field, on an ordinary getWorkspace read", async () => {
+    const legacyRecord = {
+      workspaceId: "legacy-1",
+      title: "Legacy project",
+      updatedAt: "2020-01-01T00:00:00.000Z",
+      // titleIsUserSet and projectGoal deliberately absent, as they would
+      // be for a record written before those fields existed.
+    };
+    await saveWorkspace(legacyRecord as unknown as Parameters<typeof saveWorkspace>[0]);
+    const retrieved = await getWorkspace("legacy-1");
+    expect(retrieved?.titleIsUserSet).toBe(true);
+    expect(retrieved?.projectGoal).toBe("");
+    expect(retrieved?.selectedEvidenceIds).toEqual([]);
+  });
+
+  it("heals a legacy record without re-stamping updatedAt at read time (only saveWorkspace should ever change it)", async () => {
+    // Bypasses saveWorkspace (which always stamps a fresh updatedAt) to
+    // write a raw record the way an old IndexedDB entry would actually
+    // look: a real historical updatedAt, no titleIsUserSet/projectGoal.
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open("scc_health_advocacy", 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("workspaces", "readwrite");
+      tx.objectStore("workspaces").put({
+        workspaceId: "legacy-3",
+        title: "Legacy project 3",
+        updatedAt: "2020-01-01T00:00:00.000Z",
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+
+    const retrieved = await getWorkspace("legacy-3");
+    expect(retrieved?.titleIsUserSet).toBe(true);
+    expect(retrieved?.updatedAt).toBe("2020-01-01T00:00:00.000Z");
+
+    const list = await listWorkspaces();
+    expect(list.find((w) => w.workspaceId === "legacy-3")?.updatedAt).toBe("2020-01-01T00:00:00.000Z");
   });
 });
