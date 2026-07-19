@@ -13,37 +13,47 @@ export const ADVOCACY_TERMS = {
   newProjectCta: "Start a new project",
   defaultProjectTitle: "New advocacy project",
 
-  /** The four guided stages, in order. */
-  stageProject: "Project",
+  /** The four visible guided stages, in order (flow-simplification pass --
+   * "Project" is deliberately not a separate stage; place+focus selection
+   * both live inside "Place"). */
+  stagePlace: "Place",
   stageEvidence: "Evidence",
-  stageDraft: "Draft",
-  stageReview: "Review & share",
+  stageCreate: "Create",
+  stageReview: "Review",
 
   evidenceSectionHeading: "Evidence for this project",
   evidenceSelectedHeading: "Evidence you're using",
   evidenceAvailableHeading: "More evidence you could add",
   evidenceCountSuffix: (n: number) => (n === 1 ? "1 fact selected" : `${n} facts selected`),
+  recommendedFactsHeading: "Recommended facts",
+  seeMoreEvidenceCta: "See more evidence",
+  continueWithFactsCta: (n: number) => (n === 1 ? "Continue with 1 fact" : `Continue with ${n} facts`),
+  selectAtLeastOneFactNote: "Select at least one fact to continue.",
+  addedFromPrefix: "Added from",
 
-  whatToCreateQuestion: "What do you want to create?",
+  whatToCreateQuestion: "What would you like to create?",
   whoIsThisForQuestion: "Who is this for?",
-  whatShouldItAccomplishQuestion: "What do you want this document to help accomplish?",
+  whatShouldItAccomplishQuestion: "What would you like this document to accomplish?",
+  seeMoreDocumentTypesCta: "See more document types",
 
   createDraftCta: "Create draft",
   draftNoun: "Draft",
   recreateDraftCta: "Create a new version",
 
-  findEvidenceInDocumentHeading: "Find useful evidence in a document",
+  findEvidenceInDocumentHeading: "Choose a document",
+  chooseDocumentExplainer:
+    "We'll look for passages that may be relevant. The document is processed temporarily and is not saved.",
   reviewDocumentCta: "Choose a file to upload",
-  relevantPassagesHeading: "Relevant passages",
+  relevantPassagesHeading: "Review useful passages",
   noRelevantPassages:
-    "We didn't find a passage that clearly matches this project. You can try a different document or add a note manually.",
+    "We didn't find a clearly relevant passage. You can try another document or continue with evidence from the platform.",
 
-  downloadBackupCta: "Download project backup",
-  restoreBackupCta: "Restore a project backup",
-  backupHelpText: "Download a backup to move this project to another browser or device.",
-  restoreHelpText: "Choose a project backup previously downloaded from Advocate.",
-  invalidBackupError: "This file isn't a valid Advocate project backup.",
-  unparseableBackupError: "This file isn't a valid Advocate project backup. It couldn't be read as a backup file at all.",
+  downloadBackupCta: "Download a copy",
+  restoreBackupCta: "Open a saved copy",
+  backupHelpText: "Use this to move the project to another browser or device.",
+  restoreHelpText: "Choose a project file previously downloaded from Advocate.",
+  invalidBackupError: "This file isn't a valid Advocate project file.",
+  unparseableBackupError: "This file isn't a valid Advocate project file. It couldn't be read as a project file at all.",
   nothingChangedNote: "Nothing was changed.",
 
   savedOnDevice: "Saved on this device",
@@ -51,15 +61,19 @@ export const ADVOCACY_TERMS = {
   couldNotSave: "Couldn't save",
   storageUnavailable: "Browser storage unavailable",
   storageHelpText:
-    "This project is stored in this browser. Download a backup if you need to move it to another device or if this browser's storage isn't available.",
+    "This project is stored in this browser. Download a copy if you need to move it to another device or if this browser's storage isn't available.",
 
   projectOptionsMenu: "Project options",
   renameCta: "Rename project",
   duplicateCta: "Duplicate project",
+  switchProjectCta: "Switch project",
   deleteCta: "Delete project",
+  viewProjectDetailsCta: "View project details",
+  hideProjectDetailsCta: "Hide project details",
+  changeCta: "Change",
 
   causalCaveat:
-    "This draft organizes screening evidence. It does not prove causation or make a final policy determination.",
+    "This draft organizes screening evidence. It does not prove causation or make a final policy decision.",
 } as const;
 
 /** Plain-language rewrite of the raw `data_status` API value shown on an
