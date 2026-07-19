@@ -18,6 +18,7 @@ export function SearchPanel({
   onSelect,
   selected,
   compact = false,
+  showMapHint = true,
 }: {
   onSelect: (selection: SelectedGeography) => void;
   selected: SelectedGeography | null;
@@ -27,6 +28,12 @@ export function SearchPanel({
    * without repeating the full first-time heading and helper copy that
    * State 1 already showed. */
   compact?: boolean;
+  /** Explore renders this panel next to an actual map, so "or select any
+   * tract directly on the map" is a real, followable instruction there.
+   * Advocate's Place step reuses this same component with no map on the
+   * page (a blind usability review caught the dead reference) -- callers
+   * without a map should pass false. */
+  showMapHint?: boolean;
 }) {
   const inputId = useId();
   const [inputValue, setInputValue] = useState("");
@@ -79,7 +86,9 @@ export function SearchPanel({
       <div aria-live="polite" className="mt-4">
         {submittedQuery.length === 0 && !compact && (
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Enter a search term above, or select any tract directly on the map.
+            {showMapHint
+              ? "Enter a search term above, or select any tract directly on the map."
+              : "Enter a city, ZIP code, supervisor district, or census tract number above."}
           </p>
         )}
         {searchQuery.isLoading && (
