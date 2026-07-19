@@ -35,11 +35,12 @@ test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => 
 
   test("starting from a Prioritize recommendation carries the focus area along", async ({ page }) => {
     await page.goto("/prioritize");
-    await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeChecked({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: "Show drivers" }).first()).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Show drivers" }).first().click();
-    await expect(page.getByRole("button", { name: "Add to advocacy project" })).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("button", { name: "Add to advocacy project" }).click();
+    await expect(page.getByText("Health equity overview").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Add to advocacy project" }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
 
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
     await expect(page.getByText(/Evidence was added from Prioritize/)).toBeVisible({ timeout: 10_000 });
@@ -99,9 +100,10 @@ test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => 
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
 
     await page.goto("/prioritize");
-    await expect(page.getByRole("button", { name: "Show drivers" }).first()).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Show drivers" }).first().click();
-    await page.getByRole("button", { name: "Add to advocacy project" }).click();
+    await expect(page.getByRole("button", { name: "Add to advocacy project" }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
 
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("dialog")).toContainText(/existing project|new project/i);

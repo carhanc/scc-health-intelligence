@@ -21,15 +21,14 @@ import { api, ApiError, type CustomDomainContribution, type StabilityLabel } fro
 import { domainLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
+import { RankedAreaCard, type RankedAreaCardData } from "./ranked-area-card";
 
-// The full ranked list is always 408 rows -- rendering all of them into
-// the DOM by default (with no pagination or filter) is a real density
-// problem verified live during the health-equity UX redesign (docs/
-// design/health-equity-ux-redesign.md §3/§8). The API already returns
-// rows sorted by score (desc, nulls last), so the top N by rank is a
-// safe head-slice, not a re-sort -- full data remains one click and the
-// existing sort/export controls away.
-const DEFAULT_VISIBLE_COUNT = 25;
+// The concise default view shows this many areas as cards; "View all 408
+// tracts" reveals the complete sortable table for advanced inspection
+// (docs/design/product-wide-flow-simplification-research.md
+// "PRIORITIZE" -- a 408-row table is not the first thing a user should
+// see).
+const DEFAULT_VISIBLE_COUNT = 10;
 
 export interface RankedRow {
   tract_geoid_2020: string;
@@ -40,10 +39,10 @@ export interface RankedRow {
   domain_contributions: CustomDomainContribution[];
 }
 
-/** Ranked-geographies results table, shared by both a named scenario
- * (which carries real stability labels) and a custom weighting (which
- * does not -- has_uncertainty_data is always surfaced honestly rather
- * than omitted). */
+/** Ranked-geographies results, shared by both a named scenario (which
+ * carries real stability labels) and a custom weighting (which does not
+ * -- has_uncertainty_data is always surfaced honestly rather than
+ * omitted). */
 export function ResultsPanel({
   scenarioSelection,
 }: {
@@ -70,6 +69,20 @@ export function ResultsPanel({
         ? api.computeCustomScore(scenarioSelection.weights)
         : Promise.reject(new Error("not a custom weighting")),
     enabled: scenarioSelection.kind === "custom",
+    retry: 1,
+  });
+
+  // Real top-factor drivers for a NAMED scenario's top areas -- a custom
+  // weighting already carries domain_contributions per tract in its own
+  // response, so this second request only fires for named scenarios, and
+  // only once (not per card, not per interaction).
+  const memoQuery = useQuery({
+    queryKey: ["prioritize-memo-top-factors", scenarioSelection.kind === "named" ? scenarioSelection.scenarioId : null],
+    queryFn: () =>
+      scenarioSelection.kind === "named"
+        ? api.getDecisionMemo({ scenarioId: scenarioSelection.scenarioId }, DEFAULT_VISIBLE_COUNT)
+        : Promise.reject(new Error("not a named scenario")),
+    enabled: scenarioSelection.kind === "named",
     retry: 1,
   });
 
@@ -131,6 +144,66 @@ export function ResultsPanel({
 
   const scoredRows = rows.filter((r) => r.score !== null);
   const unscoredCount = rows.length - scoredRows.length;
+  const scenarioId = scenarioSelection.kind === "named" ? scenarioSelection.scenarioId : null;
+
+  const topAreas = rows.slice(0, DEFAULT_VISIBLE_COUNT);
+  const allTopAreasComplete = topAreas.every((r) => r.coverage_fraction === 1);
+  const memoByTract = new Map((memoQuery.data?.top_tracts ?? []).map((t) => [t.tract_geoid_2020, t]));
+
+  const cardData: RankedAreaCardData[] = topAreas.map((r, i) => {
+    const memoEntry = memoByTract.get(r.tract_geoid_2020);
+    const topFactors =
+      r.domain_contributions.length > 0
+        ? [...r.domain_contributions].sort((a, b) => b.contribution - a.contribution)
+        : (memoEntry?.top_domains.map((d) => ({ domain: d.domain, contribution: d.contribution })) ?? null);
+    return {
+      rank: i + 1,
+      tractGeoid: r.tract_geoid_2020,
+      name: tractNames.get(r.tract_geoid_2020) ?? r.tract_geoid_2020,
+      score: r.score,
+      coverageFraction: r.coverage_fraction,
+      stabilityLabel: r.stability_label,
+      topFactors,
+      showCoverage: !allTopAreasComplete && r.coverage_fraction < 1,
+      scenarioId,
+    };
+  });
+
+  if (!showAll) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          {scoredRows.length} of {rows.length} tracts have a {SCREENING_SCORE_LABEL.toLowerCase()} under this
+          weighting.
+          {unscoredCount > 0 &&
+            ` ${unscoredCount} tract(s) have too little data for this weighting and are excluded, not shown as zero.`}
+          {dataMode && (
+            <>
+              {" "}
+              <DataModeBadge mode={dataMode} />
+            </>
+          )}
+        </p>
+        <p className="text-xs text-[var(--color-text-tertiary)]">
+          Rank #1 is the tract with the highest screening concern. 0 = lower screening concern, 100 = higher.
+          {allTopAreasComplete && " All areas shown below have complete data coverage."}
+        </p>
+
+        <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Highest screening concern</h2>
+        <div className="space-y-3">
+          {cardData.map((area) => (
+            <RankedAreaCard key={area.tractGeoid} area={area} />
+          ))}
+        </div>
+
+        {rows.length > DEFAULT_VISIBLE_COUNT && (
+          <Button variant="secondary" size="sm" onClick={() => setShowAll(true)}>
+            View all {rows.length} tracts
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   const columns: ColumnDef<RankedRow, unknown>[] = [
     {
@@ -198,55 +271,33 @@ export function ResultsPanel({
   ];
 
   const expandedRow = rows.find((r) => r.tract_geoid_2020 === expandedTract);
-  const visibleRows = showAll ? rows : rows.slice(0, DEFAULT_VISIBLE_COUNT);
-  const isTruncated = !showAll && rows.length > DEFAULT_VISIBLE_COUNT;
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        {scoredRows.length} of {rows.length} tracts have a {SCREENING_SCORE_LABEL.toLowerCase()} under this weighting.
-        {unscoredCount > 0 && ` ${unscoredCount} tract(s) have too little data for this weighting and are excluded, not shown as zero.`}
-        {dataMode && <> <DataModeBadge mode={dataMode} /></>}
-      </p>
-      {/* Blind usability review (docs/design/final-score-map-and-
-          intuitiveness-review.md) found the 0-100 direction was only
-          ever stated on the tract-detail page, not here where the score
-          first appears as a sortable column -- restated here so rank #1
-          is unambiguous without visiting another page. */}
-      <p className="text-xs text-[var(--color-text-tertiary)]">
-        Rank #1 is the tract with the highest screening concern. 0 = lower screening concern, 100 = higher.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-[var(--color-text-secondary)]">Showing all {rows.length} tracts.</p>
+        <Button variant="secondary" size="sm" onClick={() => setShowAll(false)}>
+          Back to the concise view
+        </Button>
+      </div>
 
       {expandedRow && (
         <div ref={explainRef}>
           <ExplainCard
             row={expandedRow}
             name={tractNames.get(expandedRow.tract_geoid_2020) ?? null}
-            scenarioId={scenarioSelection.kind === "named" ? scenarioSelection.scenarioId : null}
+            scenarioId={scenarioId}
           />
         </div>
       )}
 
       <DataTable
-        data={visibleRows}
+        data={rows}
         columns={columns}
         caption={`Ranked geographies by ${SCREENING_SCORE_LABEL.toLowerCase()}`}
         initialSorting={[{ id: "score", desc: true }]}
         getRowId={(r) => r.tract_geoid_2020}
       />
-
-      <div className="flex items-center justify-between gap-3 text-sm text-[var(--color-text-secondary)]">
-        <p>
-          {isTruncated
-            ? `Showing the top ${DEFAULT_VISIBLE_COUNT} of ${rows.length} tracts.`
-            : `Showing all ${rows.length} tracts.`}
-        </p>
-        {rows.length > DEFAULT_VISIBLE_COUNT && (
-          <Button variant="secondary" size="sm" onClick={() => setShowAll((v) => !v)}>
-            {isTruncated ? `Show all ${rows.length}` : `Show top ${DEFAULT_VISIBLE_COUNT}`}
-          </Button>
-        )}
-      </div>
     </div>
   );
 }

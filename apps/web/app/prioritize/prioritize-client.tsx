@@ -1,24 +1,24 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabPanel } from "@scc-health/ui";
 import { api } from "@/lib/api";
-import { ScenarioSelector, CUSTOM_SCENARIO_ID } from "./scenario-selector";
-import { DEFAULT_WEIGHTS, WeightSliders, normalizeWeights } from "./weight-sliders";
+import { CUSTOM_SCENARIO_ID } from "./scenario-selector";
+import { DEFAULT_WEIGHTS, normalizeWeights } from "./weight-sliders";
+import { FocusPicker } from "../focus-picker";
+import { TaskPageHeader } from "../task-page-header";
 import { ResultsPanel } from "./results-panel";
 import { ConstraintsPanel } from "./constraints-panel";
 import { ComparePanel } from "./compare-panel";
 import { ExportPanel } from "./export-panel";
 
-type TabId = "results" | "constraints" | "compare" | "export";
+type TabId = "results" | "compare";
 
 const TAB_ITEMS = [
-  { id: "results", label: "Ranked results" },
-  { id: "constraints", label: "Site & program constraints" },
-  { id: "compare", label: "Compare" },
-  { id: "export", label: "Export" },
+  { id: "results", label: "Ranked areas" },
+  { id: "compare", label: "Compare places" },
 ];
 
 function parseWeightsParam(raw: string | null): Record<string, number> | null {
@@ -35,6 +35,9 @@ function parseWeightsParam(raw: string | null): Record<string, number> | null {
 export function PrioritizeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [showAdjust, setShowAdjust] = useState(false);
+  const [showConstraints, setShowConstraints] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
 
   const scenarioId = searchParams.get("scenario") ?? "default_integrated_screen_v1";
   const isCustom = scenarioId === CUSTOM_SCENARIO_ID;
@@ -61,6 +64,7 @@ export function PrioritizeClient() {
   const scenarioLabels = Object.fromEntries(
     (scenariosQuery.data?.scenarios ?? []).map((s) => [s.scenario_id, s.label]),
   );
+  const currentFocusLabel = isCustom ? "Custom focus" : (scenarioLabels[scenarioId] ?? "Health equity overview");
 
   const scenarioSelection = isCustom
     ? ({ kind: "custom" as const, weights: normalizeWeights(customWeights) })
@@ -68,59 +72,88 @@ export function PrioritizeClient() {
 
   return (
     <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">
-          Identify health-equity priorities
-        </h1>
-        <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          A ranked screening tool, not a prediction or a guarantee that any specific intervention would help.
-        </p>
+      <TaskPageHeader
+        title="Find areas for closer review"
+        purpose="See which census tracts show the highest overlapping screening concern under the selected view. This is a screening tool, not a prediction or a guarantee that any specific intervention would help."
+      />
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium text-[var(--color-text-primary)]">{currentFocusLabel}</span>
+        <button
+          type="button"
+          onClick={() => setShowAdjust((v) => !v)}
+          aria-expanded={showAdjust}
+          className="font-medium text-[var(--color-interactive)] hover:underline"
+        >
+          {showAdjust ? "Hide priorities" : "Adjust priorities"}
+        </button>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="order-2 space-y-5 lg:order-1">
-          <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Adjust what the screening emphasizes
-          </h2>
-          <ScenarioSelector
+      {showAdjust && (
+        <div className="mt-3 max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
+          <FocusPicker
             selectedScenarioId={scenarioId}
-            onSelect={(id) => updateParams({ scenario: id === "default_integrated_screen_v1" ? null : id, weights: null })}
+            onSelect={(id) => {
+              updateParams({ scenario: id === "default_integrated_screen_v1" ? null : id, weights: null });
+              setShowAdjust(false);
+            }}
+            customWeights={customWeights}
+            onCustomWeightsChange={(w) => updateParams({ scenario: CUSTOM_SCENARIO_ID, weights: JSON.stringify(w) })}
           />
-          {isCustom && (
-            <WeightSliders
-              weights={customWeights}
-              onChange={(w) => updateParams({ weights: JSON.stringify(w) })}
-            />
-          )}
         </div>
+      )}
 
-        <div className="order-1 lg:order-2">
+      <div className="mt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs
             items={TAB_ITEMS}
             activeId={activeTab}
             onChange={(id) => updateParams({ tab: id === "results" ? null : id })}
             label="Prioritize sections"
           />
-
-          <div className="mt-4">
-            <TabPanel id="results" activeId={activeTab}>
-              <ResultsPanel scenarioSelection={scenarioSelection} />
-            </TabPanel>
-            <TabPanel id="constraints" activeId={activeTab}>
-              <ConstraintsPanel />
-            </TabPanel>
-            <TabPanel id="compare" activeId={activeTab}>
-              <ComparePanelWrapper
-                leftScenarioId={isCustom ? "default_integrated_screen_v1" : scenarioId}
-                compareScenarioId={compareScenarioId}
-                scenarioLabels={scenarioLabels}
-                onSelectCompare={(id) => updateParams({ compareScenario: id || null })}
-              />
-            </TabPanel>
-            <TabPanel id="export" activeId={activeTab}>
-              <ExportPanel scenarioSelection={scenarioSelection} />
-            </TabPanel>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <button
+              type="button"
+              onClick={() => setShowConstraints((v) => !v)}
+              aria-expanded={showConstraints}
+              className="font-medium text-[var(--color-interactive)] hover:underline"
+            >
+              Add practical constraints
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDownload((v) => !v)}
+              aria-expanded={showDownload}
+              className="font-medium text-[var(--color-interactive)] hover:underline"
+            >
+              Download results
+            </button>
           </div>
+        </div>
+
+        {showConstraints && (
+          <div className="mt-4">
+            <ConstraintsPanel />
+          </div>
+        )}
+        {showDownload && (
+          <div className="mt-4">
+            <ExportPanel scenarioSelection={scenarioSelection} />
+          </div>
+        )}
+
+        <div className="mt-4">
+          <TabPanel id="results" activeId={activeTab}>
+            <ResultsPanel scenarioSelection={scenarioSelection} />
+          </TabPanel>
+          <TabPanel id="compare" activeId={activeTab}>
+            <ComparePanelWrapper
+              leftScenarioId={isCustom ? "default_integrated_screen_v1" : scenarioId}
+              compareScenarioId={compareScenarioId}
+              scenarioLabels={scenarioLabels}
+              onSelectCompare={(id) => updateParams({ compareScenario: id || null })}
+            />
+          </TabPanel>
         </div>
       </div>
     </div>
@@ -149,7 +182,7 @@ function ComparePanelWrapper({
           onChange={(e) => onSelectCompare(e.target.value)}
           className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-1"
         >
-          <option value="">Choose a scenario to compare</option>
+          <option value="">Choose a focus area to compare</option>
           {options.map(([id, label]) => (
             <option key={id} value={id}>
               {label}
@@ -165,7 +198,7 @@ function ComparePanelWrapper({
         />
       ) : (
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Pick a second scenario above to see how the top priority places change.
+          Pick a second focus area above to see how the top priority places change.
         </p>
       )}
     </div>
