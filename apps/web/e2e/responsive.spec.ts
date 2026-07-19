@@ -130,39 +130,58 @@ for (const bp of BREAKPOINTS) {
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Prioritize: scenario selector, custom sliders, and ranked results remain usable", async ({ page }) => {
+    test("Prioritize: ranked-area cards, the priorities disclosure, and custom sliders remain usable", async ({
+      page,
+    }) => {
       await page.goto("/prioritize");
-      await expect(page.getByRole("radio", { name: /Health equity overview/ })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({
+        timeout: 15_000,
+      });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Prioritize must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
-      await page.getByRole("radio", { name: "Custom scenario" }).click();
-      await expect(page.getByLabel("Health needs")).toBeVisible({ timeout: 10_000 });
+      await page.getByRole("button", { name: "Adjust priorities" }).click();
+      await page.getByRole("button", { name: "Create a custom focus" }).click();
+      await expect(page.getByRole("slider", { name: "Health needs" })).toBeVisible({ timeout: 10_000 });
 
       const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Utilization: facility table and tab switching remain usable", async ({ page }) => {
+    test("Utilization: the task chooser, facility table, and tab switching remain usable", async ({ page }) => {
       await page.goto("/utilization");
+      await expect(page.getByRole("heading", { name: "What would you like to understand?" })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Utilization task chooser must not overflow horizontally").toBeLessThanOrEqual(
+        clientWidth + 1,
+      );
+
+      await page.getByRole("button", { name: /^Compare facilities:/ }).click();
       await expect(page.getByText("STANFORD HEALTH CARE")).toBeVisible({ timeout: 15_000 });
 
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth, "Utilization must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+      scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(scrollWidth, "Utilization facility view must not overflow horizontally").toBeLessThanOrEqual(
+        clientWidth + 1,
+      );
     });
 
-    test("Validate: tabs remain reachable and content does not overflow", async ({ page }) => {
+    test("Validate: sections remain reachable and content does not overflow", async ({ page }) => {
       await page.goto("/validate");
-      await expect(page.getByRole("heading", { name: "Validate" })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "Trust, methods, and data quality" })).toBeVisible({
+        timeout: 15_000,
+      });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Validate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
-      await page.getByRole("tab", { name: "Reproducibility" }).click();
+      await page.getByRole("tab", { name: "Reproduce the analysis" }).click();
       await expect(page.getByText("Audit status")).toBeVisible({ timeout: 10_000 });
     });
 
@@ -200,13 +219,27 @@ for (const bp of BREAKPOINTS) {
       expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Copilot: search and ask remain usable", async ({ page }) => {
+    test("Copilot: action choice, place search, and a generated answer remain usable", async ({ page }) => {
       await page.goto("/copilot");
-      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "What would you like help with?" })).toBeVisible({
+        timeout: 15_000,
+      });
 
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth, "Copilot must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+      expect(scrollWidth, "Copilot landing must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      await page.getByRole("button", { name: /^Explain a community:/ }).click();
+      await expect(page.getByLabel("Find a place")).toBeVisible();
+      await page.getByLabel("Find a place").fill("Gilroy");
+      await page.getByRole("button", { name: "Search" }).click();
+      await page.getByRole("button", { name: /Gilroy/ }).first().click();
+      await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
+      await page.getByRole("button", { name: "Create explanation" }).click();
+      await expect(page.getByRole("heading", { name: "Gilroy city" })).toBeVisible({ timeout: 15_000 });
+
+      scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(scrollWidth, "Copilot result must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
     });
   });
 }

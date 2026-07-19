@@ -47,7 +47,7 @@ test.describe("Overview", () => {
     await page.goto("/");
     await page.getByRole("link", { name: "Data & methods" }).click();
     await expect(page).toHaveURL(/\/data$/);
-    await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explore data sources and coverage", level: 1 })).toBeVisible();
   });
 
   test("every footer link points somewhere real and distinct -- Phase 9 regression: Accessibility/Privacy previously both silently pointed at /validate", async ({

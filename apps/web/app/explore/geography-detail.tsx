@@ -618,11 +618,20 @@ function TractDetail({
       </div>
 
       <GuidedNextStep prompt="What would you like to do next?">
-        <Link href="/copilot" className="text-[var(--color-interactive)] underline underline-offset-2">
+        <Link
+          href={`/copilot?geography=tract&id=${profile.tract_geoid_2020}&name=${encodeURIComponent(profile.name_long)}&scenario=${scenarioId}`}
+          className="text-[var(--color-interactive)] underline underline-offset-2"
+        >
           Ask Copilot about this tract
         </Link>
         <Link href="/prioritize" className="text-[var(--color-interactive)] underline underline-offset-2">
           See its full countywide ranking
+        </Link>
+        <Link
+          href={`/access-lab?geography=tract&id=${profile.tract_geoid_2020}&name=${encodeURIComponent(profile.name_long)}`}
+          className="text-[var(--color-interactive)] underline underline-offset-2"
+        >
+          See its access to care
         </Link>
       </GuidedNextStep>
 
