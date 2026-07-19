@@ -2,20 +2,22 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
+import { Badge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
-import { CUSTOM_SCENARIO_ID } from "../prioritize/scenario-selector";
-import { WeightSliders, DEFAULT_WEIGHTS } from "../prioritize/weight-sliders";
-import { RECOMMENDED_FOCUS_ID, COMMON_FOCUS_IDS, FOCUS_BLURBS } from "./focus-options";
+import { CUSTOM_SCENARIO_ID } from "./prioritize/scenario-selector";
+import { WeightSliders, DEFAULT_WEIGHTS } from "./prioritize/weight-sliders";
+import { RECOMMENDED_FOCUS_ID, COMMON_FOCUS_IDS, FOCUS_BLURBS, UNAVAILABLE_FOCUS_AREAS } from "./focus-options";
 
 /** "What would you like to focus on?" -- the real backend scenarios,
  * reframed in plain language: one recommended option shown prominently,
- * a few common alternatives, and the rest behind "See more focus areas"
- * (docs/design/advocate-flow-simplification-visual-review.md "FOCUS
- * STEP"). Selecting any option calls onSelect, which the parent uses to
- * advance immediately to Evidence -- this screen never shows a dense
- * grid of every option at equal weight. */
-export function FocusStep({
+ * a few common alternatives, and the rest behind "See more focus areas."
+ * Shared by every page that lets someone choose a screening lens
+ * (Advocate, Prioritize's "Adjust priorities" disclosure, Copilot) so
+ * there is exactly one progressive-disclosure focus picker in the
+ * product, not three independently-maintained full-grid ones. Selecting
+ * any option calls onSelect; this component never shows a dense grid of
+ * every option at equal weight. */
+export function FocusPicker({
   selectedScenarioId,
   onSelect,
   customWeights,
@@ -117,6 +119,15 @@ export function FocusStep({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {more.map((s) => (
             <OptionCard key={s.scenario_id} id={s.scenario_id} label={s.label} blurb={FOCUS_BLURBS[s.scenario_id] ?? s.description} />
+          ))}
+          {UNAVAILABLE_FOCUS_AREAS.map((u) => (
+            <div key={u.id} className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                {u.label}
+                <Badge tone="neutral">Not available yet</Badge>
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{u.reason}</p>
+            </div>
           ))}
         </div>
       )}

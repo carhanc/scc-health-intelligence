@@ -27,12 +27,12 @@ import { ProjectMenu } from "./project-menu";
 import { ProjectSummaryBar, ProjectDetailsDisclosure } from "./project-summary-bar";
 import { LandingChoice, CrossPageArrival } from "./landing-choice";
 import { PlaceStep } from "./place-step";
-import { FocusStep } from "./focus-step";
+import { FocusPicker } from "../focus-picker";
 import { ChooseDocumentScreen, ReviewPassagesScreen } from "./document-step";
 import { EvidenceReview } from "./evidence-review";
 import { CreateStep } from "./create-step";
 import { DraftPreview } from "./draft-preview";
-import { RECOMMENDED_FOCUS_ID } from "./focus-options";
+import { RECOMMENDED_FOCUS_ID } from "../focus-options";
 import { outputTypeLabel } from "./output-types";
 
 type Stage = "landing" | "place" | "focus" | "evidence" | "create" | "review";
@@ -505,7 +505,7 @@ export function AdvocateClient() {
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
               What would you like to focus on?
             </h2>
-            <FocusStep
+            <FocusPicker
               selectedScenarioId={workspace.selectedScenarioId ?? RECOMMENDED_FOCUS_ID}
               onSelect={handleSelectScenario}
               customWeights={workspace.customWeights ?? DEFAULT_WEIGHTS}
