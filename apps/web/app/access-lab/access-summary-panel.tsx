@@ -142,6 +142,7 @@ export function AccessSummaryPanel({
 
       <UseInAdvocateButton
         geography={{ geographyType: "tract", geoid: tractGeoid, displayName: `Tract ${tractGeoid}` }}
+        sourcePage="Access Lab"
       />
     </div>
   );

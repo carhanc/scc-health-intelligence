@@ -146,6 +146,7 @@ function TractSection() {
           // (which an e2e test comment flagged as risking collision with
           // a column-sort button of a similar name).
           label="Add to Advocate"
+          sourcePage="Utilization"
         />
       ),
     },

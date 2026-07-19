@@ -609,6 +609,7 @@ function TractDetail({
             displayName: profile.name_long,
           }}
           scenarioId={scenarioId}
+          sourcePage="Explore"
         />
         <Button variant="secondary" size="sm" onClick={onCompare}>
           Compare
@@ -1017,6 +1018,7 @@ function PlaceDetail({
         <UseInAdvocateButton
           geography={{ geographyType: "place", geoid: profile.place_geoid, displayName: profile.name_long }}
           scenarioId={scenarioId}
+          sourcePage="Explore"
         />
       </div>
 
@@ -1141,6 +1143,7 @@ function DistrictDetail({
             displayName: `Supervisor District ${profile.district_number}`,
           }}
           scenarioId={scenarioId}
+          sourcePage="Explore"
         />
       </div>
 

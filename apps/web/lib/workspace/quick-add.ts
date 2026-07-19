@@ -31,6 +31,7 @@ export async function listNonEmptyProjects() {
 export async function createWorkspaceFromGeography(
   geography: QuickAdvocateGeography,
   scenarioId?: string,
+  sourcePage?: string,
 ): Promise<string> {
   const workspace = createEmptyWorkspace(suggestProjectTitle({ placeLabel: geography.displayName, outputTypeLabel: null }));
   workspace.selectedGeography = {
@@ -39,6 +40,7 @@ export async function createWorkspaceFromGeography(
     displayName: geography.displayName,
   };
   if (scenarioId) workspace.selectedScenarioId = scenarioId;
+  if (sourcePage) workspace.sourcePage = sourcePage;
   await saveWorkspace(workspace);
   return workspace.workspaceId;
 }
@@ -52,6 +54,7 @@ export async function addGeographyToExistingWorkspace(
   workspaceId: string,
   geography: QuickAdvocateGeography,
   scenarioId?: string,
+  sourcePage?: string,
 ): Promise<void> {
   const all = await listWorkspaces();
   const workspace = all.find((w) => w.workspaceId === workspaceId);
@@ -62,6 +65,7 @@ export async function addGeographyToExistingWorkspace(
     displayName: geography.displayName,
   };
   if (scenarioId) workspace.selectedScenarioId = scenarioId;
+  if (sourcePage) workspace.sourcePage = sourcePage;
   workspace.selectedEvidenceIds = [];
   workspace.evidenceSnapshots = [];
   if (!workspace.titleIsUserSet) {

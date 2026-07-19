@@ -26,10 +26,15 @@ import { AddToAdvocacyDialog } from "./add-to-advocacy-dialog";
 export function UseInAdvocateButton({
   geography,
   scenarioId,
+  sourcePage,
   label = ADD_TO_ADVOCACY_PROJECT_CTA,
 }: {
   geography: QuickAdvocateGeography;
   scenarioId?: string;
+  /** The calling page's plain name (e.g. "Explore", "Access Lab"), shown
+   * in Advocate as "Added from <sourcePage>" so the user never has to
+   * re-find the evidence that brought them there. */
+  sourcePage?: string;
   label?: string;
 }) {
   const router = useRouter();
@@ -45,7 +50,7 @@ export function UseInAdvocateButton({
     try {
       const nonEmpty = await listNonEmptyProjects();
       if (nonEmpty.length === 0) {
-        const workspaceId = await createWorkspaceFromGeography(geography, scenarioId);
+        const workspaceId = await createWorkspaceFromGeography(geography, scenarioId, sourcePage);
         await navigateTo(workspaceId);
         return;
       }
@@ -62,10 +67,10 @@ export function UseInAdvocateButton({
     setIsCreating(true);
     try {
       if (targetWorkspaceId) {
-        await addGeographyToExistingWorkspace(targetWorkspaceId, geography, scenarioId);
+        await addGeographyToExistingWorkspace(targetWorkspaceId, geography, scenarioId, sourcePage);
         await navigateTo(targetWorkspaceId);
       } else {
-        const workspaceId = await createWorkspaceFromGeography(geography, scenarioId);
+        const workspaceId = await createWorkspaceFromGeography(geography, scenarioId, sourcePage);
         await navigateTo(workspaceId);
       }
     } finally {

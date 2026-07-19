@@ -38,6 +38,18 @@ export interface ExportHistoryEntry {
   configurationHash: string;
 }
 
+/** A document passage the user chose to include, via the simplified
+ * document flow's per-passage "Include" toggle -- folded into generation
+ * as plain notes text (see advocate-client.tsx), never as a fabricated
+ * evidence item, since a document passage isn't a sourced, structured
+ * fact the way a platform evidence item is. */
+export interface IncludedPassage {
+  docFilename: string;
+  topicId: string;
+  topicLabel: string;
+  excerpt: string | null;
+}
+
 export interface AdvocacyWorkspace {
   workspaceId: string;
   schemaVersion: number;
@@ -59,12 +71,20 @@ export interface AdvocacyWorkspace {
   evidenceSnapshots: AdvocacyEvidenceItem[];
   uploadedDocuments: UploadedDocumentMeta[];
   documentFindings: DocumentAnalysisResponse[];
+  includedPassages: IncludedPassage[];
   userNotes: string;
   targetAudience: string;
   /** Plain-language answer to "What do you want this document to help
    * accomplish?" -- new field, additive-only (see migrateWorkspace: an
    * older saved project or backup without it defaults to ""). */
   projectGoal: string;
+  /** The page name a cross-page "Add to advocacy project" click came
+   * from (e.g. "Explore", "Access Lab"), or null for a project started
+   * directly in Advocate -- lets the Evidence step feature that page's
+   * kind of evidence first with a plain "Added from X" label instead of
+   * making the user re-find it in an undifferentiated list. Additive,
+   * defaults to null for any project saved before this field existed. */
+  sourcePage: string | null;
   meetingDetails: MeetingDetails;
   requestedOutputs: string[];
   exportHistory: ExportHistoryEntry[];
@@ -88,9 +108,11 @@ export function createEmptyWorkspace(title = "New advocacy project"): AdvocacyWo
     evidenceSnapshots: [],
     uploadedDocuments: [],
     documentFindings: [],
+    includedPassages: [],
     userNotes: "",
     targetAudience: "commissioner",
     projectGoal: "",
+    sourcePage: null,
     meetingDetails: { meetingType: "", meetingDate: null },
     requestedOutputs: [],
     exportHistory: [],
@@ -140,9 +162,11 @@ export function migrateWorkspace(raw: unknown): AdvocacyWorkspace {
     evidenceSnapshots: Array.isArray(candidate.evidenceSnapshots) ? candidate.evidenceSnapshots : [],
     uploadedDocuments: Array.isArray(candidate.uploadedDocuments) ? candidate.uploadedDocuments : [],
     documentFindings: Array.isArray(candidate.documentFindings) ? candidate.documentFindings : [],
+    includedPassages: Array.isArray(candidate.includedPassages) ? candidate.includedPassages : [],
     userNotes: typeof candidate.userNotes === "string" ? candidate.userNotes : "",
     targetAudience: typeof candidate.targetAudience === "string" ? candidate.targetAudience : "commissioner",
     projectGoal: typeof candidate.projectGoal === "string" ? candidate.projectGoal : "",
+    sourcePage: typeof candidate.sourcePage === "string" ? candidate.sourcePage : null,
     meetingDetails: {
       meetingType: candidate.meetingDetails?.meetingType ?? "",
       meetingDate: candidate.meetingDetails?.meetingDate ?? null,

@@ -306,6 +306,7 @@ function ExplainCard({
             displayName: name ?? row.tract_geoid_2020,
           }}
           scenarioId={scenarioId ?? undefined}
+          sourcePage="Prioritize"
         />
       </div>
     </div>
