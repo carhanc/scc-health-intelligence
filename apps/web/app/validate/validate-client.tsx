@@ -3,27 +3,34 @@
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabPanel } from "@scc-health/ui";
+import { TaskPageHeader } from "../task-page-header";
 import { CoveragePanel } from "./coverage-panel";
 import { MethodsPanel } from "./methods-panel";
 import { UncertaintyPanel } from "./uncertainty-panel";
 import { ValidationPanel } from "./validation-panel";
 import { LimitationsPanel, ReproducibilityPanel } from "./limitations-panel";
 
-type TabId = "coverage" | "methods" | "uncertainty" | "validation" | "limitations" | "reproducibility";
+type TabId = "overview" | "methods" | "checks" | "limitations" | "reproducibility";
 
 const TAB_ITEMS = [
-  { id: "coverage", label: "Data coverage" },
-  { id: "methods", label: "Scoring methods" },
-  { id: "uncertainty", label: "Uncertainty & sensitivity" },
-  { id: "validation", label: "Validation" },
+  { id: "overview", label: "Overview" },
+  { id: "methods", label: "How scores are built" },
+  { id: "checks", label: "Checks and uncertainty" },
   { id: "limitations", label: "Known limitations" },
-  { id: "reproducibility", label: "Reproducibility" },
+  { id: "reproducibility", label: "Reproduce the analysis" },
 ];
 
+/** "Trust, methods, and data quality" -- a trust-first Overview
+ * (grouped, plain-language source status) replaces six equally-weighted
+ * tabs and six equal-sized metric cards regardless of whether a bucket
+ * is ever non-zero. Uncertainty & sensitivity and Validation are merged
+ * into one "Checks and uncertainty" section, since a first-time visitor
+ * shouldn't have to know which of the two to enter first (docs/design/
+ * product-wide-flow-simplification-research.md "VALIDATE"). */
 export function ValidateClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get("tab") as TabId | null) ?? "coverage";
+  const activeTab = (searchParams.get("tab") as TabId | null) ?? "overview";
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -39,36 +46,33 @@ export function ValidateClient() {
 
   return (
     <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">Validate</h1>
-        <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
-          Trust, methods, and data quality -- can you trust what you&apos;re seeing, and what are its
-          limits? What data goes in, how a score is built, how uncertain it is, whether it holds up
-          against independent checks, and what it still cannot tell you. Plain-language summaries come
-          first; the exact numbers behind them are always one click away.
-        </p>
-      </div>
+      <TaskPageHeader
+        title="Trust, methods, and data quality"
+        purpose="See what data is current, how scores are built, and what the platform cannot tell you."
+      />
 
       <div className="mt-5">
         <Tabs
           items={TAB_ITEMS}
           activeId={activeTab}
-          onChange={(id) => updateParams({ tab: id === "coverage" ? null : id })}
+          onChange={(id) => updateParams({ tab: id === "overview" ? null : id })}
           label="Validate sections"
         />
 
         <div className="mt-4">
-          <TabPanel id="coverage" activeId={activeTab}>
+          <TabPanel id="overview" activeId={activeTab}>
             <CoveragePanel />
           </TabPanel>
           <TabPanel id="methods" activeId={activeTab}>
             <MethodsPanel />
           </TabPanel>
-          <TabPanel id="uncertainty" activeId={activeTab}>
-            <UncertaintyPanel />
-          </TabPanel>
-          <TabPanel id="validation" activeId={activeTab}>
-            <ValidationPanel />
+          <TabPanel id="checks" activeId={activeTab}>
+            <div className="space-y-8">
+              <UncertaintyPanel />
+              <div className="border-t border-[var(--color-border)] pt-8">
+                <ValidationPanel />
+              </div>
+            </div>
           </TabPanel>
           <TabPanel id="limitations" activeId={activeTab}>
             <LimitationsPanel />
