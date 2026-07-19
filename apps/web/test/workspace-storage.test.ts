@@ -75,6 +75,39 @@ describe("migrateWorkspace", () => {
     expect(migrated.titleIsUserSet).toBe(true);
     expect(migrated.projectGoal).toBe("");
   });
+
+  // The flow-simplification pass added two more additive fields
+  // (sourcePage, includedPassages) -- a real project saved by any prior
+  // pass, or even the score/map pass before Advocate existed in its
+  // current form, must still load cleanly with safe defaults for both.
+  it("defaults sourcePage to null and includedPassages to an empty array for a project saved before this pass", () => {
+    const oldShape = {
+      workspaceId: "legacy-1",
+      title: "A project saved before the flow-simplification pass",
+      selectedGeography: { geographyType: "place", geoid: "0677000", displayName: "Sunnyvale city" },
+      selectedEvidenceIds: ["metric:test:1"],
+      titleIsUserSet: true,
+      projectGoal: "Request a meeting",
+    };
+    const migrated = migrateWorkspace(oldShape);
+    expect(migrated.sourcePage).toBeNull();
+    expect(migrated.includedPassages).toEqual([]);
+    // Everything the older pass already had must survive untouched.
+    expect(migrated.selectedGeography).toEqual(oldShape.selectedGeography);
+    expect(migrated.selectedEvidenceIds).toEqual(["metric:test:1"]);
+    expect(migrated.projectGoal).toBe("Request a meeting");
+  });
+
+  it("preserves a real sourcePage and includedPassages value when already present", () => {
+    const shape = {
+      workspaceId: "abc-2",
+      sourcePage: "Explore",
+      includedPassages: [{ docFilename: "memo.txt", topicId: "t1", topicLabel: "Diabetes prevention", excerpt: "..." }],
+    };
+    const migrated = migrateWorkspace(shape);
+    expect(migrated.sourcePage).toBe("Explore");
+    expect(migrated.includedPassages).toEqual(shape.includedPassages);
+  });
 });
 
 describe("IndexedDB workspace storage", () => {

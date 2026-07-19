@@ -49,7 +49,7 @@ test.describe("Production smoke test", () => {
     });
 
     await page.goto("/advocate");
-    await expect(page.getByRole("heading", { name: "Advocate", level: 1 })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Turn evidence into action", level: 1 })).toBeVisible({
       timeout: 20_000,
     });
 

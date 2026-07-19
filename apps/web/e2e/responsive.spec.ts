@@ -166,23 +166,34 @@ for (const bp of BREAKPOINTS) {
       await expect(page.getByText("Audit status")).toBeVisible({ timeout: 10_000 });
     });
 
-    test("Advocate: the full geography-to-brief workflow completes and never overflows horizontally", async ({
+    test("Advocate: the full place-to-brief workflow completes and never overflows horizontally", async ({
       page,
     }) => {
       await page.goto("/advocate");
-      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("Where would you like to start?")).toBeVisible({ timeout: 15_000 });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Advocate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
+      await page.getByRole("button", { name: /^Choose a community:/ }).click();
       await page.getByLabel("Find a place").fill("Sunnyvale");
       await page.getByRole("button", { name: "Search" }).click();
       await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-      await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
+        timeout: 10_000,
+      });
+      await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
+      await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+        timeout: 15_000,
+      });
 
-      await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
-      await page.getByRole("button", { name: "Generate" }).click();
+      await page.locator('button[aria-label^="Include "]').first().click();
+      await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
+      await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+      await page.getByRole("button", { name: "Commissioner / staff" }).click();
+      await page.getByRole("button", { name: "Continue" }).click();
+      await page.getByRole("button", { name: "Create draft" }).click();
       await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
 
       const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);

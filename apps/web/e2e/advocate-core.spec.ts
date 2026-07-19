@@ -1,192 +1,236 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/** Starts a brand-new project from the landing state and picks a place,
- * landing on the Evidence stage with real evidence loaded -- the entry
- * flow every core-workflow test below builds on. */
+/** Starts a brand-new project from the landing state, chooses a place,
+ * confirms the recommended focus, and lands on the Evidence stage with
+ * real evidence loaded -- the entry flow every core-workflow test below
+ * builds on. */
 async function startProjectFromPlace(page: Page, placeQuery: string) {
   await page.goto("/advocate");
-  await expect(page.getByRole("heading", { name: "Start an advocacy project" })).toBeVisible();
+  await expect(page.getByText("Where would you like to start?")).toBeVisible();
+  await page.getByRole("button", { name: /^Choose a community:/ }).click();
+
+  await expect(page.getByRole("heading", { name: "Choose a community" })).toBeVisible();
   await page.getByLabel("Find a place").fill(placeQuery);
   await page.getByRole("button", { name: "Search" }).click();
   const result = page.getByRole("button", { name: new RegExp(placeQuery, "i") }).first();
   await expect(result).toBeVisible({ timeout: 10_000 });
   await result.click();
-  await expect(page.getByRole("button", { name: /^Evidence,/ })).toBeVisible({ timeout: 5_000 });
-  await page.getByRole("button", { name: /^Evidence,/ }).click();
-  await expect(page.getByText(/facts? found for/)).toBeVisible({ timeout: 15_000 });
+
+  // Selecting a place auto-advances to the Focus question.
+  await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible();
+  await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
+
+  // Choosing a focus auto-advances to Evidence.
+  await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
-/** Selecting an evidence card relocates its checkbox into a different
- * list ("Evidence you're using"), which unmounts the original DOM node --
- * a plain `.first().check()` re-resolves against a shifting target and
- * spins through the whole list. Reading the label once (a query, not an
- * action) and clicking a name-anchored locator exactly once avoids that
- * retry loop. Returns the plain-language evidence label that was
- * selected, so callers can assert on it later if needed. */
-async function selectNthAvailableEvidenceItem(page: Page, index: number): Promise<string> {
-  const includeCheckboxes = page.locator('input[type="checkbox"][aria-label^="Include"]');
-  const fullLabel = await includeCheckboxes.nth(index).getAttribute("aria-label");
-  if (!fullLabel) throw new Error(`No unselected evidence checkbox at index ${index}`);
-  await page.getByRole("checkbox", { name: fullLabel, exact: true }).click();
-  // fullLabel is "Include <item label> in this project" -- return just
-  // the item label for readable assertions.
-  return fullLabel.replace(/^Include /, "").replace(/ in this project$/, "");
+/** Including a recommended fact relocates its card into "Evidence you're
+ * using," unmounting the original button -- clicking a name-anchored
+ * locator exactly once (not `.first()`, which would keep re-resolving
+ * against a shifting list) avoids a retry loop. Returns the label of the
+ * fact that was included. */
+async function includeNthAvailableFact(page: Page, index: number): Promise<string> {
+  const includeButtons = page.locator('button[aria-label^="Include "]');
+  const fullLabel = await includeButtons.nth(index).getAttribute("aria-label");
+  if (!fullLabel) throw new Error(`No available fact at index ${index}`);
+  await page.getByRole("button", { name: fullLabel, exact: true }).click();
+  return fullLabel.replace(/^Include /, "");
 }
 
-async function selectFirstAvailableEvidenceItem(page: Page): Promise<string> {
-  return selectNthAvailableEvidenceItem(page, 0);
-}
+const SELECT_AT_LEAST_ONE_FACT = "Select at least one fact to continue.";
 
 test.describe("Advocate -- core project workflow", () => {
-  test("starting from Sunnyvale surfaces real, cited evidence in plain language", async ({ page }) => {
+  test("the first screen asks one question with two large choices, nothing else", async ({ page }) => {
+    await page.goto("/advocate");
+    await expect(page.getByRole("heading", { name: "Turn evidence into action" })).toBeVisible();
+    await expect(page.getByText("Where would you like to start?")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Choose a community:/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Review a document:/ })).toBeVisible();
+    // Nothing else -- no scenario cards, no output types, no evidence
+    // counts, no "Untitled workspace," no project summary.
+    await expect(page.getByText("Untitled workspace")).not.toBeVisible();
+    await expect(page.getByText(/None selected yet/)).not.toBeVisible();
+  });
+
+  test("starting from a place surfaces real, cited evidence grouped as recommended facts", async ({ page }) => {
     await startProjectFromPlace(page, "Sunnyvale");
-    await expect(page.getByRole("heading", { name: "Evidence for this project" })).toBeVisible();
-    // A real publisher and a plain-language "Calculated estimate" /
-    // "Modeled estimate" status badge must appear -- never a raw
-    // internal data_status word like "derived" or "modeled" shown bare.
+    await expect(page.getByText("RECOMMENDED FACTS")).toBeVisible();
     await expect(page.getByText(/Centers for Disease Control/).first()).toBeVisible();
     await expect(page.getByText(/Calculated estimate|Modeled estimate|Reported measurement/).first()).toBeVisible();
+    // No internal jargon anywhere on this screen.
+    await expect(page.getByText("Matched evidence")).not.toBeVisible();
+    await expect(page.getByText("Evidence bundle")).not.toBeVisible();
   });
 
-  test("selecting and removing evidence updates the plain-language count and moves the card between sections", async ({
-    page,
-  }) => {
+  test("including and removing a fact updates the selected count and the project summary", async ({ page }) => {
     await startProjectFromPlace(page, "Gilroy");
 
-    const label = await selectFirstAvailableEvidenceItem(page);
-    await expect(page.getByRole("heading", { name: "Evidence you're using" })).toBeVisible();
+    const label = await includeNthAvailableFact(page, 0);
     await expect(page.getByText("1 fact selected").first()).toBeVisible();
 
-    await page.getByRole("checkbox", { name: `Remove ${label} from this project`, exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Evidence you're using" })).not.toBeVisible();
+    await page.getByRole("button", { name: `Included ${label}`, exact: true }).click();
+    await expect(page.getByText("1 fact selected")).not.toBeVisible();
   });
 
-  test("reordering selected evidence with the up/down controls changes its order", async ({ page }) => {
+  test("continuing without any fact selected shows a direct instruction, not a silent block", async ({ page }) => {
     await startProjectFromPlace(page, "Gilroy");
-
-    await selectNthAvailableEvidenceItem(page, 0);
-    await selectNthAvailableEvidenceItem(page, 0); // the list shifts after each selection
-
-    const selectedHeading = page.getByRole("heading", { name: "Evidence you're using" });
-    await expect(selectedHeading).toBeVisible();
-    const firstLabelBefore = await selectedHeading.locator("xpath=following::ul[1]//li[1]").innerText();
-
-    await page.getByRole("button", { name: /Move .* later/ }).first().click();
-
-    const firstLabelAfter = await selectedHeading.locator("xpath=following::ul[1]//li[1]").innerText();
-    expect(firstLabelAfter).not.toBe(firstLabelBefore);
+    const continueBtn = page.getByRole("button", { name: /^Continue with \d+ facts?$/ });
+    await expect(continueBtn).toBeDisabled();
+    await expect(page.getByText(SELECT_AT_LEAST_ONE_FACT)).toBeVisible();
   });
 
   test("creating a one-page brief produces cited, non-causal content with no raw internal identifiers", async ({
     page,
   }) => {
     await startProjectFromPlace(page, "Sunnyvale");
-    await selectFirstAvailableEvidenceItem(page);
+    await includeNthAvailableFact(page, 0);
+    await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
 
-    await page.getByRole("button", { name: /^Draft,/ }).click();
-    await expect(page.getByRole("heading", { name: "What do you want to create?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
+    await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+    await expect(page.getByRole("heading", { name: "Who is this for?" })).toBeVisible();
+    await page.getByRole("button", { name: "Commissioner / staff" }).click();
+    await expect(page.getByRole("heading", { name: "What would you like this document to accomplish?" })).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    await expect(page.getByText(/^Ready to create your/)).toBeVisible();
     await page.getByRole("button", { name: "Create draft" }).click();
 
     await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("What does the evidence not prove?")).toBeVisible();
     await expect(
-      page.getByText("This draft organizes screening evidence. It does not prove causation or make a final policy determination."),
+      page.getByText(
+        "This draft organizes screening evidence. It does not prove causation or make a final policy decision.",
+      ),
     ).toBeVisible();
-    // The old internal "Configuration hash: <hex>" footer must never
-    // appear in the normal interface (docs/design/advocate-intuitive-
-    // workspace-research.md -- no raw internal identifiers in the UI).
     await expect(page.getByText(/Configuration hash:/)).not.toBeVisible();
-  });
-
-  test("deterministic meeting questions are generated from real evidence", async ({ page }) => {
-    await startProjectFromPlace(page, "Sunnyvale");
-    await selectFirstAvailableEvidenceItem(page);
-    await page.getByRole("button", { name: /^Draft,/ }).click();
-    await page.getByRole("button", { name: "Create draft" }).click();
-    await expect(page.getByText("Questions for decision-makers")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Untitled workspace")).not.toBeVisible();
   });
 
   test("every generated factual claim traces to a real, cited source -- never a bare uncited statement", async ({
     page,
   }) => {
     await startProjectFromPlace(page, "Sunnyvale");
-    await selectNthAvailableEvidenceItem(page, 0);
-    await selectNthAvailableEvidenceItem(page, 0);
-    await page.getByRole("button", { name: /^Draft,/ }).click();
+    await includeNthAvailableFact(page, 0);
+    await includeNthAvailableFact(page, 0);
+    await page.getByRole("button", { name: /^Continue with 2 facts$/ }).click();
+    await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+    await page.getByRole("button", { name: "Commissioner / staff" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Create draft" }).click();
 
-    await expect(page.getByText(/facts? · \d+ sources? · all selected claims have citations/)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page.getByText(/facts? · \d+ sources? · Citations included/)).toBeVisible({ timeout: 15_000 });
     const sourcesText = await page.locator("#advocate-output-print-area").innerText();
     expect(sourcesText).toContain("Centers for Disease Control");
-    expect(sourcesText).toMatch(/retrieved|release/);
   });
 
-  test("downloading a project backup and restoring it preserves the project's state", async ({ page }) => {
+  test("the Review screen offers Back to evidence, Edit choices, a new version, Copy, Download, and Print", async ({
+    page,
+  }) => {
     await startProjectFromPlace(page, "Sunnyvale");
-    await selectFirstAvailableEvidenceItem(page);
+    await includeNthAvailableFact(page, 0);
+    await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
+    await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+    await page.getByRole("button", { name: "Commissioner / staff" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Create draft" }).click();
+    await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.getByRole("button", { name: "Back to evidence" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit choices" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create a new version" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Download sources" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Print / save as PDF" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Back to evidence" }).click();
+    await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible();
+  });
+
+  test("project title auto-suggests a human-readable name from place and output type, never a raw ID", async ({
+    page,
+  }) => {
+    await startProjectFromPlace(page, "Gilroy");
+    await includeNthAvailableFact(page, 0);
+    await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
+    await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+
+    await page.getByText("Project options").click();
+    await expect(page.getByText(/Gilroy city.*one-page meeting brief/i)).toBeVisible();
+    await expect(page.getByText(/^[0-9a-f]{8}-[0-9a-f]{4}-/)).not.toBeVisible();
+  });
+
+  test("downloading a project file and opening it back preserves the project's state", async ({ page }) => {
+    await startProjectFromPlace(page, "Sunnyvale");
+    await includeNthAvailableFact(page, 0);
 
     await page.getByText("Project options").click();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download project backup" }).click();
+    await page.getByRole("button", { name: "Download a copy" }).click();
     const download = await downloadPromise;
     const filePath = await download.path();
     expect(filePath).toBeTruthy();
 
-    await page.getByRole("button", { name: "+ Start a new project" }).click();
-    await expect(page.getByRole("heading", { name: "Start an advocacy project" })).toBeVisible();
+    // Downloading closes the menu (a deliberate one-shot action); reopen
+    // it to reach "Start a new project".
+    await page.getByText("Project options").click();
+    await page.getByText("Start a new project").click();
+    await expect(page.getByText("Where would you like to start?")).toBeVisible();
 
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByText("Project options").click();
-    await page.getByRole("button", { name: "Restore a project backup" }).click();
+    await page.getByRole("button", { name: "Open a saved copy" }).click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(filePath!);
 
-    // Two projects now exist (the empty landing one plus the restored
-    // Sunnyvale one), so the project switcher renders as a labeled
-    // <select> ("Switch project") rather than a plain title -- and the
-    // summary panel's own heading is collapsed behind an explicit toggle
-    // on narrow viewports, so check the select's selected option
-    // directly instead of relying on a heading that isn't always shown.
-    await expect(page.locator("#project-switcher option:checked")).toHaveText(/Sunnyvale/, {
+    // Importing switches straight to the restored project and resumes at
+    // its furthest-reached stage (Create, since a fact was already
+    // selected) -- there is no separate <select>-based project switcher
+    // in the redesigned menu, just the project itself becoming active.
+    await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible({
       timeout: 10_000,
     });
+    // Scoped to the project summary bar, not the (currently closed, thus
+    // hidden) project-switch list in the menu, which also contains the
+    // project's title text.
+    await expect(page.getByTestId("project-summary-bar")).toContainText("Sunnyvale");
     await expect(page.getByText("1 fact selected").first()).toBeVisible();
   });
 
-  test("restoring a file that isn't a valid backup shows a plain-language error, not a stack trace", async ({
+  test("opening a file that isn't a valid project shows a plain-language error, not a stack trace", async ({
     page,
   }) => {
     await page.goto("/advocate");
     await page.getByText("Project options").click();
     const fileChooserPromise = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Restore a project backup" }).click();
+    await page.getByRole("button", { name: "Open a saved copy" }).click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles({
-      name: "not-a-backup.json",
+      name: "not-a-project.json",
       mimeType: "application/json",
       buffer: Buffer.from("{ this is not valid JSON"),
     });
 
     await expect(
-      page.getByText("This file isn't a valid Advocate project backup. It couldn't be read as a backup file at all. Nothing was changed."),
+      page.getByText(
+        "This file isn't a valid Advocate project file. It couldn't be read as a project file at all. Nothing was changed.",
+      ),
     ).toBeVisible({ timeout: 5_000 });
+    // Never a stack trace, parsing exception, or raw schema/validation object.
+    await expect(page.getByText(/SyntaxError|TypeError|at Object\./)).not.toBeVisible();
   });
 
-  test("reloading the browser resumes at the furthest stage already reached, not the empty entry form", async ({
+  test("reloading resumes at the furthest stage already reached, never back at the empty landing", async ({
     page,
   }) => {
     await startProjectFromPlace(page, "Gilroy");
-    await selectFirstAvailableEvidenceItem(page);
+    await includeNthAvailableFact(page, 0);
     await page.waitForTimeout(1200); // allow the 500ms autosave debounce to fire
 
     await page.reload({ waitUntil: "networkidle" });
-    // A project that already has a place and evidence must resume on the
-    // Draft stage, not silently reset to the empty search form -- a real
-    // bug found and fixed during this pass (advocate-client.tsx
-    // resumeStageFor).
-    await expect(page.getByRole("heading", { name: "What do you want to create?" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByText("1 fact selected").first()).toBeVisible();
@@ -200,8 +244,11 @@ test.describe("Advocate -- core project workflow", () => {
     });
 
     await startProjectFromPlace(page, "Sunnyvale");
-    await selectFirstAvailableEvidenceItem(page);
-    await page.getByRole("button", { name: /^Draft,/ }).click();
+    await includeNthAvailableFact(page, 0);
+    await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
+    await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+    await page.getByRole("button", { name: "Commissioner / staff" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Create draft" }).click();
     await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
 

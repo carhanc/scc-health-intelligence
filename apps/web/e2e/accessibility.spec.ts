@@ -1,3 +1,4 @@
+import path from "node:path";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -216,39 +217,97 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Advocate (initial, no workspace state) has no serious or critical violations", async ({ page }) => {
+  test("Advocate landing (choose a starting point) has no serious or critical violations", async ({ page }) => {
     await page.goto("/advocate");
-    await expect(page.getByRole("heading", { name: "Advocate" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Turn evidence into action" })).toBeVisible({ timeout: 15_000 });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Advocate with evidence selected and a brief generated has no serious or critical violations", async ({
-    page,
-  }) => {
+  test("Advocate Place step (search results shown) has no serious or critical violations", async ({ page }) => {
     await page.goto("/advocate");
+    await page.getByRole("button", { name: /^Choose a community:/ }).click();
+    await page.getByLabel("Find a place").fill("Sunnyvale");
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page.getByRole("button", { name: /Sunnyvale/ }).first()).toBeVisible({ timeout: 10_000 });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Advocate Focus step has no serious or critical violations", async ({ page }) => {
+    await page.goto("/advocate");
+    await page.getByRole("button", { name: /^Choose a community:/ }).click();
     await page.getByLabel("Find a place").fill("Sunnyvale");
     await page.getByRole("button", { name: "Search" }).click();
     await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
-    await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
-    await page.getByRole("button", { name: "Generate" }).click();
-    await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
-
-    const results = await new AxeBuilder({ page }).analyze();
-    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
-  });
-
-  test("Advocate document-upload tab has no serious or critical violations", async ({ page }) => {
-    await page.goto("/advocate");
-    await page.getByRole("tab", { name: "Start from a document" }).click();
-    await expect(page.getByText(/Upload only documents you are authorized/)).toBeVisible({
+    await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
       timeout: 10_000,
     });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Advocate Evidence step (recommended facts loaded) and a generated brief have no serious or critical violations", async ({
+    page,
+  }) => {
+    await page.goto("/advocate");
+    await page.getByRole("button", { name: /^Choose a community:/ }).click();
+    await page.getByLabel("Find a place").fill("Sunnyvale");
+    await page.getByRole("button", { name: "Search" }).click();
+    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
+    await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
+    await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    let results = await new AxeBuilder({ page }).analyze();
+    let serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+
+    await page.locator('button[aria-label^="Include "]').first().click();
+    await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
+    await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
+
+    results = await new AxeBuilder({ page }).analyze();
+    serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+
+    await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+    await page.getByRole("button", { name: "Commissioner / staff" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Create draft" }).click();
+    await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
+
+    results = await new AxeBuilder({ page }).analyze();
+    serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Advocate document flow (choose a document, review passages) has no serious or critical violations", async ({
+    page,
+  }) => {
+    await page.goto("/advocate");
+    await page.getByRole("button", { name: /^Review a document:/ }).click();
+    await expect(page.getByRole("heading", { name: "Choose a document" })).toBeVisible();
+
+    let results = await new AxeBuilder({ page }).analyze();
+    let serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+
+    await page.getByRole("checkbox").check();
+    await page
+      .getByLabel("Upload a meeting document")
+      .setInputFiles(path.join(__dirname, "fixtures", "sample-agenda.txt"));
+    await expect(page.getByRole("heading", { name: "Review useful passages" })).toBeVisible({ timeout: 15_000 });
+
+    results = await new AxeBuilder({ page }).analyze();
+    serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
@@ -342,12 +401,16 @@ test.describe("Keyboard navigation and focus", () => {
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
   });
 
-  test("the full Advocate workflow -- search, select evidence, generate a brief -- works with keyboard only", async ({
+  test("the full Advocate workflow -- choose a place, focus, select evidence, create a draft -- works with keyboard only", async ({
     page,
   }) => {
     await page.goto("/advocate");
-    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+    const chooseCommunity = page.getByRole("button", { name: /^Choose a community:/ });
+    await expect(chooseCommunity).toBeVisible({ timeout: 15_000 });
+    await chooseCommunity.focus();
+    await page.keyboard.press("Enter");
 
+    await expect(page.getByLabel("Find a place")).toBeVisible();
     await page.getByLabel("Find a place").fill("Sunnyvale");
     await page.keyboard.press("Enter");
 
@@ -356,15 +419,40 @@ test.describe("Keyboard navigation and focus", () => {
     await result.focus();
     await page.keyboard.press("Enter");
 
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+    const recommendedFocus = page.getByRole("button", { name: /^Health equity overview, recommended:/ });
+    await expect(recommendedFocus).toBeVisible({ timeout: 10_000 });
+    await recommendedFocus.focus();
+    await page.keyboard.press("Enter");
 
-    const firstCheckbox = page.locator('input[type="checkbox"][aria-label^="Include"]').first();
-    await firstCheckbox.focus();
-    await page.keyboard.press("Space");
-    await expect(firstCheckbox).toBeChecked();
+    await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+      timeout: 15_000,
+    });
+    const includeButton = page.locator('button[aria-label^="Include "]').first();
+    await includeButton.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("1 fact selected").first()).toBeVisible();
 
-    const generateButton = page.getByRole("button", { name: "Generate" });
-    await generateButton.focus();
+    const continueButton = page.getByRole("button", { name: /^Continue with 1 fact$/ });
+    await continueButton.focus();
+    await page.keyboard.press("Enter");
+
+    await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
+    const briefOption = page.getByRole("button", { name: /^One-page meeting brief:/ });
+    await briefOption.focus();
+    await page.keyboard.press("Enter");
+
+    const audienceOption = page.getByRole("button", { name: "Commissioner / staff" });
+    await expect(audienceOption).toBeVisible();
+    await audienceOption.focus();
+    await page.keyboard.press("Enter");
+
+    const goalContinue = page.getByRole("button", { name: "Continue" });
+    await goalContinue.focus();
+    await page.keyboard.press("Enter");
+
+    const createButton = page.getByRole("button", { name: "Create draft" });
+    await expect(createButton).toBeVisible();
+    await createButton.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
   });
