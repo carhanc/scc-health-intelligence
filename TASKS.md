@@ -399,8 +399,57 @@ interface and read as a single dense page rather than an understandable task.
       most significant defect found this pass); the guided dashboard always resuming a returning project
       at the first stage regardless of progress already made (DEC-085); a cross-page handoff using a raw
       GEOID display name when a nicer name was already available in the same component (DEC-085).
-- [ ] Blind usability review (3 independent cold subagents) and visual-review doc.
-- [ ] Commits, and the explicitly-authorized push to `origin/ux/health-equity-redesign`.
+- [x] Blind usability review (3 independent cold subagents) and visual-review doc —
+      `docs/design/advocate-intuitive-workspace-visual-review.md`.
+- [x] Commits (7), and the explicitly-authorized push to `origin/ux/health-equity-redesign` — commit
+      `6c6ecad1348ae6d2330d712d87dbdf5bf51caed3`, pushed.
+
+---
+
+## Sixth pass: Advocate radical flow simplification (new branch `ux/advocate-flow-simplification`)
+
+Triggered by direct real-world feedback on the fifth pass's dashboard-model Advocate ("Even I do not know
+what to do on this page") — a release-blocking usability failure, not a terminology or styling issue. Full
+detail: `docs/design/advocate-flow-simplification-visual-review.md`.
+
+- [x] Replaced the permanent three-column dashboard with a linear, one-question-at-a-time guided flow —
+      exactly 4 user-facing stages (Place/Evidence/Create/Review), never more than one dominant at once
+      (DEC-086). Deleted 7 files whose UI is fully replaced; added 8 new ones.
+- [x] Simplified place and focus selection (search-only Place step; a recommended/common/"see more" Focus
+      step reframing the real backend scenarios in plain language).
+- [x] Simplified evidence review (Selected → Added-from-page → Recommended → "See more" grouping, plain
+      Include toggle) and the document-passage flow (real excerpt + page reference, honest no-match
+      copy), integrated into the existing draft-generation notes pipeline via two purely-additive schema
+      fields (`sourcePage`, `includedPassages`).
+- [x] Simplified output selection and draft creation into a 4-question micro-wizard (output → audience →
+      goal → ready) with a concise, only-populated-fields readiness summary.
+- [x] Redesigned Review (unchanged document-style preview, clarified action row) and project options (a
+      compact, collapsed-by-default menu near the title, not a permanent rail).
+- [x] Cross-page handoff now lands directly on Evidence with a plain-language confirmation and a real,
+      prefetched fact count, never the Place stage and never a re-prompted community selection.
+- [x] Full backward-compatibility testing: 2 new regression tests confirm a project saved before this pass
+      (missing both new schema fields entirely) still loads with safe defaults and every existing field
+      intact.
+- [x] Full verification gate: frontend lint/typecheck/**105 unit tests**; production build clean; backend
+      pytest **193/193** (no backend changes this pass); full project-wide Playwright suite (not only
+      Advocate specs) — 229 passed/6 skipped desktop-chromium, 211 passed/24 skipped mobile-chromium, 0
+      failed; axe-core zero serious/critical violations on every Advocate stage; keyboard-only full flow;
+      no horizontal overflow at 1440/1280/1024/768/390/375/320px; 200% zoom and `prefers-reduced-motion`
+      both clean; secret scan and oversized-file scan clean.
+- [x] Real bugs found and fixed through live interaction (DEC-087 and several smaller fixes): a redundant
+      double-nested "View project details" disclosure requiring two clicks to see any content; a mobile
+      horizontal-overflow bug in the new step indicator; a cross-page arrival screen claiming "0 facts"
+      while the real count was still loading; a legacy project showing "Place, not started yet" despite
+      having a real place and evidence; a document-only project's draft leaking the literal placeholder
+      string "Selected geography."
+- [x] 4 independent blind usability reviews (2 explicitly nontechnical personas) using the exact
+      12-question protocol — `docs/design/advocate-flow-simplification-visual-review.md` §8. Two
+      repeated, high-confidence findings fixed (a dead map-reference on Advocate's Place step; "Project
+      options" not reading as clickable); one finding traced to a screenshot-coverage gap rather than a
+      real defect; one new disclosed risk (RISK-038, the three visually-distinct "back" controls).
+- [x] Screenshot capture (23 desktop states, 7 mobile states) — `docs/design/screenshots/advocate-flow-
+      simplification/`.
+- [x] Commits, and the explicitly-authorized push to `origin/ux/advocate-flow-simplification`.
 
 **Gate (fifth pass): IN PROGRESS.**
 

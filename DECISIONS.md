@@ -985,4 +985,72 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+---
+
+### DEC-086 — Replace Advocate's permanent-dashboard layout with a linear, one-question-at-a-time guided flow
+
+**Context:** The dashboard-model Advocate built in the prior pass (DEC-081 onward) was functionally
+complete but, per direct real-world feedback ("Even I do not know what to do on this page"), presented too
+many simultaneous decisions: a permanent three-column layout showed project navigation, evidence
+collection, and output configuration all at once, with a summary rail frequently showing incomplete values.
+
+**Decision:** Advocate is rebuilt around exactly 4 user-facing stages — Place, Evidence, Create, Review —
+with never more than one stage visually dominant at a time. Two structural techniques make this possible
+without adding a fifth stage or breaking the "one question at a time" rule: (1) `visibleStageId()`
+(`advocate-client.tsx`) folds two genuinely sequential internal screens (place search, then focus
+confirmation) into a single outer "Place" stage for the progress indicator, so a stage that inherently
+needs two decisions doesn't need its own top-level slot; (2) the Create stage is a self-contained micro-
+wizard (`create-step.tsx`) that owns its own `output → audience → goal → ready` sub-step state and renders
+a distinct heading per sub-step, achieving one-question-per-screen for a stage that has four real decisions
+without inflating the outer stage count. "Project" is deliberately never shown as its own stage — place,
+focus, audience, and output are surfaced only via a compact summary bar and an on-demand "View project
+details" disclosure, never a permanent rail.
+
+**Rationale:** The task's own explicit acceptance test was procedural, not just cosmetic: a first-time
+reviewer following the golden path (choose a place, choose a focus, select facts, choose an output type,
+select an audience, create the draft, find the citations, download it) should never hesitate about where to
+click. Folding sequential decisions into one outer stage, rather than either cramming them onto one screen
+(the old dashboard's failure mode) or exploding the top-level stage count (which would violate the "exactly
+Place/Evidence/Create/Review" spec), was the only approach satisfying both constraints at once.
+
+**Consequences:** `project-nav.tsx`, `project-summary-panel.tsx`, `start-project-landing.tsx`,
+`geography-issue-entry.tsx`, `document-entry.tsx`, `draft-creator.tsx`, and `packages/ui/src/StepIndicator.tsx`
+were deleted (confirmed zero remaining references before deletion) and replaced by `landing-choice.tsx`,
+`place-step.tsx`, `focus-step.tsx`, `document-step.tsx`, `create-step.tsx`, `project-menu.tsx`,
+`project-summary-bar.tsx`, and `packages/ui/src/HorizontalSteps.tsx`. The underlying `AdvocacyWorkspace`
+schema, IndexedDB persistence, evidence-matching, and deterministic draft generation are entirely unchanged.
+All three Advocate e2e spec files, plus the pre-existing project-wide `accessibility.spec.ts`,
+`responsive.spec.ts`, and `production-smoke.spec.ts` (which had Advocate-specific tests written against the
+now-deleted dashboard UI) were rewritten against the new flow.
+
+---
+
+### DEC-087 — Fix two real defects found through live interaction and blind usability review, not just pattern-match against the spec
+
+**Context:** Two genuine bugs surfaced only through actually using the running app and through independent
+blind review, neither of which a code read alone would have caught: (1) a "View project details" toggle
+button mounted a `ProjectDetailsDisclosure` component whose own root was *itself* a second, separately-closed
+`<details>` element — clicking "View project details" revealed nothing until a second, hidden click on an
+identically-worded inner summary was also made; (2) the shared `SearchPanel` component's default empty-state
+text ("...select any tract directly on the map") is accurate on Explore, which renders a real map beside it,
+but was being reused verbatim on Advocate's Place step, which has no map at all — three of four blind
+reviewers independently flagged confusion near this screen.
+
+**Decision:** `ProjectDetailsDisclosure` (`project-summary-bar.tsx`) is now a plain `<dl>`, not a second
+`<details>` — the outer toggle button (which already tracks its own open/closed state and now reads "Hide
+project details" when open) is the only disclosure control. `SearchPanel` gained a `showMapHint` boolean
+prop (default `true`, preserving Explore's existing, correct behavior); Advocate's `PlaceStep` passes
+`false` and shows map-free copy instead.
+
+**Rationale:** Both are the kind of defect that only reproduces by actually clicking through the running
+application or by a reviewer encountering the screen cold — neither would show up in a static code read
+against the design spec, which is exactly why this pass's process mandates live browser verification and
+blind usability review as release gates, not optional extras.
+
+**Consequences:** `apps/web/e2e/advocate-cross-page.spec.ts`'s Prioritize-handoff test was updated to assert
+against the details disclosure directly (`getByTestId("project-details-disclosure")`) rather than a
+nested-`<details>` selector that no longer exists. No other behavior changed.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

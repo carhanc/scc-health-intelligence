@@ -374,4 +374,22 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 ---
 
+## RISK-038 — Advocate has three visually distinct "go back" controls with no unifying visual treatment
+
+**Category:** UX consistency. **Likelihood:** Confirmed — found independently by 3 of 4 blind usability
+reviewers during the flow-simplification pass (`docs/design/advocate-flow-simplification-visual-review.md`
+§8). **Impact:** Low-moderate — each control works correctly and does something genuinely different (a
+small "← Back" link steps back one question within the Create sub-wizard; a "Change" link next to the
+project summary jumps directly to editing a specific earlier choice; a "Back to evidence" button on Review
+jumps directly to the Evidence stage), but reviewers could not tell at a glance that these are three
+different actions rather than duplicates of the same one.
+
+**Mitigation:** None applied this pass — a redesign of the back-navigation model (e.g. a single consistent
+"back" affordance per stage, or explicit labeling of what each control does) was judged a larger change than
+this pass's remaining scope, given the underlying behavior itself is already correct and tested.
+
+**Status:** `open`, low priority — revisit as a small, focused, UX-only follow-up; does not block release.
+
+---
+
 *New risks are appended here as they are identified in each subsequent phase; existing risks are updated in place (status, mitigation progress) rather than duplicated.*

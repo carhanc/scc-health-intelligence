@@ -1,8 +1,59 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-18 (Advocate workspace comprehension, dashboard, and cross-page integration redesign — fifth pass on branch `ux/health-equity-redesign`, not merged to `main`)
+**Last updated:** 2026-07-18 (Advocate radical flow simplification — new branch `ux/advocate-flow-simplification`, created from `ux/health-equity-redesign`, not merged to `main`)
 
-## Most recent work: Advocate workspace comprehension, dashboard, and cross-page integration redesign (fifth pass, same branch, not on `main`)
+## Most recent work: Advocate radical flow simplification (new branch `ux/advocate-flow-simplification`)
+
+Triggered by direct real-world feedback on the prior pass's dashboard-model Advocate ("Even I do not know
+what to do on this page") — a release-blocking usability failure, not a terminology or styling issue.
+Rebuilt Advocate's information architecture around a linear, one-question-at-a-time guided flow with
+exactly 4 user-facing stages (Place → Evidence → Create → Review), replacing the permanent three-column
+dashboard entirely while preserving every tested piece of underlying logic (`AdvocacyWorkspace` schema,
+IndexedDB persistence, evidence matching, deterministic draft generation, citations, all six output types,
+backup/restore) unchanged. Full rationale, before/after screenshots, and blind-review findings:
+`docs/design/advocate-flow-simplification-visual-review.md`. Key decisions: `DECISIONS.md` DEC-086/DEC-087;
+new disclosed risk: `RISK_REGISTER.md` RISK-038.
+
+**What changed, concretely:** deleted 7 files whose UI the new flow fully replaces (`project-nav.tsx`,
+`project-summary-panel.tsx`, `start-project-landing.tsx`, `geography-issue-entry.tsx`, `document-entry.tsx`,
+`draft-creator.tsx`, `packages/ui/src/StepIndicator.tsx` — confirmed zero remaining references before
+deletion) and added 8 new ones (`landing-choice.tsx`, `place-step.tsx`, `focus-step.tsx`,
+`document-step.tsx`, `create-step.tsx`, `project-menu.tsx`, `project-summary-bar.tsx`,
+`packages/ui/src/HorizontalSteps.tsx`); rewrote `evidence-review.tsx` and `draft-preview.tsx` in place;
+added two purely-additive `AdvocacyWorkspace` schema fields (`sourcePage`, `includedPassages`) for the new
+document-passage-to-draft integration and cross-page "Added from X" evidence grouping; updated all 6
+cross-page "Add to advocacy project" call sites to pass their originating page name through to the
+handoff.
+
+**Real bugs found and fixed through live interaction and blind review** (DEC-087, plus several smaller
+timing/legacy-data fixes): a redundant double-nested disclosure that required two clicks to see "View
+project details" content at all; a shared `SearchPanel` component's map-reference text bleeding into
+Advocate's map-free Place step (caught independently by 3 of 4 blind reviewers); a "Project options" menu
+that didn't read as clickable (same 3 reviewers); a cross-page arrival screen that claimed "0 facts" while
+the real count was still loading; a legacy pre-existing project showing "Place, not started yet" despite
+having a real place and evidence; a mobile horizontal-overflow bug in the new step indicator; a document-
+only project's generated draft leaking the literal placeholder string "Selected geography."
+
+**Verification, all live-run this session:** frontend unit 105/105 (2 new backward-compatibility
+regression tests); frontend lint/typecheck clean (`apps/web` and `packages/ui`); production build clean;
+backend pytest 193/193 (no backend changes this pass — full re-run confirms no regression); full
+project-wide Playwright suite (not only Advocate specs) 229 passed/6 skipped desktop-chromium, 211
+passed/24 skipped mobile-chromium, 0 failed; axe-core zero serious/critical violations across every
+Advocate stage; keyboard-only full flow; no horizontal overflow at 1440/1280/1024/768/390/375/320px; 200%
+zoom simulation and `prefers-reduced-motion` both clean; secret scan and oversized-file scan clean; 4
+independent blind usability reviews (2 explicitly nontechnical personas) using the exact 12-question
+protocol, findings triaged and two real fixes applied (DEC-087).
+
+**Not pushed, not merged, not deployed** at the time this note was written — see the session's final
+report for the actual push confirmation, since the explicitly-authorized `git push -u origin
+ux/advocate-flow-simplification` happens after this file is updated, per this project's own commit
+ordering.
+
+**Next action for this thread:** none — this pass's task list is complete through the final report.
+
+---
+
+## Prior work: Advocate workspace comprehension, dashboard, and cross-page integration redesign (fifth pass, same branch, not on `main`)
 
 Triggered by stakeholder feedback that Advocate, while functionally correct, exposed internal/technical
 vocabulary throughout its normal interface (matched evidence, evidence bundle, output type, Generate,
