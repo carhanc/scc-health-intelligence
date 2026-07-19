@@ -1053,4 +1053,76 @@ nested-`<details>` selector that no longer exists. No other behavior changed.
 
 ---
 
+---
+
+### DEC-088 — Generalize Advocate's focus step into a shared `FocusPicker`, reused by Prioritize and Copilot
+
+**Context:** Three separate pages (Advocate's Focus step, Prioritize's scenario selector, and the new
+Copilot focus-selection screen) each needed the identical job: let a user pick a "priority weighting" —
+recommended default, a few common alternatives, "see more" for the rest, plus a real custom-weights path —
+over the same underlying set of real backend `scenario_id`s, without ever surfacing an internal scenario ID
+or a raw weight array as the normal interface. Building this three separate times would have meant three
+separately-maintained copies of the same recommended/common/unavailable-focus-area logic, with real risk of
+the three drifting out of sync (e.g. Prioritize's own pre-existing `UNAVAILABLE_SCENARIOS` handling already
+differed subtly from what Advocate's `focus-step.tsx` did).
+
+**Decision:** Advocate's existing, already-tested `focus-step.tsx` was generalized and relocated to
+`apps/web/app/focus-picker.tsx` (exported as `FocusPicker`), with `focus-options.ts` (constants: recommended
+ID, common IDs, blurbs, and a new `UNAVAILABLE_FOCUS_AREAS` list) moved out of `app/advocate/` to
+`apps/web/app/focus-options.ts` as a shared module. Prioritize's old, separately-implemented
+`ScenarioSelector` component (and its own `UNAVAILABLE_SCENARIOS` constant) was deleted in favor of the
+shared component; Copilot's new focus-selection screen uses it directly with no wrapper.
+
+**Rationale:** This is exactly the kind of "global component opportunity" the pass's own instructions call
+for building — a real, provable duplication eliminated by promoting an already-battle-tested component,
+not a new abstraction invented to match an illustrative name. It also fixes a real, disclosed gap in the
+same motion: neither Advocate's nor Copilot's focus selection previously had any "unavailable focus area"
+disclosure at all (only Prioritize did) — now all three surface Language Access as a real, explained,
+non-dominant unavailable option under "See more," consistently.
+
+**Consequences:** `apps/web/app/advocate/focus-step.tsx` was deleted (confirmed zero remaining references
+first); `advocate-client.tsx`'s only change is an import-path/name update, with zero behavioral change to
+Advocate. `apps/web/e2e/prioritize-core.spec.ts` and the new `copilot-core.spec.ts` both assert against the
+shared component's real rendered output (e.g. "language access is shown as a real, explained unavailable
+option under See more, not a dominant warning") rather than page-specific mocks.
+
+---
+
+### DEC-089 — Fix five findings from blind usability review with frontend-only display changes, leaving the pipeline and backend untouched
+
+**Context:** Six independent blind usability reviews (four explicitly nontechnical personas) surfaced five
+concrete, repeatable, high-confidence findings, two of which trace back to strings generated outside the
+frontend: Access Lab's access-summary error message named an internal pipeline script
+(`` `run_access_metrics_pipeline` ``) directly in a user-facing error, and its mobile-service-scenario
+titles carried a raw internal domain-key fragment (`(health_burden-weighted, transit-hub candidates)`)
+appended by `pipelines/src/scc_health_pipeline/run_analytics_pipeline.py` — a file this pass's own branch
+constraints explicitly forbid editing ("do not alter... source-data pipelines"). The other three findings
+(Copilot's leaked `[Deterministic mode -- ...]` status line, its duplicated bullet-dump/source-list wall of
+text, and Access Lab's dead-end ZIP-code guidance) were purely frontend presentation issues.
+
+**Decision:** All five were fixed as frontend-only display-layer changes, never touching the pipeline,
+backend, scenario IDs, or any computed value. The pipeline error message was replaced with the same plain
+`"Couldn't load X. Is the API running?"` wording every sibling panel on the page already used
+(`access-summary-panel.tsx`). The leaked domain-key fragment is stripped for display via an exact-match
+string replace on the known, stable literal suffix the pipeline always appends
+(`optimizer-scenarios.tsx`) — real data untouched, only a known, redundant technical parenthetical hidden
+(the same plain-language equivalent already appears once in the intro paragraph above the list). Copilot's
+answer body now strips the static deterministic-mode disclaimer line and collapses to an 8-line preview
+with a "Show all N facts" disclosure, with the Sources list compacted to avoid repeating each fact's full
+value a second time. Access Lab's ZIP-code guidance gained a real `<Link href="/explore">`.
+
+**Rationale:** The branch's own constraints prioritize "no scientific-methodology changes... no source-data
+pipeline changes" above cosmetic preferences — a frontend-only string transform that never alters the
+underlying real value, citation, or computed number satisfies both the usability finding and that
+constraint simultaneously, without waiting on a separate pipeline-scoped pass.
+
+**Consequences:** Each fix has a new, permanent Playwright assertion (`access-lab-core.spec.ts`,
+`copilot-core.spec.ts`) asserting the specific leaked string is absent and the real content is present, plus
+a live screenshot recapture confirming the corrected state. Several other, lower-confidence or
+larger-scope findings from the same six reviews were deliberately left unfixed and disclosed instead
+(RISK-039), consistent with this pass's five-item fix budget rather than attempting every finding under
+time pressure.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

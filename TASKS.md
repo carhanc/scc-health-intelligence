@@ -451,7 +451,75 @@ detail: `docs/design/advocate-flow-simplification-visual-review.md`.
       simplification/`.
 - [x] Commits, and the explicitly-authorized push to `origin/ux/advocate-flow-simplification`.
 
-**Gate (fifth pass): IN PROGRESS.**
+**Gate (sixth pass): PASS.** Seven commits on the same branch, pushed to
+`origin/ux/advocate-flow-simplification`. Not merged, not deployed.
+
+---
+
+## Seventh pass: Product-wide flow simplification (new branch `ux/product-wide-flow-simplification`)
+
+Applied the sixth pass's own clarity/interaction discipline (one question at a time, progressive
+disclosure, one primary action, plain language) to every remaining route: Copilot, Prioritize, Access Lab,
+Utilization, Validate, Data. Overview, Explore, and Advocate were coherence-reviewed only, not rebuilt. Full
+detail: `docs/design/product-wide-flow-simplification-visual-review.md`; research audit:
+`docs/design/product-wide-flow-simplification-research.md`.
+
+- [x] Live audit of every route at 1440/1280/1024/768/390/375/320px across initial/selected/loading/
+      waking/unavailable/empty/error/long-content/print states, plus review of shared layout, nav, query
+      hooks, tabs, tables, maps, charts, empty states, tooltips, responsive behavior, accessibility tests,
+      screenshots, and copy.
+- [x] Established shared progressive-disclosure primitives: generalized Advocate's own focus step into
+      `focus-picker.tsx` (`FocusPicker`), now reused identically by Advocate, Prioritize, and Copilot —
+      eliminating three separately-built full scenario-picker grids; added `task-page-header.tsx` and
+      `plain-language-empty-state.tsx`.
+- [x] Rebuilt Copilot as a guided evidence-explanation flow: one task-choice screen (six real actions
+      mapped to real backend actions via `copilot-actions.ts`), place selection (skipped when arriving
+      with a place already known), the shared `FocusPicker`, then a result-dominant answer view with
+      citations, limitations, and cross-page actions.
+- [x] Simplified Prioritize around a concise top-10 ranked-card list (`ranked-area-card.tsx`, backed by a
+      real decision-memo fetch for top factors), with priority controls behind "Adjust priorities," the
+      full 408-row table behind "View all," and Export as a secondary action, not a tab.
+- [x] Simplified Access Lab around a place-first flow: one search question, then travel mode and the
+      access summary together as the result, with Resource browser/Resource gaps/Mobile-service scenarios
+      as secondary tabs reachable only once a place is chosen. Fixed a real URL-param display-name-loss
+      bug found while rebuilding it.
+- [x] Simplified Utilization around a 3-card task chooser (Compare facilities / Explore where patients
+      come from / See changes over time), each view leading with a computed plain-language takeaway; added
+      a dependency-free SVG `trend-bar-chart.tsx` (no charting library).
+- [x] Rebuilt Validate and Data as a clear trust center: grouped trust-status vocabulary (Available and
+      current / Needs attention / Unavailable) replacing six equal-sized status cards; five simplified
+      Validate tabs (merging Uncertainty and Validation into "Checks and uncertainty"); Data page gained
+      search/status filters and publisher-primary source labels. Fixed a real duplicate-React-key console
+      error on the Data page (two sources sharing one `source_id`).
+- [x] Harmonized navigation (nav-item tooltips using the existing `NavItem.description` field), loading/
+      waking/error states, and cross-page context handoffs (Explore → Copilot/Access Lab now carry the
+      selected tract's real GEOID and display name).
+- [x] Full verification gate: frontend lint (`--max-warnings=0`) and `tsc --noEmit` clean; **105/105**
+      frontend unit tests; backend/pipeline unchanged this pass (zero files touched — prior **193/193**
+      pytest baseline stands); full project-wide Playwright suite (every spec file, not only redesigned
+      pages), desktop-chromium + mobile-chromium — **461 passed, 0 failed, 31 skipped** (expected
+      project-scoped skips), zero flakes on the final run; axe-core zero serious/critical violations on
+      every redesigned page and state; responsive verified at all seven required widths; keyboard-only,
+      200% zoom, and `prefers-reduced-motion` verified for all six redesigned pages (18/18); no new
+      dependency added.
+- [x] Two apparent test flakes root-caused with isolated reproduction, not dismissed: a 429 from Copilot's
+      real, deliberate, pre-existing per-IP rate limiter, triggered only by an artificial stress test (not
+      the real suite, and the limiter was correctly left untouched); two axe-core `document-title`
+      violations that reproduced 0/16 times in isolation (8 repeats each) — a transient timing artifact of
+      the full suite under load, not a real defect.
+- [x] Six independent blind usability reviews (4 of 6 explicitly nontechnical personas) using the exact
+      10-question protocol — `docs/design/product-wide-flow-simplification-visual-review.md` §4. Five
+      concrete, high-confidence findings fixed (DEC-089): Copilot's leaked deterministic-mode status line
+      and its duplicated bullet-dump/source-list wall of text; Access Lab's leaked internal pipeline-script
+      name in an error message, its leaked internal domain-key fragment in scenario titles, and its
+      dead-end ZIP-code guidance with no working link. Remaining lower-confidence findings recorded as
+      disclosed limitations, not silently dropped (RISK-039).
+- [x] Screenshot capture (45 desktop+mobile states) —
+      `docs/design/screenshots/product-wide-flow-simplification/`.
+- [x] Commits, governance docs, and the explicitly-authorized push to
+      `origin/ux/product-wide-flow-simplification`.
+
+**Gate (seventh pass): PASS.**
 
 ---
 

@@ -1,8 +1,67 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-18 (Advocate radical flow simplification — new branch `ux/advocate-flow-simplification`, created from `ux/health-equity-redesign`, not merged to `main`)
+**Last updated:** 2026-07-19 (Product-wide flow simplification — new branch `ux/product-wide-flow-simplification`, created from `ux/advocate-flow-simplification`, not merged to `main`)
 
-## Most recent work: Advocate radical flow simplification (new branch `ux/advocate-flow-simplification`)
+## Most recent work: Product-wide flow simplification (new branch `ux/product-wide-flow-simplification`)
+
+Applied the same clarity/interaction discipline that made the Advocate redesign work (one question at a
+time, progressive disclosure, one primary action, plain language) to every remaining route: Copilot,
+Prioritize, Access Lab, Utilization, Validate, and Data were rebuilt around their own task model, not
+Advocate's specific layout. Overview, Explore, and Advocate were coherence-reviewed only, not rebuilt.
+Full rationale, before/after tables, and all six blind-review findings:
+`docs/design/product-wide-flow-simplification-visual-review.md` (research doc:
+`docs/design/product-wide-flow-simplification-research.md`). Key decisions: `DECISIONS.md` DEC-088/DEC-089;
+new disclosed limitations: `RISK_REGISTER.md` RISK-039.
+
+**What changed, concretely:** generalized Advocate's own `focus-step.tsx` into a shared
+`apps/web/app/focus-picker.tsx` (`FocusPicker`), now reused identically by Advocate, Prioritize's "Adjust
+priorities," and Copilot's focus-selection step, replacing three separately-implemented full scenario
+grids; added `task-page-header.tsx` and `plain-language-empty-state.tsx` shared primitives; rewrote
+`copilot-client.tsx` as a 5-stage guided flow (`landing → place → place-b → focus → instruction → result`)
+with a new `copilot-actions.ts` mapping 6 user-facing task cards to real backend actions; rewrote
+`prioritize-client.tsx`/`results-panel.tsx` around a concise top-10 `ranked-area-card.tsx` list backed by a
+real decision-memo fetch for top factors, with the 408-row table moved behind "View all"; rewrote
+`access-lab-client.tsx` around a place-first flow, fixing a real URL-param display-name-loss bug found
+while rebuilding it; rewrote `utilization-client.tsx` around a 3-card task chooser, added a dependency-free
+`trend-bar-chart.tsx` SVG component; rewrote `validate-client.tsx`/`coverage-panel.tsx` around grouped
+trust-status vocabulary (mirrored in `data-explorer.tsx`'s new search/filter UI, which also fixed a real
+duplicate-React-key console error from two sources sharing one `source_id`).
+
+**Real bugs found and fixed, six independent blind usability reviews (4 of 6 explicit nontechnical
+personas) plus pre-review live verification:** Copilot's deterministic-mode answer led with a raw
+`[Deterministic mode -- ...]` internal-status line (found before the reviews, independently confirming the
+task's own "never lead with provider status" rule); Copilot's generated answer was a ~30-line bullet dump
+duplicated a second time as a near-identical numbered source list (found by a nontechnical-persona
+reviewer, fixed with an 8-line preview + "Show all N facts" disclosure and a compacted source list); Access
+Lab's access-summary error message named an internal pipeline script
+(`` `run_access_metrics_pipeline` `` — a real backend-debugging string leaking into a user-facing error);
+Access Lab's mobile-service-scenario titles leaked a raw internal domain-key fragment
+(`(health_burden-weighted, transit-hub candidates)`) from the (out-of-scope-to-edit) pipeline's generated
+label; Access Lab's ZIP-code guidance named "Explore" as the way forward with no actual link there. All
+five were fixed with targeted, frontend-only display-layer changes (the pipeline and backend were not
+touched), each verified with a new permanent Playwright assertion plus a live screenshot recapture.
+
+**Verification, all live-run this session:** frontend unit 105/105; frontend lint (`--max-warnings=0`) and
+`tsc --noEmit` clean; backend/pipeline unchanged this pass (zero files touched under `apps/api` or
+`pipelines` — prior 193/193 pytest baseline stands); full project-wide Playwright suite (all spec files, not
+only changed pages), desktop-chromium + mobile-chromium: 461 passed, 0 failed, 31 skipped (expected
+project-scoped skips), zero flakes on the final run; axe-core serious/critical: clean on every redesigned
+page and state; responsive verified at all seven required widths; keyboard-only/200%-zoom/reduced-motion
+verified for all six redesigned pages (18/18) during implementation. No new dependency added.
+
+**Two apparent flakes, each root-caused with isolated reproduction before being dismissed, per this
+project's own "do not call a failure a flake without isolated reproduction and evidence" rule:** (1) a
+429 "Too many requests" response from Copilot's real, deliberate, pre-existing per-IP rate limiter
+(`apps/api/src/scc_health_api/rate_limit.py`, 10-request burst/~10-per-minute steady state, guarding the
+AI-provider-call route) surfaced only under an artificial `--repeat-each=8` stress test concentrating many
+Copilot asks into one minute — confirmed not a real defect (the full interleaved 245+/526-test suite runs
+clean without it) and the rate limiter itself was correctly left untouched, since it is a deliberate
+production-safety feature. (2) two unrelated axe-core `document-title` violations (Advocate document flow;
+Prioritize) appeared once each in one full 526-test run and reproduced 0/16 times in isolation (8 repeats
+each) — a transient timing artifact of running the full suite under load, matching the same class of
+pre-existing flake already root-caused in the Advocate pass's own "Focus step" axe test.
+
+## Prior work: Advocate radical flow simplification (sixth pass, same branch lineage, not on `main`)
 
 Triggered by direct real-world feedback on the prior pass's dashboard-model Advocate ("Even I do not know
 what to do on this page") — a release-blocking usability failure, not a terminology or styling issue.

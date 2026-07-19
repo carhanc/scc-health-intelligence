@@ -368,9 +368,25 @@ Each risk: description, category, likelihood, impact, mitigation, status, owner 
 
 **Impact:** Low — the resulting Advocate project still functions correctly and the raw GEOID is a real, valid identifier, not a fabricated or incorrect one; the effect is purely a presentation inconsistency (a project's "Place" field can read "Tract 06085500100" instead of a nicer "Census Tract 5001" style name), and CLAUDE.md's leading-zero/geographic-identifier-integrity rule is unaffected either way.
 
-**Mitigation:** None applied this pass — fixing it would require adding a name field to `TractAccessSummaryResponse` (and Utilization's equivalent response), a backend API-response schema change judged out of scope for a frontend-only Advocate redesign pass. Explore's tract-detail handoff, which *did* already have the nicer name available and was simply not using it, was fixed (DEC-085) since that required no backend change.
+**Mitigation:** **Access Lab's instance is now fixed (product-wide flow simplification pass).** The real
+root cause was a URL-param round-trip bug, not the API-response shape this entry originally described:
+`access-lab-client.tsx`'s `handleGeographySelect` never persisted the real search-provided display name
+into the URL, so `access-summary-panel.tsx` (re-derived every render from
+`parseSelectedGeographyFromParams`, which only ever returns `displayName: geoidParam`) silently fell back
+to the raw GEOID the instant the URL updated. Fixed by adding a `name` URL param, persisted on selection
+and read back as an override — `access-summary-panel.tsx` no longer has any `` `Tract ${tractGeoid}` ``
+fallback at all; it now requires a real `displayName` prop from its parent. **Utilization's
+`geographic-panel.tsx` is unchanged and remains partially improved only**: it already used a
+`useTractNames()` lookup map with a `?? tract_geoid_2020` fallback (real name once the lookup resolves,
+raw GEOID only during the brief initial load or on a genuine lookup miss) rather than an unconditional raw
+GEOID — better than the pre-fix Access Lab behavior, but not a guaranteed real name, and out of scope for
+this pass (fixing it cleanly would mean either gating render on the name query or reworking
+`useTractNames`' shared return shape across its four call sites, a larger change than this pass's five-item
+fix budget).
 
-**Status:** `open`, low priority — revisit if either endpoint's response schema is touched for an unrelated reason, or as a small, independent, backend-inclusive follow-up.
+**Status:** `open` for Utilization only, low priority — revisit alongside a `useTractNames` loading-state
+improvement (see the flash-of-raw-GEOID note added during the product-wide flow simplification pass's blind
+review) or as a small, independent follow-up. Access Lab's instance is `resolved`.
 
 ---
 
@@ -389,6 +405,45 @@ different actions rather than duplicates of the same one.
 this pass's remaining scope, given the underlying behavior itself is already correct and tested.
 
 **Status:** `open`, low priority — revisit as a small, focused, UX-only follow-up; does not block release.
+
+---
+
+---
+
+## RISK-039 — Several lower-confidence blind-review findings from the product-wide flow simplification pass remain unfixed
+
+**Category:** UX polish / plain-language presentation. **Likelihood:** Confirmed — found by six independent
+blind usability reviewers (`docs/design/product-wide-flow-simplification-visual-review.md` §4, §7), four of
+six explicitly nontechnical personas. **Impact:** Low — none affect data correctness, scientific
+methodology, or any non-negotiable product rule; all are presentation/IA refinements.
+
+Specific items, grouped by page:
+
+- **Prioritize:** "Robust" and "Ranks similarly under most alternate weightings" repeat verbatim on every
+  ranked-area card with no first-use explanation; the full 408-row table has no search/filter beyond native
+  column sort.
+- **Validate/Data:** raw internal identifiers (`ca_hpi_3_0`, `acs_5year_b01003`, `weights_hash`, build
+  hashes) remain visible as de-emphasized secondary text rather than moved fully behind an expand-on-request
+  disclosure; the Data page's full source and table lists render as one very long, unpaginated page;
+  "Published on its normal schedule" repeats as a badge on nearly every source row, diluting the badges
+  that matter.
+- **Cross-product navigation:** "Access Lab" and "Utilization" are nav labels that don't fully self-describe
+  without visiting the page; "Compare places" and "explain this place to me" are each reachable from more
+  than one entry point (Overview/Prioritize/Copilot; Explore/Access Lab/Copilot respectively) with no visible
+  distinction between them.
+- **Access Lab:** "Block group" terminology appears unexplained in the main result; the resource-browser
+  table's address column truncates at the right edge on narrower widths.
+- **Utilization:** one static screenshot capture showed an apparently non-rendering facility-drill-down
+  panel and a large blank region partway down the geographic-view table; not reproduced in the passing,
+  dedicated `utilization-core.spec.ts` suite (flagged for re-check with a longer capture wait, not confirmed
+  as a live defect).
+
+**Mitigation:** None applied this pass. Each was judged either a larger-scope change (table search/filter,
+nav-label renames risking the "do not rename routes casually" constraint, a first-use glossary system) or a
+single-reviewer, lower-confidence finding not warranting a rushed fix under this pass's five-item concrete-
+fix budget (matching the same discipline as RISK-038's "leave as a small, focused follow-up" treatment).
+
+**Status:** `open`, low priority — revisit as a small, focused UX-only follow-up; does not block release.
 
 ---
 
