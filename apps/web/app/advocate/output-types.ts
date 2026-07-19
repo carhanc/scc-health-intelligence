@@ -44,6 +44,11 @@ export const OUTPUT_TYPES: OutputTypeOption[] = [
   },
 ];
 
+/** The 3 most broadly useful real output types, shown first on the
+ * simplified Create step -- the other 3 real types are still fully
+ * available behind "See more document types," never hidden or removed. */
+export const PRIMARY_OUTPUT_TYPE_IDS = ["one_page_brief", "detailed_memo", "public_comment"];
+
 export interface AudienceOption {
   id: string;
   label: string;

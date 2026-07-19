@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button, Card, DataModeBadge } from "@scc-health/ui";
 import type { GeneratedBriefResponse } from "@/lib/api";
 import { ADVOCACY_TERMS } from "@/lib/advocacy-terms";
@@ -64,15 +65,46 @@ const SECTION_LABELS: Record<string, string> = {
  * disclosure, same as Explore's headline (DEC-077). */
 export function DraftPreview({
   brief,
+  onBackToEvidence,
   onEditProject,
   onCreateNewVersion,
 }: {
   brief: GeneratedBriefResponse;
+  onBackToEvidence: () => void;
   onEditProject: () => void;
   onCreateNewVersion: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
   function handlePrint() {
     window.print();
+  }
+
+  function draftAsPlainText(): string {
+    const lines: string[] = [];
+    lines.push(`${brief.geography_label}${brief.scenario_label ? ` -- ${brief.scenario_label}` : ""}`);
+    for (const key of SECTIONS_BY_OUTPUT_TYPE[brief.output_type] ?? Object.keys(brief.sections)) {
+      if (!brief.sections[key]) continue;
+      lines.push("", SECTION_LABELS[key] ?? key, brief.sections[key]!);
+    }
+    if (QUESTIONS_SHOWN_FOR.has(brief.output_type) && brief.questions.length > 0) {
+      lines.push("", "Questions for decision-makers", ...brief.questions.map((q) => `- ${q.question}`));
+    }
+    lines.push("", ADVOCACY_TERMS.causalCaveat);
+    return lines.join("\n");
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(draftAsPlainText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can fail (permissions, insecure context) -- the
+      // draft itself is unaffected either way, so this fails quietly
+      // rather than showing an alarming error for a non-destructive
+      // convenience action; Print/Download remain available.
+    }
   }
 
   function handleDownloadCsv() {
@@ -98,16 +130,22 @@ export function DraftPreview({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={onBackToEvidence}>
+            Back to evidence
+          </Button>
           <Button variant="secondary" size="sm" onClick={onEditProject}>
-            Edit project
+            Edit choices
           </Button>
           <Button variant="secondary" size="sm" onClick={onCreateNewVersion}>
             {ADVOCACY_TERMS.recreateDraftCta}
           </Button>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={handleCopy}>
+            {copied ? "Copied!" : "Copy"}
+          </Button>
           <Button size="sm" variant="secondary" onClick={handleDownloadCsv}>
-            Download sources (CSV)
+            Download sources
           </Button>
           <Button size="sm" onClick={handlePrint}>
             Print / save as PDF
@@ -132,7 +170,7 @@ export function DraftPreview({
 
           <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
             {brief.evidence_used.length} fact{brief.evidence_used.length === 1 ? "" : "s"} · {sourceCount} source
-            {sourceCount === 1 ? "" : "s"} · all selected claims have citations
+            {sourceCount === 1 ? "" : "s"} · Citations included
           </p>
 
           <div className="mt-4 space-y-4">
