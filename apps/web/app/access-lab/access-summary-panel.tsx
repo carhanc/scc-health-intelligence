@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Card, DataModeBadge, EmptyState, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
+import { Badge, Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { categoryLabel, methodLabel, serviceLevelLabel } from "@/lib/labels";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
@@ -19,26 +19,21 @@ function formatDuration(minutes: number | null): string {
 
 export function AccessSummaryPanel({
   tractGeoid,
+  displayName,
   mode,
 }: {
-  tractGeoid: string | null;
+  tractGeoid: string;
+  /** The real name the search result already carries (e.g. "Census
+   * Tract 5001") -- passed through to the Advocate handoff instead of a
+   * raw-GEOID fallback reconstructed here. */
+  displayName: string;
   mode: "walk" | "drive";
 }) {
   const query = useQuery({
     queryKey: ["access-tract-summary", tractGeoid],
-    queryFn: () => api.getTractAccessSummary(tractGeoid as string),
-    enabled: tractGeoid !== null,
+    queryFn: () => api.getTractAccessSummary(tractGeoid),
     retry: 1,
   });
-
-  if (!tractGeoid) {
-    return (
-      <EmptyState
-        title="No tract selected yet"
-        description="Search for a census tract on the left to see its modeled travel distance to the nearest hospitals, clinics, and transit stop."
-      />
-    );
-  }
 
   if (query.isLoading) {
     return (
@@ -55,7 +50,7 @@ export function AccessSummaryPanel({
         description={
           query.error instanceof ApiError
             ? query.error.message
-            : "Access Lab data is temporarily unavailable. Is the API running, and has `run_access_metrics_pipeline` been run?"
+            : "Couldn't load this tract's access summary. Is the API running?"
         }
       />
     );
@@ -141,7 +136,7 @@ export function AccessSummaryPanel({
       </Card>
 
       <UseInAdvocateButton
-        geography={{ geographyType: "tract", geoid: tractGeoid, displayName: `Tract ${tractGeoid}` }}
+        geography={{ geographyType: "tract", geoid: tractGeoid, displayName }}
         sourcePage="Access Lab"
       />
     </div>

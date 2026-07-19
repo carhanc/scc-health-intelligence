@@ -11,6 +11,20 @@ const STATUS_TONE: Record<string, "success" | "alert" | "caution"> = {
   INFEASIBLE: "alert",
 };
 
+// The pipeline (out of scope to edit here -- source-data pipelines are not
+// touched by this pass) appends a raw internal-domain-key fragment to
+// every scenario's label, e.g. "...(health_burden-weighted, transit-hub
+// candidates)". The intro paragraph above the list already explains this
+// in plain language ("...reach the most health-burden-weighted
+// population"), so repeating the same idea as a technical-looking
+// parenthetical on every card is both redundant and a leaked internal
+// term. Strip only that exact known suffix for display; nothing else
+// about the label is altered.
+const SCENARIO_LABEL_TECHNICAL_SUFFIX = /\s*\(health_burden-weighted, transit-hub candidates\)\s*$/i;
+function formatScenarioLabel(label: string): string {
+  return label.replace(SCENARIO_LABEL_TECHNICAL_SUFFIX, "");
+}
+
 /**
  * Precomputed mobile-clinic siting sensitivity scenarios (DEC-051): this
  * is deliberately NOT an interactive live solver -- every scenario shown
@@ -91,7 +105,9 @@ function ScenarioCard({
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{scenario.scenario_label}</h3>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            {formatScenarioLabel(scenario.scenario_label)}
+          </h3>
           <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
             Up to {scenario.k_sites} sites, within {scenario.distance_threshold_miles} mi
           </p>

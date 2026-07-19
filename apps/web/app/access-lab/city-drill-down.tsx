@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, type TopConcernTract } from "@/lib/api";
@@ -64,8 +65,11 @@ export function CityDrillDown({
   if (!isPlace && !isDistrict) {
     return (
       <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-        Access Lab currently shows results by census tract. Search for a tract number, or pick a place and then a
-        tract within it from Explore.
+        Access Lab currently shows results by census tract. Search for a tract number, or{" "}
+        <Link href="/explore" className="text-[var(--color-interactive)] underline underline-offset-2">
+          pick a place on the map in Explore
+        </Link>{" "}
+        and choose a tract within it.
       </p>
     );
   }
