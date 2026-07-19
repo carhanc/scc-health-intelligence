@@ -80,9 +80,19 @@ export function FacilityPanel() {
   ];
 
   const selected = listQuery.data.facilities.find((f) => f.oshpd_id === selectedId);
+  const comprehensiveCount = listQuery.data.facilities.filter((f) =>
+    (f.er_service_level ?? "").toLowerCase().includes("comprehensive"),
+  ).length;
+  const traumaCount = listQuery.data.facilities.filter(
+    (f) => f.trauma_center_level && f.trauma_center_level !== "Not a designated trauma center",
+  ).length;
 
   return (
     <div className="space-y-4">
+      <p className="text-sm font-medium text-[var(--color-text-primary)]">
+        {comprehensiveCount} of {listQuery.data.facilities.length} facilities operate a comprehensive-level
+        emergency department; {traumaCount} are designated trauma centers.
+      </p>
       <p className="text-sm text-[var(--color-text-secondary)]">
         Real, observed 2024 emergency-department characteristics reported by each Santa Clara
         County facility to HCAI. Select a row to see its payer mix, disposition pattern, and
