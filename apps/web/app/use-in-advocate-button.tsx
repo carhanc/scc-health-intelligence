@@ -3,39 +3,96 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@scc-health/ui";
-import { createWorkspaceFromGeography, type QuickAdvocateGeography } from "@/lib/workspace/quick-add";
+import type { AdvocacyWorkspace } from "@/lib/workspace/storage";
+import {
+  addGeographyToExistingWorkspace,
+  createWorkspaceFromGeography,
+  listNonEmptyProjects,
+  type QuickAdvocateGeography,
+} from "@/lib/workspace/quick-add";
+import { ADD_TO_ADVOCACY_PROJECT_CTA } from "@/lib/advocacy-terms";
+import { AddToAdvocacyDialog } from "./add-to-advocacy-dialog";
 
 /**
- * Shared "Use in Advocate" action for Explore, Prioritize, Access Lab,
- * and Utilization. Creates a new local workspace pre-filled with this
- * page's real, structured geography (and scenario, where relevant) and
- * navigates straight there -- never scrapes on-screen text.
+ * Shared "Add to advocacy project" action for Explore, Prioritize,
+ * Access Lab, and Utilization. Creates or updates a local project
+ * pre-filled with this page's real, structured geography (and scenario,
+ * where relevant) and navigates straight there -- never scrapes on-
+ * screen text. If more than one real project already exists, asks which
+ * one should receive this evidence rather than silently creating a new,
+ * disconnected project every time (docs/design/advocate-intuitive-
+ * workspace-research.md §"cross-page integration").
  */
 export function UseInAdvocateButton({
   geography,
   scenarioId,
-  label = "Use in Advocate",
+  sourcePage,
+  label = ADD_TO_ADVOCACY_PROJECT_CTA,
 }: {
   geography: QuickAdvocateGeography;
   scenarioId?: string;
+  /** The calling page's plain name (e.g. "Explore", "Access Lab"), shown
+   * in Advocate as "Added from <sourcePage>" so the user never has to
+   * re-find the evidence that brought them there. */
+  sourcePage?: string;
   label?: string;
 }) {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
+  const [existingProjects, setExistingProjects] = useState<AdvocacyWorkspace[] | null>(null);
+
+  async function navigateTo(workspaceId: string) {
+    router.push(`/advocate?workspace=${workspaceId}&added=1`);
+  }
 
   async function handleClick() {
     setIsCreating(true);
     try {
-      const workspaceId = await createWorkspaceFromGeography(geography, scenarioId);
-      router.push(`/advocate?workspace=${workspaceId}`);
+      const nonEmpty = await listNonEmptyProjects();
+      if (nonEmpty.length === 0) {
+        const workspaceId = await createWorkspaceFromGeography(geography, scenarioId, sourcePage);
+        await navigateTo(workspaceId);
+        return;
+      }
+      // More than one real project already exists (or one exists and
+      // already has content) -- ask which project this evidence belongs
+      // to instead of guessing.
+      setExistingProjects(nonEmpty);
     } finally {
       setIsCreating(false);
     }
   }
 
+  async function handleDialogConfirm(targetWorkspaceId: string | null) {
+    setIsCreating(true);
+    try {
+      if (targetWorkspaceId) {
+        await addGeographyToExistingWorkspace(targetWorkspaceId, geography, scenarioId, sourcePage);
+        await navigateTo(targetWorkspaceId);
+      } else {
+        const workspaceId = await createWorkspaceFromGeography(geography, scenarioId, sourcePage);
+        await navigateTo(workspaceId);
+      }
+    } finally {
+      setIsCreating(false);
+      setExistingProjects(null);
+    }
+  }
+
   return (
-    <Button size="sm" variant="secondary" onClick={handleClick} disabled={isCreating}>
-      {isCreating ? "Preparing…" : label}
-    </Button>
+    <>
+      <Button size="sm" variant="secondary" onClick={handleClick} disabled={isCreating}>
+        {isCreating ? "Adding…" : label}
+      </Button>
+      {existingProjects && (
+        <AddToAdvocacyDialog
+          open
+          onClose={() => setExistingProjects(null)}
+          existingProjects={existingProjects}
+          newPlaceLabel={geography.displayName}
+          onConfirm={handleDialogConfirm}
+        />
+      )}
+    </>
   );
 }

@@ -99,7 +99,12 @@ class TractBoundaryCollectionResponse(BaseModel):
     feature's properties always carry identity (tract_geoid_2020, name);
     score/coverage_fraction/stability_label are present only when a valid
     scenario_id was supplied and analytics tables exist -- absent, not
-    zero, when scoring data isn't available for a tract or at all."""
+    zero, when scoring data isn't available for a tract or at all. Also
+    carries each tract's 5 domain scores (health_burden_score,
+    access_barriers_score, environmental_burden_score,
+    resource_accessibility_score, workforce_shortage_score) -- these are
+    scenario-independent (DEC-073) and power the map's per-domain layer
+    switcher."""
 
     type: Literal["FeatureCollection"] = "FeatureCollection"
     features: list[dict[str, Any]]

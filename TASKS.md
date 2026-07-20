@@ -280,6 +280,249 @@ Most of this phase's original scope was delivered under the redirected Phase 9 a
 
 ---
 
+## Health-equity UX redesign (branch `ux/health-equity-redesign`, not merged to `main`)
+
+- [x] Research and audit phase (frontend architecture, live multi-viewport browser review, API-schema inspection, Overview "7"/"16" root-cause trace) — `docs/design/health-equity-ux-redesign.md` §3/§4.
+- [x] Redesign plan document (`docs/design/health-equity-ux-redesign.md`), 12 sections, written before implementation.
+- [x] Commit 1 — design tokens (DEC-072 concern gradient) + 11 new shared `packages/ui` components, unit-tested in isolation.
+- [x] Commit 2 — Overview 7-of-7 metric fix (regression-tested) + Explore map recolor, mobile search/map reorder, GuidedNextStep.
+- [x] Commit 3 — Prioritize top-25 default, Access Lab GlossaryTerm, Utilization/DataTable scroll-shadow affordance.
+- [x] Commit 4 — Validate MetricCard migration, Advocate data-status tooltip, Copilot BackendWakeState, Data scroll-shadow.
+- [x] Commit 5 — full a11y/responsive/unit/e2e regression pass + real WCAG-contrast/colorblind-simulation check + `docs/design/health-equity-ux-visual-review.md`.
+
+**Gate (this branch): PASS**, evidenced in `docs/design/health-equity-ux-visual-review.md` — 85/85 unit tests, 25/25 axe checks, 161+221 e2e tests across desktop/mobile Playwright projects, zero new dependencies, zero hardcoded values introduced. One pre-existing (not introduced) defect disclosed: Access Lab's tab row clips at ≤390px. Branch not pushed, not merged, not deployed.
+
+### Second pass — Explore health-equity comprehension, driver explanation, mobile bottom sheet
+
+- [x] Research phase: reference-product methodology review (Tree Equity Score, HPI, Health Equity Tracker, County Health Rankings), 11-item live comprehension audit, API/data-model availability inventory — `docs/design/explore-health-equity-research.md`.
+- [x] Backend: `tract-boundaries` endpoint extended with 5 scenario-independent domain scores (DEC-073), tested.
+- [x] Frontend fixes: contribution-based (not percentile-based) driver sorting, live-computed countywide-rank denominator (DEC-074); zero-extra-request map layer switcher (7 layers); redesigned hover card; non-modal Explore orientation state; desktop Health Equity Screening Profile (headline comparison, interpretation, domain breakdown, ranked driver list with disclosed Strong-driver threshold, "what this does not mean" disclosure); mobile collapsed-summary-bar + bottom-sheet pattern reusing the same profile content.
+- [x] Two real defects found and fixed during live verification, not just written and assumed correct: Compare not closing the mobile sheet (stranding the comparison workflow behind a still-open modal) and a raw place GEOID showing in the mobile collapsed bar instead of a resolved name (DEC-075).
+- [x] Full verification gate: frontend unit 98/98, backend pytest 192/192, full Playwright suite 425 passed/29 honestly-skipped/0 failed (clean run), axe 0 serious/critical violations (including 2 new mobile-specific scans), responsive suite passing at all 6 breakpoints, lint/typecheck clean (frontend and backend), production build clean, zero new runtime dependencies, zero new network requests from map-layer switching (live-verified).
+- [x] `docs/design/explore-health-equity-visual-review.md` — real screenshots, the two defects found/fixed, and an investigated-and-ruled-out preview-pane tooling artifact (backend-unavailable state), documented rather than silently omitted.
+
+**Gate (second pass): PASS.** Two commits on the same branch, not pushed, not merged, not deployed.
+
+### Third pass — Product-wide health-equity UX consolidation and visual polish
+
+- [x] Research phase: official reference-product review for interaction/hierarchy principles only (Tree Equity Score National Explorer, CA Healthy Places Index, Health Equity Tracker, County Health Rankings), current 10-item Explore problem inventory, target product narrative, desktop/mobile wireframes, terminology rules — `docs/design/health-equity-product-consolidation.md`.
+- [x] Terminology consolidation: default scenario renamed "Health equity overview" (presentation-layer only, `scenario_id`/weights unchanged, DEC-076); domain display labels renamed centrally in `labels.ts`, cascading to Explore/Prioritize/Validate with no string duplication.
+- [x] Explore rebuilt as a 2-surface map-dominant layout: ~380px sidebar + map filling the remaining width (~72% of content width at 1440px, up from ~26%); compact 2-row header; collision-aware quadrant-positioned hover inspector; minimal selected-tract map callout; "Reset view" control.
+- [x] Selected-tract profile simplified: above-the-fold now geography → headline concern band → county comparison → always-visible non-causal disclaimer (DEC-077) → 5-domain summary → top-3 plain-language drivers; raw contributions, uncertainty, stability methodology, and full sources moved behind labeled, collapsed disclosures, not removed.
+- [x] Mobile bottom sheet inherits the identical simplified hierarchy for free (same component tree) — no separate mobile-specific content work required.
+- [x] Remaining pages (Overview, Prioritize, Access Lab, Utilization, Validate, Advocate, Copilot, Data) reframed with plain-language purpose sentences and pathway-oriented task framing, all existing routes/functionality preserved.
+- [x] Two independent cold usability-review subagents run after implementation, given only screenshots + purpose + the 8 required comprehension questions; findings (not approval) drove two real fixes: a two-different-percentile-numbers trust problem (resolved by dropping the redundant map-UI number) and an ambiguous "near the county middle" comparison phrase.
+- [x] One self-caught truthfulness-rule issue: the non-causal disclaimer became non-always-visible when moved behind a disclosure; caught via a failing test, fixed by adding a permanently visible headline line (DEC-077).
+- [x] Full verification gate: frontend unit 98/98, frontend lint/typecheck clean, backend+pipeline+scripts pytest 470/470, backend ruff/mypy clean, production build clean (zero new dependencies), full Playwright suite (both desktop-chromium and mobile-chromium projects) **456 total, 426 passed, 30 skipped, 0 failed**, axe accessibility coverage across every route/state (part of the same suite), responsive suite passing at all 6 required breakpoints including the updated 1024px desktop-sidebar boundary, secret scan clean, oversized-file scan clean.
+- [x] `docs/design/health-equity-product-visual-review.md` — screenshots inspected, live-interaction checks, every fix documented, e2e regressions found/fixed disclosed, one known tooling limitation (MCP browser synthetic hover events vs. real-Chromium Playwright) disclosed rather than silently worked around.
+
+**Gate (third pass): PASS.** Five commits on the same branch (terminology core, Explore rebuild, remaining-pages terminology, e2e fixes, docs/screenshots), plus this governance-update commit. Not pushed, not merged, not deployed.
+
+### Fourth pass — Final score, map-context, and product-intuitiveness pass
+
+- [x] Scientific trace of the 0-100 composite score (formula, bounds, direction, scenario dependence,
+      comparison universe, missing-data behavior, uncertainty, rank/percentile treatment, ties) completed
+      and documented in `docs/methods/screening-score-interpretation.md` before any visual elevation (DEC-078).
+- [x] Canonical `ScreeningScore` component (`packages/ui/src/ScreeningScore.tsx`) established as the single
+      formatting/presentation path for the score, replacing 5 independently-rounded frontend call sites plus
+      one backend service (DEC-079).
+- [x] Score re-elevated as the dominant visual element of the selected-tract headline, reversing the third
+      pass's deemphasis, per stakeholder feedback that a screening/prioritization tool needs one objective
+      number (DEC-078). Non-causal disclaimer remains unconditionally visible.
+- [x] Real map basemap added (OpenFreeMap, free/keyless) — the map previously had no basemap at all, not just
+      hidden labels. City/road/water labels render above the choropleth via `beforeId` layer insertion;
+      verified live at county, mid, and tract zoom (DEC-080).
+- [x] A real React-Strict-Mode/remote-style-URL map-readiness bug found and fixed (`idle` + `isStyleLoaded()`
+      as redundant signals alongside `load`).
+- [x] Hover/selection interaction model redesigned after evaluating 3 alternatives: sidebar-docked "Quick
+      preview" for the no-selection state (map stays fully unobscured); a shrunk `TinyHoverCallout` for
+      hovering a different tract while one is already selected (never erases the open profile).
+- [x] Top-3 driving factors gained a visual `PercentileBar` track, matching the domain-summary rows.
+- [x] Score consistency applied across Prioritize (table + decision memo), Explore's tract-comparison panel,
+      Advocate's backend evidence service, and Validate's methods panel.
+- [x] Two real, independently-corroborated bugs found by 3 blind cold-subagent usability reviewers (screenshots
+      only, no implementation context) and fixed: a concern-band/rounding mismatch (three tracts all showing
+      "75/100" but two different band labels) and confusing "higher than 100% of tracts" ceiling phrasing
+      (DEC-079).
+- [x] Full verification gate: frontend lint/typecheck/98 unit tests, backend ruff/mypy/470 pytest, production
+      build (zero new dependencies), full Playwright suite (both projects) **456 total, 426 passed, 30
+      skipped, 0 failed**. One axe flake isolated and confirmed non-reproducible (3 clean re-runs) before
+      being excluded.
+- [x] `docs/design/final-score-map-and-intuitiveness-review.md` — every screenshot inspected, map/hover
+      decisions with evaluated alternatives, score-consistency audit, all usability findings (fixed and
+      disclosed), exact verification numbers, known limitations disclosed honestly.
+
+**Gate (fourth pass): PASS.** Six commits on the same branch (canonical score + methods doc, map basemap +
+hover/selection, headline elevation + factor visuals, score consistency across remaining surfaces, e2e/unit
+test fixes, usability review + visual verification), plus this governance-update commit. Not pushed, not
+merged, not deployed.
+
+---
+
+## Fifth pass: Advocate workspace comprehension, dashboard, and cross-page integration redesign
+
+Triggered by stakeholder feedback that Advocate exposed internal/technical vocabulary (matched evidence,
+evidence bundle, output type, Generate, Export/Import JSON, configuration hash) throughout its normal
+interface and read as a single dense page rather than an understandable task.
+
+- [x] Research: inspected the complete Advocate route/every child component, browser-local persistence,
+      import/export, all 6 real output types, document upload/extraction, every cross-page "Use in
+      Advocate" entry point, and every Advocate test — `docs/design/advocate-intuitive-workspace-
+      research.md`.
+- [x] Established a centralized plain-language terminology module (`apps/web/lib/advocacy-terms.ts`) and
+      the additive `titleIsUserSet`/`projectGoal` schema fields (backward-compatible, safely defaulted).
+- [x] Rebuilt Advocate as a 4-stage guided project dashboard (Project/Evidence/Draft/Review & share,
+      `packages/ui/src/StepIndicator.tsx`) with freely-clickable step navigation, reusing all existing
+      business-logic handlers unchanged (DEC-081).
+- [x] Simplified evidence cards (plain-language theme grouping, include/remove controls, plain-language
+      data-status labels/definitions), evidence selection UX, and the document-upload flow ("Find useful
+      evidence in a document," plain no-match copy, non-technical injection warnings).
+- [x] Redesigned output selection ("What do you want to create?"), draft creation (calm readiness
+      checklist, deterministic-only framing), the draft/citations preview (document-style, "View sources
+      and limitations" disclosure only where the draft body doesn't already include it), and backup/
+      restore (moved into an unobtrusive "Project options" menu, real typed error path for a genuinely
+      invalid file, DEC-083).
+- [x] Unified the "Add to advocacy project" CTA and its plain-language arrival confirmation across every
+      contributing page (Explore, Prioritize, Access Lab, Utilization); added a project picker when
+      evidence is added to an existing multi-project state.
+- [x] Full verification gate: frontend lint/typecheck/**103 unit tests** (2 new regression tests for a
+      real field-healing bug, DEC-084); backend pytest **192/192** (advocacy/document-specific 54/54);
+      full Advocate e2e suite (3 spec files, near-total rewrites for the new flow/terminology) passing on
+      both `desktop-chromium` and `mobile-chromium`; live manual verification of the full place → evidence
+      → draft → review flow, document upload (real match and real no-match cases), backup download/
+      restore round-trip (including a corrupted-file case), project switching, and the mobile collapsed-
+      summary-panel toggle.
+- [x] Four real bugs found and fixed during live verification (not usability-review findings): an
+      unhandled 4th backend `data_status` value (`"derived"`) rendering as a bare untranslated word
+      (DEC-082); `getWorkspace`/`listWorkspaces` never healing a pre-existing record missing a newer
+      schema field, which would have silently overwritten a legacy project's title forever (DEC-084, the
+      most significant defect found this pass); the guided dashboard always resuming a returning project
+      at the first stage regardless of progress already made (DEC-085); a cross-page handoff using a raw
+      GEOID display name when a nicer name was already available in the same component (DEC-085).
+- [x] Blind usability review (3 independent cold subagents) and visual-review doc —
+      `docs/design/advocate-intuitive-workspace-visual-review.md`.
+- [x] Commits (7), and the explicitly-authorized push to `origin/ux/health-equity-redesign` — commit
+      `6c6ecad1348ae6d2330d712d87dbdf5bf51caed3`, pushed.
+
+---
+
+## Sixth pass: Advocate radical flow simplification (new branch `ux/advocate-flow-simplification`)
+
+Triggered by direct real-world feedback on the fifth pass's dashboard-model Advocate ("Even I do not know
+what to do on this page") — a release-blocking usability failure, not a terminology or styling issue. Full
+detail: `docs/design/advocate-flow-simplification-visual-review.md`.
+
+- [x] Replaced the permanent three-column dashboard with a linear, one-question-at-a-time guided flow —
+      exactly 4 user-facing stages (Place/Evidence/Create/Review), never more than one dominant at once
+      (DEC-086). Deleted 7 files whose UI is fully replaced; added 8 new ones.
+- [x] Simplified place and focus selection (search-only Place step; a recommended/common/"see more" Focus
+      step reframing the real backend scenarios in plain language).
+- [x] Simplified evidence review (Selected → Added-from-page → Recommended → "See more" grouping, plain
+      Include toggle) and the document-passage flow (real excerpt + page reference, honest no-match
+      copy), integrated into the existing draft-generation notes pipeline via two purely-additive schema
+      fields (`sourcePage`, `includedPassages`).
+- [x] Simplified output selection and draft creation into a 4-question micro-wizard (output → audience →
+      goal → ready) with a concise, only-populated-fields readiness summary.
+- [x] Redesigned Review (unchanged document-style preview, clarified action row) and project options (a
+      compact, collapsed-by-default menu near the title, not a permanent rail).
+- [x] Cross-page handoff now lands directly on Evidence with a plain-language confirmation and a real,
+      prefetched fact count, never the Place stage and never a re-prompted community selection.
+- [x] Full backward-compatibility testing: 2 new regression tests confirm a project saved before this pass
+      (missing both new schema fields entirely) still loads with safe defaults and every existing field
+      intact.
+- [x] Full verification gate: frontend lint/typecheck/**105 unit tests**; production build clean; backend
+      pytest **193/193** (no backend changes this pass); full project-wide Playwright suite (not only
+      Advocate specs) — 229 passed/6 skipped desktop-chromium, 211 passed/24 skipped mobile-chromium, 0
+      failed; axe-core zero serious/critical violations on every Advocate stage; keyboard-only full flow;
+      no horizontal overflow at 1440/1280/1024/768/390/375/320px; 200% zoom and `prefers-reduced-motion`
+      both clean; secret scan and oversized-file scan clean.
+- [x] Real bugs found and fixed through live interaction (DEC-087 and several smaller fixes): a redundant
+      double-nested "View project details" disclosure requiring two clicks to see any content; a mobile
+      horizontal-overflow bug in the new step indicator; a cross-page arrival screen claiming "0 facts"
+      while the real count was still loading; a legacy project showing "Place, not started yet" despite
+      having a real place and evidence; a document-only project's draft leaking the literal placeholder
+      string "Selected geography."
+- [x] 4 independent blind usability reviews (2 explicitly nontechnical personas) using the exact
+      12-question protocol — `docs/design/advocate-flow-simplification-visual-review.md` §8. Two
+      repeated, high-confidence findings fixed (a dead map-reference on Advocate's Place step; "Project
+      options" not reading as clickable); one finding traced to a screenshot-coverage gap rather than a
+      real defect; one new disclosed risk (RISK-038, the three visually-distinct "back" controls).
+- [x] Screenshot capture (23 desktop states, 7 mobile states) — `docs/design/screenshots/advocate-flow-
+      simplification/`.
+- [x] Commits, and the explicitly-authorized push to `origin/ux/advocate-flow-simplification`.
+
+**Gate (sixth pass): PASS.** Seven commits on the same branch, pushed to
+`origin/ux/advocate-flow-simplification`. Not merged, not deployed.
+
+---
+
+## Seventh pass: Product-wide flow simplification (new branch `ux/product-wide-flow-simplification`)
+
+Applied the sixth pass's own clarity/interaction discipline (one question at a time, progressive
+disclosure, one primary action, plain language) to every remaining route: Copilot, Prioritize, Access Lab,
+Utilization, Validate, Data. Overview, Explore, and Advocate were coherence-reviewed only, not rebuilt. Full
+detail: `docs/design/product-wide-flow-simplification-visual-review.md`; research audit:
+`docs/design/product-wide-flow-simplification-research.md`.
+
+- [x] Live audit of every route at 1440/1280/1024/768/390/375/320px across initial/selected/loading/
+      waking/unavailable/empty/error/long-content/print states, plus review of shared layout, nav, query
+      hooks, tabs, tables, maps, charts, empty states, tooltips, responsive behavior, accessibility tests,
+      screenshots, and copy.
+- [x] Established shared progressive-disclosure primitives: generalized Advocate's own focus step into
+      `focus-picker.tsx` (`FocusPicker`), now reused identically by Advocate, Prioritize, and Copilot —
+      eliminating three separately-built full scenario-picker grids; added `task-page-header.tsx` and
+      `plain-language-empty-state.tsx`.
+- [x] Rebuilt Copilot as a guided evidence-explanation flow: one task-choice screen (six real actions
+      mapped to real backend actions via `copilot-actions.ts`), place selection (skipped when arriving
+      with a place already known), the shared `FocusPicker`, then a result-dominant answer view with
+      citations, limitations, and cross-page actions.
+- [x] Simplified Prioritize around a concise top-10 ranked-card list (`ranked-area-card.tsx`, backed by a
+      real decision-memo fetch for top factors), with priority controls behind "Adjust priorities," the
+      full 408-row table behind "View all," and Export as a secondary action, not a tab.
+- [x] Simplified Access Lab around a place-first flow: one search question, then travel mode and the
+      access summary together as the result, with Resource browser/Resource gaps/Mobile-service scenarios
+      as secondary tabs reachable only once a place is chosen. Fixed a real URL-param display-name-loss
+      bug found while rebuilding it.
+- [x] Simplified Utilization around a 3-card task chooser (Compare facilities / Explore where patients
+      come from / See changes over time), each view leading with a computed plain-language takeaway; added
+      a dependency-free SVG `trend-bar-chart.tsx` (no charting library).
+- [x] Rebuilt Validate and Data as a clear trust center: grouped trust-status vocabulary (Available and
+      current / Needs attention / Unavailable) replacing six equal-sized status cards; five simplified
+      Validate tabs (merging Uncertainty and Validation into "Checks and uncertainty"); Data page gained
+      search/status filters and publisher-primary source labels. Fixed a real duplicate-React-key console
+      error on the Data page (two sources sharing one `source_id`).
+- [x] Harmonized navigation (nav-item tooltips using the existing `NavItem.description` field), loading/
+      waking/error states, and cross-page context handoffs (Explore → Copilot/Access Lab now carry the
+      selected tract's real GEOID and display name).
+- [x] Full verification gate: frontend lint (`--max-warnings=0`) and `tsc --noEmit` clean; **105/105**
+      frontend unit tests; backend/pipeline unchanged this pass (zero files touched — prior **193/193**
+      pytest baseline stands); full project-wide Playwright suite (every spec file, not only redesigned
+      pages), desktop-chromium + mobile-chromium — **461 passed, 0 failed, 31 skipped** (expected
+      project-scoped skips), zero flakes on the final run; axe-core zero serious/critical violations on
+      every redesigned page and state; responsive verified at all seven required widths; keyboard-only,
+      200% zoom, and `prefers-reduced-motion` verified for all six redesigned pages (18/18); no new
+      dependency added.
+- [x] Two apparent test flakes root-caused with isolated reproduction, not dismissed: a 429 from Copilot's
+      real, deliberate, pre-existing per-IP rate limiter, triggered only by an artificial stress test (not
+      the real suite, and the limiter was correctly left untouched); two axe-core `document-title`
+      violations that reproduced 0/16 times in isolation (8 repeats each) — a transient timing artifact of
+      the full suite under load, not a real defect.
+- [x] Six independent blind usability reviews (4 of 6 explicitly nontechnical personas) using the exact
+      10-question protocol — `docs/design/product-wide-flow-simplification-visual-review.md` §4. Five
+      concrete, high-confidence findings fixed (DEC-089): Copilot's leaked deterministic-mode status line
+      and its duplicated bullet-dump/source-list wall of text; Access Lab's leaked internal pipeline-script
+      name in an error message, its leaked internal domain-key fragment in scenario titles, and its
+      dead-end ZIP-code guidance with no working link. Remaining lower-confidence findings recorded as
+      disclosed limitations, not silently dropped (RISK-039).
+- [x] Screenshot capture (45 desktop+mobile states) —
+      `docs/design/screenshots/product-wide-flow-simplification/`.
+- [x] Commits, governance docs, and the explicitly-authorized push to
+      `origin/ux/product-wide-flow-simplification`.
+
+**Gate (seventh pass): PASS.**
+
+---
+
 ## Cross-cutting acceptance items (apply across phases, tracked here for visibility)
 
 - [ ] No all-null production metric column at any point after Phase 3. **Phase 4 evidence:** `analytics_audits.py` checks resource/workforce columns aren't all-null; all 25 metrics show 100% coverage live.

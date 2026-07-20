@@ -8,9 +8,10 @@ interface DialogProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
-  /** "side" renders as a right-anchored drawer (evidence panels, mobile
-   * insight drawer); "center" renders as a centered modal. */
-  variant?: "side" | "center";
+  /** "side" renders as a right-anchored drawer (evidence panels); "center"
+   * renders as a centered modal; "bottom" renders as a bottom-anchored
+   * sheet (mobile tract-selection flows, MobileBottomSheet). */
+  variant?: "side" | "center" | "bottom";
 }
 
 /** Built on the native <dialog> element, which provides a real focus
@@ -38,7 +39,9 @@ export function Dialog({ open, onClose, title, children, variant = "center" }: D
   const positionClasses =
     variant === "side"
       ? "fixed inset-y-0 right-0 m-0 h-full max-h-full w-full max-w-md rounded-l-[var(--radius-lg)]"
-      : "max-w-lg rounded-[var(--radius-lg)]";
+      : variant === "bottom"
+        ? "fixed inset-x-0 bottom-0 m-0 max-h-[85vh] w-full rounded-t-[var(--radius-lg)]"
+        : "max-w-lg rounded-[var(--radius-lg)]";
 
   return (
     <dialog

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge, DataModeBadge, DataTable, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type CountyTrendPoint } from "@/lib/api";
+import { TrendBarChart } from "./trend-bar-chart";
 
 const BREAKDOWNS = [
   { id: "disposition", label: "Disposition" },
@@ -80,6 +81,21 @@ function TrendsTable({
 }) {
   const suppressedCount = points.filter((p) => p.is_suppressed).length;
 
+  // Lead with the single real category that has the most total encounters
+  // -- a real, computed choice (not an invented "total" row, which would
+  // risk double-counting or silently undercounting suppressed cells
+  // across categories that may not partition cleanly).
+  const totalsByCategory = new Map<string, number>();
+  for (const p of points) {
+    if (p.is_suppressed || p.encounters === null) continue;
+    totalsByCategory.set(p.category_value, (totalsByCategory.get(p.category_value) ?? 0) + p.encounters);
+  }
+  const leadCategory = [...totalsByCategory.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const leadSeries = points
+    .filter((p) => p.category_value === leadCategory)
+    .sort((a, b) => a.service_year - b.service_year);
+  const nonSuppressedLead = leadSeries.filter((p) => !p.is_suppressed && p.encounters !== null);
+
   const columns: ColumnDef<CountyTrendPoint, unknown>[] = [
     {
       accessorKey: "category_value",
@@ -106,8 +122,32 @@ function TrendsTable({
     },
   ];
 
+  const firstYearPoint = nonSuppressedLead[0];
+  const lastYearPoint = nonSuppressedLead[nonSuppressedLead.length - 1];
+  const takeaway =
+    leadCategory && firstYearPoint && lastYearPoint && firstYearPoint !== lastYearPoint
+      ? `${leadCategory.replace(/_/g, " ")} encounters ${
+          (lastYearPoint.encounters ?? 0) >= (firstYearPoint.encounters ?? 0) ? "rose" : "fell"
+        } from ${(firstYearPoint.encounters ?? 0).toLocaleString()} in ${firstYearPoint.service_year} to ${(lastYearPoint.encounters ?? 0).toLocaleString()} in ${lastYearPoint.service_year}.`
+      : null;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      {leadCategory && nonSuppressedLead.length > 1 && (
+        <div className="space-y-2">
+          {takeaway && <p className="text-sm font-medium text-[var(--color-text-primary)]">{takeaway}</p>}
+          <TrendBarChart
+            title={`${leadCategory.replace(/_/g, " ")} encounters by year`}
+            unit="ED encounters"
+            points={leadSeries.map((p) => ({
+              year: p.service_year,
+              value: p.encounters,
+              suppressed: p.is_suppressed,
+            }))}
+            sourceNote="HCAI, Santa Clara County, observed"
+          />
+        </div>
+      )}
       <p className="text-xs text-[var(--color-text-tertiary)]">
         {points.length} data points. {suppressedCount > 0 && `${suppressedCount} suppressed for small-number privacy (shown as a labeled gap, never zero).`}{" "}
         <DataModeBadge mode={dataMode} />

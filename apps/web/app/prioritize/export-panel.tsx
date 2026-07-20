@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
+import { Button, Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText, ScreeningScore } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { domainLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
@@ -112,7 +112,7 @@ function MemoContent({
                   {t.rank}. {tractNames.get(t.tract_geoid_2020) ?? t.tract_geoid_2020}
                 </span>
                 <span className="tabular-nums text-[var(--color-text-secondary)]">
-                  {t.score !== null ? t.score.toFixed(1) : "No score"}
+                  <ScreeningScore score={t.score} mode="compact" />
                 </span>
               </div>
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">

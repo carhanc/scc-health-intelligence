@@ -1,65 +1,112 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Advocate -- cross-page 'Use in Advocate' integration", () => {
-  test("starting from a selected tract in Explore carries real structured state", async ({ page }) => {
+/** Every contributing page must use the same CTA and land the user
+ * directly on Evidence with a plain-language confirmation -- never make
+ * them repeat a place selection another page already supplied (docs/
+ * design/advocate-flow-simplification-visual-review.md "CROSS-PAGE
+ * HANDOFF"). */
+test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => {
+  test("starting from Explore lands directly on Evidence with a plain-English confirmation, not the Place step", async ({
+    page,
+    isMobile,
+  }) => {
     await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({
-      timeout: 15_000,
-    });
-    await page.getByRole("button", { name: "Use in Advocate" }).first().click();
+    if (isMobile) {
+      await page.getByRole("button", { name: /Tap to view its full profile|concern/ }).click();
+    }
+    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
 
-    await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
-    // The geography label shown here is a plain-language name (e.g. "Census
-    // Tract 5001"), never the raw GEOID -- per this platform's own
-    // "no internal IDs in primary views" rule (CLAUDE.md), so this asserts
-    // on the human-readable label, not the id passed into the workspace.
-    await expect(page.getByText(/evidence item\(s\) found for Census Tract/)).toBeVisible({
-      timeout: 15_000,
-    });
-  });
-
-  test("starting from a Prioritize recommendation carries the scenario along", async ({ page }) => {
-    await page.goto("/prioritize");
-    await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeChecked({
-      timeout: 15_000,
-    });
-    await expect(page.getByRole("button", { name: "Show drivers" }).first()).toBeVisible({
-      timeout: 15_000,
-    });
-    await page.getByRole("button", { name: "Show drivers" }).first().click();
-    await expect(page.getByRole("button", { name: "Use in Advocate" })).toBeVisible({
+    await expect(page).toHaveURL(/\/advocate\?workspace=.*added=1/, { timeout: 10_000 });
+    await expect(page.getByText("Evidence was added from Explore")).toBeVisible({ timeout: 10_000 });
+    // A real, specific fact count -- never "0 facts" while evidence is
+    // still loading, and never the raw GEOID.
+    await expect(page.getByText(/\d+ facts? about Census Tract.*ready to review/)).toBeVisible({
       timeout: 10_000,
     });
-    await page.getByRole("button", { name: "Use in Advocate" }).click();
 
-    await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
-    await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeChecked({
-      timeout: 15_000,
+    await page.getByRole("button", { name: "Review the evidence" }).click();
+    await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+      timeout: 10_000,
     });
+    // The facts this page contributed appear first, clearly labeled.
+    await expect(page.getByText("ADDED FROM EXPLORE")).toBeVisible();
   });
 
-  test("starting from an Access Lab tract summary carries the tract along", async ({ page }) => {
+  test("starting from a Prioritize recommendation carries the focus area along", async ({ page }) => {
+    await page.goto("/prioritize");
+    await expect(page.getByText("Health equity overview").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Add to advocacy project" }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
+
+    await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
+    await expect(page.getByText(/Evidence was added from Prioritize/)).toBeVisible({ timeout: 10_000 });
+
+    // The carried-over focus is visible from the Place step (a real
+    // scenario was set, not left blank) -- confirm via View project
+    // details rather than assuming any one UI location. The compact
+    // project summary bar shows the same focus label too, so scope to
+    // the details disclosure specifically to avoid a strict-mode
+    // ambiguity between the two intentionally-overlapping summaries.
+    await page.getByRole("button", { name: "Review the evidence" }).click();
+    await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: "View project details" }).click();
+    await expect(page.getByTestId("project-details-disclosure")).toContainText("Health equity overview");
+  });
+
+  test("starting from an Access Lab tract summary carries the tract along and confirms in plain English", async ({
+    page,
+  }) => {
     await page.goto("/access-lab?geography=tract&id=06085500100");
     await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Use in Advocate" }).click();
+    await page.getByRole("button", { name: "Add to advocacy project" }).click();
 
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
-    await expect(page.getByText(/evidence item\(s\) found for Census Tract/)).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page.getByText("Evidence was added from Access Lab")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Review the evidence" }).click();
+    await expect(page.getByText("ADDED FROM ACCESS LAB")).toBeVisible({ timeout: 10_000 });
   });
 
-  test("starting from a Utilization finding carries the tract along", async ({ page }) => {
+  test("starting from a Utilization finding carries the tract along, using the dense-table CTA variant", async ({
+    page,
+  }) => {
     await page.goto("/utilization?tab=geographic");
-    await expect(page.getByRole("heading", { name: /modeled by tract/ })).toBeVisible({
-      timeout: 15_000,
-    });
-    // `exact: true` matters here -- a substring match on "Use" also hits
-    // the "High modeled use" column-sort header button, which sits earlier
-    // in DOM order than any row's real "Use" action button.
-    await page.getByRole("button", { name: "Use", exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: /modeled by tract/ })).toBeVisible({ timeout: 15_000 });
+    // Utilization's own table-column context uses the shorter "Add to
+    // Advocate" label variant (documented exception for a dense
+    // table-cell context) -- `exact: true` avoids matching an unrelated
+    // column-sort header button.
+    await page.getByRole("button", { name: "Add to Advocate", exact: true }).first().click();
 
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
-    await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Evidence was added from Utilization/)).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("adding evidence a second time, with a real project already open, asks which project it belongs to", async ({
+    page,
+    isMobile,
+  }) => {
+    await page.goto("/explore?geography=tract&id=06085500100");
+    if (isMobile) {
+      await page.getByRole("button", { name: /Tap to view its full profile|concern/ }).click();
+    }
+    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
+    await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
+
+    await page.goto("/prioritize");
+    await expect(page.getByRole("button", { name: "Add to advocacy project" }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
+
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("dialog")).toContainText(/existing project|new project/i);
+    // Never silently added to an unrelated project without asking.
   });
 });

@@ -5,11 +5,19 @@
 // place that converts them to the reader-facing phrasing used throughout
 // Explore, matching docs/01_UX_UI_SPEC.md §5.4's suggested domain names.
 
+// Renamed to the platform's consolidated health-equity terminology
+// (docs/design/health-equity-product-consolidation.md §6): "Health
+// needs" and "Community resources" read as plain conditions a reader
+// without statistical training can picture, where "Health burden" and
+// "Resource accessibility" read as technical index names. This is the
+// single place these five domain keys become display text, so the
+// rename cascades to Explore, Prioritize, and Validate without any
+// duplicated string elsewhere.
 const DOMAIN_LABELS: Record<string, string> = {
-  health_burden: "Health burden",
+  health_burden: "Health needs",
   access_barriers: "Access barriers",
-  environmental_burden: "Environmental burden",
-  resource_accessibility: "Resource accessibility",
+  environmental_burden: "Environmental conditions",
+  resource_accessibility: "Community resources",
   workforce_shortage: "Workforce shortage",
 };
 

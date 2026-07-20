@@ -37,7 +37,7 @@ Verified at the six widths required by the release gate: 1440, 1280, 1024, 768, 
 
 ## 4. Color tokens
 
-All colors are CSS custom properties on `:root` (`apps/web/app/globals.css`), mirrored as literal hex strings in `packages/ui/src/tokens.ts` (`COLOR`, `CHART_PALETTE`, `MAP_SEQUENTIAL_SCALE`, `MAP_NO_DATA_COLOR`) for contexts that cannot consume a CSS variable — MapLibre GL style expressions and any future canvas/SVG chart rendering. **The two files must be kept in sync by hand**; each has a comment pointing at the other.
+All colors are CSS custom properties on `:root` (`apps/web/app/globals.css`), mirrored as literal hex strings in `packages/ui/src/tokens.ts` (`COLOR`, `CHART_PALETTE`, `CONCERN_SCALE`, `CONCERN_NO_DATA_COLOR`) for contexts that cannot consume a CSS variable — MapLibre GL style expressions and any future canvas/SVG chart rendering. **The two files must be kept in sync by hand**; each has a comment pointing at the other.
 
 ### Surfaces
 | Token | Value | Use |
@@ -108,8 +108,8 @@ A single global focus-visible rule (`globals.css`) applies to every native inter
 ## 9. Map conventions
 
 - **No external basemap tiles** (DEC-040) — the map renders only this platform's own tract-choropleth polygons and place-outline overlays, on a flat neutral background (`#eceae5`). Fully keyless, fully reliable, and free of visual noise unrelated to the scored geography.
-- **Sequential single-hue scale**, never red/green: `--map-scale-1` (lightest, `#eef6f6`) through `--map-scale-7` (darkest, `#063f43`), all teal — "higher concern" reads as "more saturated," not "alarm-colored."
-- **No-data fill** (`--map-no-data`, `#e4e0d8`) is a distinct neutral, visually separated from the sequential scale, and is never the same as the lightest "low concern" shade — a missing score must never look like a real low score.
+- **Five-stop concern gradient** (DEC-072, reversing an earlier single-hue "never red/green" rule): `--concern-scale-1` (lowest concern, muted teal/green, `#1a5c4a`) through `--concern-scale-5` (highest concern, dark red, `#c0392b`), via a low-moderate, moderate/neutral, and elevated/orange stop in between — chosen so a reader reads "more concern" without first learning that a darker teal means "higher." The guardrails behind the old rule are kept by other means: every legend says "Higher concern"/"Lower concern" in words, never "alarm" or "critical"; color is never the sole cue (a score, rank, or badge always accompanies it); and this red is a distinct token from `--color-alert` (system/data-freshness alerts), never merged with it.
+- **No-data fill** (`--concern-no-data`, `#d9d4cc`) is a distinct gray, paired with a diagonal-hatch pattern on the map itself (not a flat color alone) — visually and structurally separated from the concern gradient, never the same as the lightest "lowest concern" shade. A missing score must never look like a real low score.
 - **Selected-tract outline**: a 3px solid dark line (`#1e2933`), redrawn via a MapLibre filter expression, not a separate re-fetch.
 - **Selected-place outline**: a 3px dashed dark line, added when a non-tract geography (place/district/ZCTA/county) is selected, with the map panning/zooming to fit it — added during Phase 5 closeout to fix a real usability gap (Task 1: a user could find a city but had no way to see where it was on the map).
 - **Plain-language legend**: always rendered below the map as visible text + a gradient swatch, not a hover-only tooltip.

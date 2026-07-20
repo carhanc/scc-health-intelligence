@@ -9,7 +9,7 @@ test.describe("Overview", () => {
   test("loads real countywide data, not placeholders", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { name: /Find where health needs/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Understand health equity/i })).toBeVisible();
 
     const snapshot = page.locator("section", { has: page.getByRole("heading", { name: "Countywide snapshot" }) });
     await expect(snapshot).toBeVisible();
@@ -30,16 +30,16 @@ test.describe("Overview", () => {
   test("primary task cards navigate to the correct Explore states", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Explore a community" }).click();
+    await page.getByRole("link", { name: "Explore the map" }).click();
     await expect(page).toHaveURL(/\/explore$/);
 
     await page.goto("/");
-    await page.getByRole("link", { name: "See where concerns overlap" }).click();
+    await page.getByRole("link", { name: "See county priorities" }).click();
     await expect(page).toHaveURL(/\/explore\?tab=table/);
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
 
     await page.goto("/");
-    await page.getByRole("link", { name: "Compare two places" }).click();
+    await page.getByRole("link", { name: "Compare places" }).click();
     await expect(page).toHaveURL(/\/explore\?compare=1/);
   });
 
@@ -47,7 +47,7 @@ test.describe("Overview", () => {
     await page.goto("/");
     await page.getByRole("link", { name: "Data & methods" }).click();
     await expect(page).toHaveURL(/\/data$/);
-    await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explore data sources and coverage", level: 1 })).toBeVisible();
   });
 
   test("every footer link points somewhere real and distinct -- Phase 9 regression: Accessibility/Privacy previously both silently pointed at /validate", async ({

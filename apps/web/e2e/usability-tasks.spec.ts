@@ -8,6 +8,14 @@ import { test, expect } from "@playwright/test";
  * respectively.
  */
 test.describe("Usability Task 3 -- compare two cities", () => {
+  // Asserts on the desktop-inline detail panel; below the 1280px xl
+  // breakpoint the same content lives behind a collapsed mobile summary
+  // bar (MobileSelectedSheet), covered separately in
+  // explore-mobile-sheet.spec.ts.
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("San Jose and Sunnyvale: select a representative tract from each and compare them", async ({ page }) => {
     // Comparisons work tract-to-tract (scores are tract-level, not
     // aggregated to a city) -- the realistic path is: find a city, let
@@ -42,17 +50,24 @@ test.describe("Usability Task 3 -- compare two cities", () => {
 });
 
 test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", () => {
-  test("the stability badge and its explanation are visible right next to the score, not buried", async ({
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
+  test("the stability badge and its explanation are visible right next to the headline result, not buried", async ({
     page,
   }) => {
     await page.goto("/explore?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
 
-    // The stability badge sits immediately beside the score, and its
-    // title attribute carries the plain-language explanation (surfaced
-    // as a native tooltip on hover/focus for sighted and AT users alike)
-    // -- not buried behind an extra click or a separate methods page.
-    await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible();
+    // The stability badge sits in the compact confidence line right
+    // after the top drivers -- above the fold, before any disclosure
+    // needs opening -- and its title attribute carries the
+    // plain-language explanation (surfaced as a native tooltip on
+    // hover/focus for sighted and AT users alike). The raw 0-100 score
+    // number itself is deliberately secondary now (docs/design/
+    // health-equity-product-consolidation.md's headline-result
+    // requirement) and lives behind "How this was calculated" instead.
     const badge = page.locator("span[title]").filter({
       hasText: /^(Robust|Moderately stable|Assumption-sensitive|Data-limited)$/,
     });
@@ -65,6 +80,10 @@ test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", ()
 });
 
 test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limitations", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("the evidence drawer lists a source citation for every metric, and each domain disclosure shows its limitation", async ({
     page,
   }) => {
@@ -89,6 +108,10 @@ test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limit
 });
 
 test.describe("Usability Task 7 -- understand what the platform cannot conclude", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("the Overview trust section and the tract score panel both state the non-causal, screening-only framing in plain language", async ({
     page,
   }) => {
@@ -103,6 +126,6 @@ test.describe("Usability Task 7 -- understand what the platform cannot conclude"
 
     await page.goto("/explore?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/not a prediction or a causal claim/)).toBeVisible();
+    await expect(page.getByText(/not a diagnosis or causal conclusion/)).toBeVisible();
   });
 });

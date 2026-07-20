@@ -4,11 +4,15 @@ const KNOWN_TRACT_A = "06085500100";
 const KNOWN_TRACT_B = "06085503112";
 
 test.describe("Explore -- scenario switching and URL/browser state", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("switching priorities changes the displayed results", async ({ page }) => {
     await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_A}`);
     await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });
 
-    const select = page.getByLabel("Priorities");
+    const select = page.getByLabel("Screening view");
     await expect(select).toHaveValue(/default_integrated_screen_v1/, { timeout: 10_000 });
     const scoreBefore = await page.locator("p.text-3xl").first().textContent();
 
@@ -16,11 +20,11 @@ test.describe("Explore -- scenario switching and URL/browser state", () => {
 
     // The description paragraph next to the selector must change to the
     // new scenario's own description -- proof the switch took effect.
-    // Scoped to the paragraph immediately after the Priorities label,
+    // Scoped to the paragraph immediately after the Screening view label,
     // since "food insecurity" also appears inside metric text elsewhere
     // on the page once the tract's data has loaded.
-    const prioritiesLabel = page.locator("label", { has: page.getByLabel("Priorities") });
-    const scenarioDescription = prioritiesLabel.locator("xpath=following-sibling::p[1]");
+    const screeningViewLabel = page.locator("label", { has: page.getByLabel("Screening view") });
+    const scenarioDescription = screeningViewLabel.locator("xpath=following-sibling::p[1]");
     await expect(scenarioDescription).toContainText(/food insecurity/i, { timeout: 10_000 });
     await expect(page).toHaveURL(/scenario=food_access_v1/);
 
@@ -35,12 +39,12 @@ test.describe("Explore -- scenario switching and URL/browser state", () => {
   test("reloading the page preserves the selected tract and scenario", async ({ page }) => {
     await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_B}&scenario=diabetes_prevention_v1`);
     await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_B}` })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByLabel("Priorities")).toHaveValue(/diabetes_prevention_v1/, { timeout: 10_000 });
+    await expect(page.getByLabel("Screening view")).toHaveValue(/diabetes_prevention_v1/, { timeout: 10_000 });
 
     await page.reload();
 
     await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_B}` })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByLabel("Priorities")).toHaveValue(/diabetes_prevention_v1/, { timeout: 10_000 });
+    await expect(page.getByLabel("Screening view")).toHaveValue(/diabetes_prevention_v1/, { timeout: 10_000 });
   });
 
   test("browser back and forward restore the previously selected tract", async ({ page }) => {

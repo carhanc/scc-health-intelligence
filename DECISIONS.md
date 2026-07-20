@@ -815,4 +815,314 @@ A real performance defect was found and fixed during this live verification: eva
 
 ---
 
+---
+
+### DEC-072 — The Explore map's choropleth moves from a single-hue teal sequential scale to an explicit red→orange→neutral→teal/green "concern" gradient, reversing the earlier "never red/green" rule
+
+**Context:** `packages/ui/src/tokens.ts` and `docs/design/design-system.md` previously encoded a deliberate rule that the map's sequential scale must never use red or green, reasoned as: "a red '90th percentile' implies a fire alarm, not a screening signal" (`design-system.md:68`). The health-equity UX redesign (`docs/design/health-equity-ux-redesign.md` §6) was given an explicit, detailed specification for a concern-oriented color system (dark red/red-orange highest concern → orange → warm neutral → muted teal/green lower concern → gray/hatching for missing data), modeled on established civic-data-map conventions for communicating relative urgency at a glance.
+
+**Decision:** Adopt the new five-stop concern gradient for the map choropleth (and any other place-level "combined concern" color indicator), replacing `MAP_SEQUENTIAL_SCALE`. The guardrails that motivated the original rule are preserved by other means rather than dropped: every score-adjacent view keeps its existing non-causal disclosure sentence (unchanged, `content-style-guide.md` §6); every legend explicitly reads "Higher concern / Lower concern," never "danger," "critical," or "alarm"; color is never the sole cue (every colored map region or badge pairs with a visible score, rank, or text label); missing data gets a structurally distinct gray-plus-hatch treatment, never a shade that could read as "low concern"; and the new concern-scale red is a separate, distinctly-named token from `--color-alert` (the pre-existing system/data-freshness alert color on Validate), so the two are never visually or semantically merged.
+
+**Rationale:** The original rule addressed a real risk (a bare red number reading as a medical/safety alarm rather than a relative-ranking signal) but was one specific mechanism toward a broader goal that this redesign satisfies through several redundant means at once — explicit disclosure text, non-color redundant cues, and careful token separation — rather than through color restraint alone. A concern-oriented gradient also directly serves this redesign's comprehension goal (§5 of the redesign doc): a reader should be able to glance at the map and read "more concern here" without first learning that darker teal means "higher," which a single-hue scale requires and a familiar warm/cool gradient does not.
+
+**Consequences:** `docs/design/design-system.md` §8/§18 and `packages/ui/src/tokens.ts`'s `MAP_SEQUENTIAL_SCALE` comment are updated to describe the new rule in place of the old one, not left contradicting the shipped code. Any future surface that wants a "concern" indicator must use the new dedicated tokens, not repurpose `--color-alert` or any other existing semantic color. Colorblind-simulation and contrast verification for the new scale is a release gate for the redesign (`health-equity-ux-redesign.md` §11), not assumed safe by inheritance from the old scale's own prior verification.
+
+---
+
+### DEC-073 — The Explore map's tract-boundaries endpoint now also returns each tract's 5 domain scores, enabling a per-domain map layer with no new pipeline computation
+
+**Context:** The second-stage Explore comprehension redesign (`docs/design/explore-health-equity-research.md`) required a map layer switcher so a user could view a single domain (e.g., "Access barriers") instead of only the composite concern score. `GET /api/v1/geographies/tracts/boundaries` previously returned only `score`/`coverage_fraction`/`stability_label` per tract. Research this session confirmed `analytics.domain_scores` already holds every tract's 5 domain scores, already computed by the existing pipeline, and — verified directly against the warehouse — carries no `scenario_id` column at all: a domain's percentile-scale score does not depend on how domains are weighted against each other, only the composite score does.
+
+**Decision:** `get_all_tract_boundaries_with_scores` (`apps/api/src/scc_health_api/repositories/geography.py`) adds five more `LEFT JOIN`s against `analytics.domain_scores` (one per named domain, matching the function's existing plain-SQL style — no dynamic pivot), adding `health_burden_score`, `access_barriers_score`, `environmental_burden_score`, `resource_accessibility_score`, and `workforce_shortage_score` to every feature's `properties`. No new table, no new pipeline stage, no new methodology — purely an additional read of data that already exists.
+
+**Rationale:** This is the smallest possible tested API addition that uses a calculation already present in the pipeline, per this task's explicit instruction not to create new methodology casually. Returning all 5 domains unconditionally (rather than one at a time behind a `domain` query parameter) lets the frontend switch layers instantly against an already-fetched payload with no additional network request per layer change — the map's boundary data is fetched once per scenario selection regardless of how many times the user switches which domain is displayed.
+
+**Consequences:** `test_tract_boundaries_join_real_scenario_scores` is extended (not replaced) with a new test, `test_tract_boundaries_carry_scenario_independent_domain_scores`, which pins the exact live domain-score values for a known tract and asserts they're identical across two differently-weighted scenarios — a real regression test for the "scenario-independent" claim, not just a shape check. The `TractBoundaryFeatureProperties` TypeScript type (`apps/web/lib/api.ts`) gains the same 5 fields. `analytics.domain_scores` having no `scenario_id` column means a domain-score change would only ever come from a genuine pipeline re-run (new source data or a metric-registry change), never from switching scenarios — this is now documented behavior, not an implicit assumption.
+
+---
+
+### DEC-074 — Two real, live-verified defects in the Explore selected-tract panel are fixed: the "driven mainly by" domain picker now sorts by contribution, and the countywide-rank denominator is no longer hardcoded
+
+**Context:** The second-stage Explore comprehension redesign's research phase (`docs/design/explore-health-equity-research.md` §2/§7) found that `TractDetail`'s "driven mainly by X" sentence (`apps/web/app/explore/geography-detail.tsx`) sorted domains by raw `domain_score` (percentile) rather than `contribution` (percentile × this scenario's actual weight for that domain) to pick the headline driver. Live-verified against tract `06085503112`: the two rankings agreed only because the default "Balanced overview" scenario weights all 5 domains equally (0.20 each) — under any of the platform's other 7, unequally-weighted scenarios, a domain with the single highest percentile but a low weight could be reported as "driving" the score while a domain with a merely-moderate percentile and a high weight actually contributed more. Separately, `ScoreSummary`'s "Countywide rank (of 408)" label hardcoded `408` as a literal string, violating this project's explicit no-hardcoded-values rule.
+
+**Decision:** `TractDetail` now sorts `explanation.domains` (and a new flattened, ranked per-metric driver list) by `contribution`, never `domain_score`/`percentile` alone. `ScoreSummary` now receives `totalTracts` as a prop, read from the already-fetched `tract-boundaries` query (shared TanStack Query cache with `ExploreMap`, same query key, so this costs no additional network request in the common case both components are mounted together) rather than a literal `408`. The new "specific drivers" list's "Strong driver" badge uses a documented threshold — `contribution >= meanMetricContribution * 1.5` — rather than an undocumented magic number; this threshold changes no score, weight, or ranking, only which rows carry the badge text, and is recorded here per this task's explicit "do not create new methodology casually" instruction.
+
+**Rationale:** A driver explanation that can silently name the wrong domain as "driving" a score under 7 of the platform's 8 scenarios is a real accuracy defect in exactly the kind of explanatory surface this platform exists to get right — not a cosmetic issue. The tested invariant that per-metric `contribution` values already sum exactly to the composite score (`apps/api/tests/test_analytics_routes.py`) means sorting by `contribution` is not new methodology; it is the correct application of methodology the pipeline already computes and already returns via `explainScore`, previously just not the field the frontend happened to sort by.
+
+**Consequences:** `apps/web/test/explore-driver-ranking.test.tsx` (new) is a regression test with a fixture specifically constructed so unequal domain weights make the old (`domain_score`-sorted) and new (`contribution`-sorted) computations disagree — proving the fix, not just exercising the code path. Any future scenario added to `config/scenarios.yml` with non-uniform domain weights is now safe against this failure mode by construction.
+
+---
+
+### DEC-075 — Two real defects found during live verification of the new mobile bottom sheet are fixed: Compare no longer strands the comparison workflow behind a still-open modal, and the collapsed summary bar no longer shows a raw place GEOID
+
+**Context:** Live testing of `MobileSelectedSheet` (the collapsed-summary-bar-plus-bottom-sheet pattern added this pass for viewports below the app's 1280px xl breakpoint) surfaced two real bugs, both confirmed via direct DOM/`getBoundingClientRect()` inspection and a full-page screenshot, not assumed from reading the code. First: tapping "Compare" from inside the expanded sheet updated the URL (`compare=1`) correctly, but the sheet itself stayed open; since `ComparisonPanel` renders as a page-level sibling of the sheet in `explore-client.tsx` (not inside the sheet's own `<dialog>`), the newly-rendered comparison workflow was completely covered by the still-open modal's backdrop and genuinely unreachable on mobile. Second: selecting a place or supervisor district purely via a URL round-trip (a shared/bookmarked link, not a live search) showed the raw internal GEOID (e.g. "0668000") in the collapsed bar instead of a resolved human-readable name ("San Jose city") — a regression against this platform's own pre-existing "never show a raw place GEOID" rule (the Phase 6.5 fix), which the desktop panel already respects via its fetched profile's `name_long` but which `MobileCollapsedSummary` (new this pass) did not yet replicate.
+
+**Decision:** `MobileSelectedSheet`'s `onCompare` handler now closes the sheet (`setExpanded(false)`) before delegating to the parent's `onCompare` callback, matching the same close-before-delegate pattern already used for `onSelect`/`onClearSelection`. `MobileCollapsedSummary` now fetches the same `place-profile`/`district-profile` queries `PlaceDetail`/`DistrictDetail` already make (same TanStack Query cache keys, so this costs no additional request in the common case both are mounted) and resolves a real name for place/district selections, showing "Loading…" rather than the raw GEOID during the brief window before that resolves.
+
+**Rationale:** Both are genuine, user-facing correctness defects in newly-added code, not cosmetic issues — one makes an entire workflow (comparison) silently unreachable on mobile, the other reintroduces a previously-fixed truthfulness defect (showing an internal identifier as if it were a place name) in a code path the original Phase 6.5 fix didn't cover because it didn't exist yet.
+
+**Consequences:** `apps/web/e2e/responsive.spec.ts`'s "Tract detail, comparison, and evidence drawer remain operable" test now opens the mobile sheet and completes the full Compare flow at every sub-1280px breakpoint, not just the desktop-inline path. No new test was added specifically for the GEOID-resolution fix beyond live verification, since it mirrors an existing, already-tested contract (`explore-core.spec.ts`'s Phase 6.5 regression test) applied to a new component — a live-verified fix judged sufficient given the pattern is identical and already covered structurally by the existing desktop test.
+
+---
+
+### DEC-076 — Rename the default scenario's display label and domain display labels through the existing central config, rather than introducing a new "product terminology" layer
+
+**Context:** Stakeholder review (Tara Sreekrishnan) found the product's terminology still read as an internal analytics tool rather than a public-interest mapping product: "Balanced overview" for the default scenario name did not communicate purpose, and the map's "Priorities" control label was ambiguous. `docs/design/health-equity-product-consolidation.md` (this pass's research doc) audited every consumer of both strings before changing either.
+
+**Decision:** Change exactly two existing central sources of truth, add no new ones. `config/scenarios.yml`'s `default_integrated_screen_v1.label` becomes "Health equity overview" and its `description` becomes plain language describing the four domains it balances; `scenario_id` and `weights` are untouched, confirmed via `grep -rn '"Balanced overview"' apps/api/src apps/web/app apps/web/lib packages/ui/src` returning zero matches before the change (no application logic depended on the literal string, only display). `apps/web/lib/labels.ts`'s existing `DOMAIN_LABELS` map is updated the same way (`health_burden` -> "Health needs", `environmental_burden` -> "Environmental conditions", `resource_accessibility` -> "Community resources"), cascading to every consumer of `domainLabel()` (Explore, Prioritize, Validate) with no per-page string duplication. The Explore "Priorities" control is relabeled "Screening view" directly in `explore-client.tsx`.
+
+**Rationale:** Both `scenarios.yml`'s `label`/`description` fields and `labels.ts`'s `domainLabel()` function already existed specifically as the presentation-layer indirection this kind of rename requires — introducing a second, parallel "display terminology" config would have duplicated that indirection for no benefit and created two places a future rename could drift out of sync.
+
+**Consequences:** `apps/web/test/labels.test.ts` and every e2e assertion that referenced the old strings (`"Balanced overview"`, `"Priorities"`, `"Health burden"`, `"Resource accessibility"`) were updated in the same pass (see the e2e-fix commit on this branch). Any future default-scenario or domain rename should go through these same two files, not a new mechanism.
+
+---
+
+### DEC-077 — Explore's selected-tract profile hides technical detail behind progressive disclosure, but the non-causal disclaimer is duplicated into the always-visible headline rather than relying on disclosure alone
+
+**Context:** This pass's consolidation restructured `TractDetail` so raw weighted-point contributions, uncertainty intervals, stability methodology, and full source citations move behind collapsed `<details>` sections, per the explicit goal of showing a plain-language result first. `ScoreSummary` (moved inside the new "How this was calculated" disclosure) already carried this project's mandatory "not a prediction or a causal claim" sentence (CLAUDE.md: never label a heuristic/association/correlation as causal impact — a non-negotiable, priority-1 rule). Moving `ScoreSummary` behind a closed-by-default disclosure would have made that sentence not-always-visible, which a failing `usability-tasks.spec.ts` assertion caught during this pass's own verification (not a proactive re-read).
+
+**Decision:** Add a short, always-visible line to the headline block itself — "A screening signal, not a prediction or a causal claim." — and remove the now-duplicate clause from `ScoreSummary`'s (collapsed) text, keeping only its unique second sentence there. Progressive disclosure is applied to every other technical detail without exception, but this one disclosure-worthy-looking sentence is deliberately kept outside any `<details>`.
+
+**Rationale:** CLAUDE.md's non-causal-framing rule is listed above UX/cosmetic preferences in this project's own priority order (data integrity/truthfulness first). Progressive disclosure is a UX technique for managing what is *optional* to read; a truthfulness disclaimer required by project policy is not optional information a user might reasonably skip, so it does not belong exclusively behind a click a reader may never make.
+
+**Consequences:** Any future change to the headline block must preserve this line outside of any collapsed section; `usability-tasks.spec.ts`'s existing assertion for this text (originally written against the pre-consolidation layout) continues to serve as the regression guard, now checking the headline location instead of the old `ScoreSummary` location.
+
+---
+
+### DEC-078 — Re-elevate the 0-100 composite score as the dominant visual element, reversing DEC-077's prior deemphasis, after tracing and documenting it first
+
+**Context:** The prior consolidation pass (DEC-077) deliberately deemphasized the raw 0-100 score in favor of a plain-language concern band, reasoning that a bare number invites false precision. Stakeholder feedback on that redesign judged this went too far: the product exists to screen and prioritize areas, and a user needs one objective, consistently calculated number to anchor on, not just a qualitative band. Before making this change, this pass traced the score's exact formula, bounds, direction, scenario dependence, comparison universe, missing-data behavior, uncertainty treatment, and every distinct rank/percentile computation in the codebase (`docs/methods/screening-score-interpretation.md`), per the explicit instruction not to elevate the number until that trace was complete.
+
+**Decision:** The score returns as the dominant visual element (`packages/ui/src/ScreeningScore.tsx`, "full" mode) — large number, "/100," a "HEALTH EQUITY SCREENING SCORE" caption, then the concern band, county comparison, and a 0/100 direction legend below it. The always-visible non-causal disclaimer (DEC-077) is preserved unconditionally. No calculation, weight, or scenario ID changed; this is a presentation-hierarchy change built on the same traced, documented number.
+
+**Rationale:** DEC-077's underlying concern (false precision) is still valid and is addressed by *how* the number is presented (rounded to the nearest integer everywhere via one shared formatter, always paired with the concern band and comparison sentence, never shown alone) rather than by hiding the number. A screening/prioritization tool whose primary number is deemphasized relative to a qualitative band makes the "prioritize by what" question harder to answer at a glance, which is a worse tradeoff for this product's actual job than the false-precision risk, provided the number's meaning and limits are always presented alongside it.
+
+**Consequences:** Every surface that shows the score to a person now goes through `ScreeningScore`/`formatScreeningScore`, replacing five previously independent, inconsistently-rounded call sites (integer in Explore, one decimal in Prioritize, two decimals in CSV) — see DEC-079. `docs/methods/screening-score-interpretation.md` is the permanent interpretation reference this and future passes should update if the underlying calculation ever changes.
+
+---
+
+### DEC-079 — Centralize every score display through one shared component; fix a real band/rounding inconsistency found by independent usability review
+
+**Context:** Before this pass, the score was rounded and labeled independently in at least five frontend locations and one backend service, with no shared formatting logic. Three independent blind usability-review subagents (screenshots only, no implementation context) were run after implementation, per this project's established pattern (see the second and third health-equity UX passes). Reviewer 3, unprompted, found a genuine defect: three tracts in the Prioritize table all displayed "75/100" but two read "High concern" and one read "Moderate-to-high concern."
+
+**Decision:** All five frontend call sites (Explore headline, mobile collapsed bar, map hover/selection callouts, Prioritize table, Explore's tract comparison panel) and Advocate's backend evidence service now render through `ScreeningScore`/`formatScreeningScore`/`concernBandFor`. The root cause of the found defect — `concernBandFor` was being called with the raw unrounded score while the displayed number was the rounded value, so a raw 74.6 and a raw 75.4 could both display as "75" yet fall on opposite sides of the 75.0 band threshold — is fixed by computing the band from `Math.round(score)`, the same value shown as the headline number, in both the visual band and the accessible name.
+
+**Rationale:** A screening tool whose own displayed number and displayed category can visibly disagree for the same tract is a direct trust problem, not a cosmetic one — exactly the kind of "same fact, two different labels" issue this project's usability-review process exists to catch (per the explicit instruction "do not treat subagent approval as evidence by itself; use specific confusion reports to improve the product"). Centralizing the formatting in one component means this class of bug can only be reintroduced in one place, not five.
+
+**Consequences:** `screeningComparisonSentence`'s wording also changed at the percentile ceiling ("higher than 100% of tracts" → "among the highest ... in the county" for comparisonPercentile >= 99), independently flagged by two of the three reviewers as reading like a claim of being higher-concern than every tract including itself, especially next to a tied rank #1 in Prioritize. The underlying Monte-Carlo-derived statistic is unchanged; only the sentence at that boundary changed. Full findings, including limitations left disclosed rather than fixed (slider tracks with no numeric scale, an unrelated pre-existing floating UI element obscuring some mobile content, missing inline tooltips for "Stability"/"Data coverage"), are recorded in `docs/design/final-score-map-and-intuitiveness-review.md`.
+
+---
+
+### DEC-080 — Add a real map basemap (OpenFreeMap, free and keyless) rather than continuing with no basemap at all
+
+**Context:** The Explore map's MapLibre style was `{ version: 8, sources: {}, layers: [{id: "bg", type: "background"}] }` — a flat background color with no tile source, no roads, no water, no place labels of any kind. Stakeholder feedback described this as "looks like a collection of colored polygons instead of a recognizable map," which undersold the actual severity: there was no basemap to reorder layers on top of at all. This pass's task instructions specified a preference order (reorder existing basemap labels; build a custom label layer from local data; change the basemap only as a last resort) that assumed a basemap already existed.
+
+**Decision:** Adopt OpenFreeMap's "positron" vector style (`https://tiles.openfreemap.org/styles/positron`) as the basemap — free, requires no API key (satisfying CLAUDE.md's "core functionality must work without paid API keys"), OSM-derived data, self-hostable if this project ever needs to move off the public instance. Every tract layer (fill, no-data hatch, outline) is inserted via `addLayer(layer, beforeId)` with `beforeId` set to the basemap's first symbol layer (`waterway_line_label`), so all city/road/water labels render above the choropleth. The selected-tract outline and selected-place boundary are appended without `beforeId`, staying above every label. A dedicated custom label layer sourced from `geo.places` (real TIGER place centroids already in the warehouse, confirmed to include all task-specified target cities with population-plausible land-area ordering) was evaluated but judged unnecessary once the basemap's own OpenMapTiles-schema place layer was verified live to already label all required cities correctly at county zoom.
+
+**Rationale:** Once a real basemap exists, the task's own preferred "Option A" (reorder existing labels) becomes both applicable and sufficient — it required no new custom rendering logic, no additional network requests beyond the basemap's own tile fetches (which any basemap choice requires), and leverages OpenMapTiles' already-tuned, real-world place-importance data rather than reimplementing an approximation of it from a smaller, land-area-only local proxy.
+
+**Consequences:** `AttributionControl({ compact: true })` is required and present — OpenFreeMap's tile source reports its own "OpenFreeMap © OpenMapTiles Data from OpenStreetMap" credit via tile metadata, which MapLibre auto-collects; a hand-written duplicate credit was tried first, found to genuinely duplicate the auto-collected one, and removed. A real bug in the map's own readiness-detection logic was found and fixed during this change: React Strict Mode's dev-only double mount/cleanup/mount cycle caused the `load` event to never fire for a remote style URL on the surviving map instance, even though tiles rendered visually — fixed by also listening for `idle` and checking `isStyleLoaded()` synchronously as redundant signals.
+
+---
+
+### DEC-081 — Rebuild Advocate as a 4-stage guided project dashboard, reusing the existing workspace data model and business logic unchanged
+
+**Context:** Stakeholder feedback identified that Advocate, while functionally correct, exposed internal/technical vocabulary throughout its normal interface (matched evidence, evidence bundle, output type, generate, Export/Import JSON, configuration hash) and presented as a single dense page rather than a task the user could understand and complete. A pre-implementation research pass (`docs/design/advocate-intuitive-workspace-research.md`) audited every route, component, and cross-page entry point before any code changed, per this project's established "explore first, plan second, implement third" discipline.
+
+**Decision:** Rebuild the page as a 4-stage dashboard (Project → Evidence → Draft → Review & share) via a single `activeStage` client-side state variable with freely-clickable step navigation, not a gated wizard — every stage reads from the same always-fully-populated `AdvocacyWorkspace`, so moving between stages never discards work. The underlying `AdvocacyWorkspace` IndexedDB schema, its field names, and every existing CRUD handler (`handleSelectGeography`, `handleToggleEvidence`, `handleDraftCreated`, etc.) are reused unchanged — this pass is a presentation-layer rebuild, not a data-model rewrite.
+
+**Rationale:** The task's underlying business logic (evidence matching, deterministic brief generation, IndexedDB persistence) was already correct and well-tested; the actual problem was information architecture and terminology, not calculation or storage. Reusing the existing handlers verbatim means the redesign can't introduce a silent calculation regression, and satisfies the explicit constraint that backup/export files and internal schema keys must not change shape merely to match new UI labels (see DEC-083).
+
+**Consequences:** A new `apps/web/lib/advocacy-terms.ts` module (`ADVOCACY_TERMS`) is the single source of plain-language strings for the whole page and every cross-page entry point, replacing what were previously several independent, ad hoc label strings — see DEC-082. `packages/ui/src/StepIndicator.tsx` is a new shared component (step list with current/complete/upcoming state, communicated through icon shape and text together, never color alone).
+
+---
+
+### DEC-082 — Centralize plain-language terminology and evidence-status labels in one module; fix a real 4th `data_status` value found only by finally rendering it through real logic
+
+**Context:** Terms like "matched evidence," "evidence bundle," "Generate," and raw `data_status` values ("observed"/"modeled"/"suppressed") were previously either shown verbatim or handled by an incomplete, independently-drifting 3-value mapping in `apps/web/lib/glossary.ts`. Live testing during this pass (creating a project, selecting evidence, generating a draft against the real backend) surfaced a genuine backend/frontend contract gap: `apps/api/.../advocacy_evidence.py` legitimately returns a 4th `data_status` value, `"derived"` (used for averaged/composite evidence, including the health equity screening score itself), which neither the frontend's `DataStatus` type nor any existing label mapping accounted for — the evidence card was rendering the bare word "derived" as if it were already plain English.
+
+**Decision:** `apps/web/lib/advocacy-terms.ts` centralizes both the terminology map (`ADVOCACY_TERMS`) and the `data_status` → plain-language label/definition functions (`dataStatusLabel`, `dataStatusDefinition`), now covering all 4 real backend values. `DataStatus` in `apps/web/lib/api.ts` is widened to include `"derived"`. The now-superseded, now-provably-incomplete 3-value copy in `glossary.ts` is removed (confirmed via grep to have no other callers) rather than left to drift independently.
+
+**Rationale:** A single source of truth for this mapping means a future 5th `data_status` value can only be missed in one place, and makes the omission visible (a bare fallback string) rather than silently wrong. This is the same "centralize once, no independently-drifting copies" pattern already used for `ScreeningScore` (DEC-079).
+
+**Consequences:** No backend calculation or field changed — this is a purely additive frontend type/label fix for a value the backend was already, correctly, returning.
+
+---
+
+### DEC-083 — Real, typed backup-import error path, replacing an always-succeeds-silently import that could produce an unexplained placeholder project
+
+**Context:** The prior `importWorkspaceJson` always returned a `AdvocacyWorkspace` (via `migrateWorkspace`, which defaults every missing/invalid field), even for a file that was not valid JSON at all or was JSON of the wrong shape (a bare array, string, or number) — silently producing a placeholder project with no error shown to the user, undermining a real "restore a project backup" user action with a genuine failure mode.
+
+**Decision:** `importWorkspaceBackup` (`apps/web/lib/workspace/storage.ts`) now returns a discriminated union, `BackupImportResult = { ok: true; workspace } | { ok: false; reason: "unparseable" | "not_a_project" }`. A file that fails `JSON.parse` outright, or parses to a non-object (array/string/number), is now a reported, plain-language error (`ADVOCACY_TERMS.unparseableBackupError` / `invalidBackupError`, both ending in "Nothing was changed."). A file that *is* a plausible-but-old-shape object still recovers gracefully through the existing `migrateWorkspace` field-by-field defaulting — backward compatibility for genuinely old exports is fully preserved.
+
+**Rationale:** The task's own explicit, simultaneous requirements — "show real errors" and "never silently delete unsupported fields, fail safely" — are both satisfiable at once because they apply to two different failure classes: a file that isn't a backup at all (new, real error) versus a file that is an old-but-recognizable backup (unchanged, safe recovery). Conflating them was the actual bug.
+
+**Consequences:** `apps/web/test/workspace-storage.test.ts` gained explicit tests for both new failure branches and confirms the graceful-recovery branch is unaffected.
+
+---
+
+### DEC-084 — Heal missing schema fields on every ordinary workspace read, not only on backup import
+
+**Context:** Found live during this pass's verification: `getWorkspace`/`listWorkspaces` (`apps/web/lib/workspace/storage.ts`) returned the raw IndexedDB record as-is, with no field-defaulting — `migrateWorkspace`'s safe-defaulting logic was only ever invoked on the backup-*import* path. A record written to IndexedDB before a schema field existed (e.g. `titleIsUserSet`, `projectGoal`, both added earlier this pass) is read back missing that field entirely, not just falsy. Confirmed concretely: a real pre-existing project created earlier in this session's own live testing exported with `titleIsUserSet` and `projectGoal` genuinely absent from its JSON — meaning `titleIsUserSet` evaluated as falsy forever, which would silently re-trigger the auto-title-suggestion logic (DEC-081's title-suggestion feature) on every future edit to that project, overwriting a name the user believed was permanently theirs.
+
+**Decision:** `getWorkspace` and `listWorkspaces` now run every record through the same `migrateWorkspace` defaulting logic via a new `healWorkspaceShape` wrapper, which additionally restores the record's real `updatedAt` afterward (since `migrateWorkspace` always stamps a fresh one, correct for an actual import/save but not for a plain read — this would otherwise have silently corrupted `listWorkspaces`' most-recently-updated sort order and misreported "last saved" time on every visit). The healed shape is not written back to storage on read; it's naturally persisted next time the workspace is actually edited and saved.
+
+**Rationale:** CLAUDE.md and this task's explicit migration requirements ("preserve existing IndexedDB projects... any schema change must be additive, safely defaulted, never silently drop fields") apply to every read path a schema change can reach, not only the one path (backup import) that happened to already have defaulting logic. This is exactly the kind of "silent, only-reproducible-with-a-pre-existing-record" bug that unit tests written against only freshly-created objects would never catch — reproduced here with a raw IndexedDB `put()` bypassing `saveWorkspace`, matching what a genuinely old record looks like.
+
+**Consequences:** Two new regression tests in `workspace-storage.test.ts` cover both the general healing behavior and the `updatedAt`-preservation requirement specifically (a record with a deliberately old `updatedAt` must read back with that same value, not a freshly re-stamped one).
+
+---
+
+### DEC-085 — Resume a returning project at its furthest-reached stage; fix a real display-name inconsistency in one cross-page handoff
+
+**Context:** `activeStage` (the guided-dashboard's current step) always initialized to `"project"` on every load, switch, or backup restore, regardless of how much of the project was already filled in — found live: reloading a project that already had a place, audience, and evidence selected dropped the user back on the empty search form, with the summary panel's own "Next" guidance simultaneously (and wrongly) suggesting "Choose a place..." Separately, Explore's tract-detail "Add to advocacy project" button hardcoded `displayName: \`Tract ${geoid}\`` even though the same component already fetches and displays a nicer `profile.name_long` for its own page heading — a real, avoidable cross-page geography-naming inconsistency (Prioritize and Explore's place/district views use a human-readable name; this one tract view didn't, unlike Access Lab and Utilization, which don't have a nicer name available from their own API responses at all and were left as a disclosed, backend-scoped limitation).
+
+**Decision:** A new `resumeStageFor(workspace)` helper (`apps/web/app/advocate/advocate-client.tsx`) computes the first stage that still needs input (place missing → Project; evidence missing → Evidence; otherwise → Draft, since a generated draft is never persisted and can't be resumed into Review directly) and is applied uniformly on initial mount, project switch, and backup import. Explore's tract-detail handoff now passes `displayName: profile.name_long` instead of the raw-GEOID string.
+
+**Rationale:** A dashboard whose own stated purpose is "every value helps continue the task" (per the guided-dashboard model, DEC-081) cannot silently contradict itself by defaulting to the start of a task that in fact is already partway done. The display-name fix was a one-line, zero-risk correction using data the component already had in hand — not a new fetch, not a backend change.
+
+**Consequences:** Access Lab's tract-summary API response has no name field at all (`TractAccessSummaryResponse` — confirmed by reading its schema), so its "Tract <GEOID>" label is left as a disclosed, out-of-scope limitation requiring a backend schema addition, not fixed this pass. e2e coverage (`advocate-core.spec.ts`'s "reloading the browser resumes..." test) now asserts the resumed stage directly rather than only the underlying data.
+
+---
+
+---
+
+### DEC-086 — Replace Advocate's permanent-dashboard layout with a linear, one-question-at-a-time guided flow
+
+**Context:** The dashboard-model Advocate built in the prior pass (DEC-081 onward) was functionally
+complete but, per direct real-world feedback ("Even I do not know what to do on this page"), presented too
+many simultaneous decisions: a permanent three-column layout showed project navigation, evidence
+collection, and output configuration all at once, with a summary rail frequently showing incomplete values.
+
+**Decision:** Advocate is rebuilt around exactly 4 user-facing stages — Place, Evidence, Create, Review —
+with never more than one stage visually dominant at a time. Two structural techniques make this possible
+without adding a fifth stage or breaking the "one question at a time" rule: (1) `visibleStageId()`
+(`advocate-client.tsx`) folds two genuinely sequential internal screens (place search, then focus
+confirmation) into a single outer "Place" stage for the progress indicator, so a stage that inherently
+needs two decisions doesn't need its own top-level slot; (2) the Create stage is a self-contained micro-
+wizard (`create-step.tsx`) that owns its own `output → audience → goal → ready` sub-step state and renders
+a distinct heading per sub-step, achieving one-question-per-screen for a stage that has four real decisions
+without inflating the outer stage count. "Project" is deliberately never shown as its own stage — place,
+focus, audience, and output are surfaced only via a compact summary bar and an on-demand "View project
+details" disclosure, never a permanent rail.
+
+**Rationale:** The task's own explicit acceptance test was procedural, not just cosmetic: a first-time
+reviewer following the golden path (choose a place, choose a focus, select facts, choose an output type,
+select an audience, create the draft, find the citations, download it) should never hesitate about where to
+click. Folding sequential decisions into one outer stage, rather than either cramming them onto one screen
+(the old dashboard's failure mode) or exploding the top-level stage count (which would violate the "exactly
+Place/Evidence/Create/Review" spec), was the only approach satisfying both constraints at once.
+
+**Consequences:** `project-nav.tsx`, `project-summary-panel.tsx`, `start-project-landing.tsx`,
+`geography-issue-entry.tsx`, `document-entry.tsx`, `draft-creator.tsx`, and `packages/ui/src/StepIndicator.tsx`
+were deleted (confirmed zero remaining references before deletion) and replaced by `landing-choice.tsx`,
+`place-step.tsx`, `focus-step.tsx`, `document-step.tsx`, `create-step.tsx`, `project-menu.tsx`,
+`project-summary-bar.tsx`, and `packages/ui/src/HorizontalSteps.tsx`. The underlying `AdvocacyWorkspace`
+schema, IndexedDB persistence, evidence-matching, and deterministic draft generation are entirely unchanged.
+All three Advocate e2e spec files, plus the pre-existing project-wide `accessibility.spec.ts`,
+`responsive.spec.ts`, and `production-smoke.spec.ts` (which had Advocate-specific tests written against the
+now-deleted dashboard UI) were rewritten against the new flow.
+
+---
+
+### DEC-087 — Fix two real defects found through live interaction and blind usability review, not just pattern-match against the spec
+
+**Context:** Two genuine bugs surfaced only through actually using the running app and through independent
+blind review, neither of which a code read alone would have caught: (1) a "View project details" toggle
+button mounted a `ProjectDetailsDisclosure` component whose own root was *itself* a second, separately-closed
+`<details>` element — clicking "View project details" revealed nothing until a second, hidden click on an
+identically-worded inner summary was also made; (2) the shared `SearchPanel` component's default empty-state
+text ("...select any tract directly on the map") is accurate on Explore, which renders a real map beside it,
+but was being reused verbatim on Advocate's Place step, which has no map at all — three of four blind
+reviewers independently flagged confusion near this screen.
+
+**Decision:** `ProjectDetailsDisclosure` (`project-summary-bar.tsx`) is now a plain `<dl>`, not a second
+`<details>` — the outer toggle button (which already tracks its own open/closed state and now reads "Hide
+project details" when open) is the only disclosure control. `SearchPanel` gained a `showMapHint` boolean
+prop (default `true`, preserving Explore's existing, correct behavior); Advocate's `PlaceStep` passes
+`false` and shows map-free copy instead.
+
+**Rationale:** Both are the kind of defect that only reproduces by actually clicking through the running
+application or by a reviewer encountering the screen cold — neither would show up in a static code read
+against the design spec, which is exactly why this pass's process mandates live browser verification and
+blind usability review as release gates, not optional extras.
+
+**Consequences:** `apps/web/e2e/advocate-cross-page.spec.ts`'s Prioritize-handoff test was updated to assert
+against the details disclosure directly (`getByTestId("project-details-disclosure")`) rather than a
+nested-`<details>` selector that no longer exists. No other behavior changed.
+
+---
+
+---
+
+### DEC-088 — Generalize Advocate's focus step into a shared `FocusPicker`, reused by Prioritize and Copilot
+
+**Context:** Three separate pages (Advocate's Focus step, Prioritize's scenario selector, and the new
+Copilot focus-selection screen) each needed the identical job: let a user pick a "priority weighting" —
+recommended default, a few common alternatives, "see more" for the rest, plus a real custom-weights path —
+over the same underlying set of real backend `scenario_id`s, without ever surfacing an internal scenario ID
+or a raw weight array as the normal interface. Building this three separate times would have meant three
+separately-maintained copies of the same recommended/common/unavailable-focus-area logic, with real risk of
+the three drifting out of sync (e.g. Prioritize's own pre-existing `UNAVAILABLE_SCENARIOS` handling already
+differed subtly from what Advocate's `focus-step.tsx` did).
+
+**Decision:** Advocate's existing, already-tested `focus-step.tsx` was generalized and relocated to
+`apps/web/app/focus-picker.tsx` (exported as `FocusPicker`), with `focus-options.ts` (constants: recommended
+ID, common IDs, blurbs, and a new `UNAVAILABLE_FOCUS_AREAS` list) moved out of `app/advocate/` to
+`apps/web/app/focus-options.ts` as a shared module. Prioritize's old, separately-implemented
+`ScenarioSelector` component (and its own `UNAVAILABLE_SCENARIOS` constant) was deleted in favor of the
+shared component; Copilot's new focus-selection screen uses it directly with no wrapper.
+
+**Rationale:** This is exactly the kind of "global component opportunity" the pass's own instructions call
+for building — a real, provable duplication eliminated by promoting an already-battle-tested component,
+not a new abstraction invented to match an illustrative name. It also fixes a real, disclosed gap in the
+same motion: neither Advocate's nor Copilot's focus selection previously had any "unavailable focus area"
+disclosure at all (only Prioritize did) — now all three surface Language Access as a real, explained,
+non-dominant unavailable option under "See more," consistently.
+
+**Consequences:** `apps/web/app/advocate/focus-step.tsx` was deleted (confirmed zero remaining references
+first); `advocate-client.tsx`'s only change is an import-path/name update, with zero behavioral change to
+Advocate. `apps/web/e2e/prioritize-core.spec.ts` and the new `copilot-core.spec.ts` both assert against the
+shared component's real rendered output (e.g. "language access is shown as a real, explained unavailable
+option under See more, not a dominant warning") rather than page-specific mocks.
+
+---
+
+### DEC-089 — Fix five findings from blind usability review with frontend-only display changes, leaving the pipeline and backend untouched
+
+**Context:** Six independent blind usability reviews (four explicitly nontechnical personas) surfaced five
+concrete, repeatable, high-confidence findings, two of which trace back to strings generated outside the
+frontend: Access Lab's access-summary error message named an internal pipeline script
+(`` `run_access_metrics_pipeline` ``) directly in a user-facing error, and its mobile-service-scenario
+titles carried a raw internal domain-key fragment (`(health_burden-weighted, transit-hub candidates)`)
+appended by `pipelines/src/scc_health_pipeline/run_analytics_pipeline.py` — a file this pass's own branch
+constraints explicitly forbid editing ("do not alter... source-data pipelines"). The other three findings
+(Copilot's leaked `[Deterministic mode -- ...]` status line, its duplicated bullet-dump/source-list wall of
+text, and Access Lab's dead-end ZIP-code guidance) were purely frontend presentation issues.
+
+**Decision:** All five were fixed as frontend-only display-layer changes, never touching the pipeline,
+backend, scenario IDs, or any computed value. The pipeline error message was replaced with the same plain
+`"Couldn't load X. Is the API running?"` wording every sibling panel on the page already used
+(`access-summary-panel.tsx`). The leaked domain-key fragment is stripped for display via an exact-match
+string replace on the known, stable literal suffix the pipeline always appends
+(`optimizer-scenarios.tsx`) — real data untouched, only a known, redundant technical parenthetical hidden
+(the same plain-language equivalent already appears once in the intro paragraph above the list). Copilot's
+answer body now strips the static deterministic-mode disclaimer line and collapses to an 8-line preview
+with a "Show all N facts" disclosure, with the Sources list compacted to avoid repeating each fact's full
+value a second time. Access Lab's ZIP-code guidance gained a real `<Link href="/explore">`.
+
+**Rationale:** The branch's own constraints prioritize "no scientific-methodology changes... no source-data
+pipeline changes" above cosmetic preferences — a frontend-only string transform that never alters the
+underlying real value, citation, or computed number satisfies both the usability finding and that
+constraint simultaneously, without waiting on a separate pipeline-scoped pass.
+
+**Consequences:** Each fix has a new, permanent Playwright assertion (`access-lab-core.spec.ts`,
+`copilot-core.spec.ts`) asserting the specific leaked string is absent and the real content is present, plus
+a live screenshot recapture confirming the corrected state. Several other, lower-confidence or
+larger-scope findings from the same six reviews were deliberately left unfixed and disclosed instead
+(RISK-039), consistent with this pass's five-item fix budget rather than attempting every finding under
+time pressure.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

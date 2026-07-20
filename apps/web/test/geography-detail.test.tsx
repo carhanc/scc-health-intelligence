@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GeographyDetail } from "@/app/explore/geography-detail";
 import { api } from "@/lib/api";
@@ -13,6 +13,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       ...actual.api,
       getTractProfile: vi.fn(),
       explainScore: vi.fn(),
+      getAllTractBoundaries: vi.fn(),
+      getDomains: vi.fn(),
     },
   };
 });
@@ -77,7 +79,14 @@ const dataLimitedExplanation: ScoreExplanationResponse = {
       ],
     },
   ],
-  domains_missing: ["Environmental burden", "Resource accessibility"],
+  // Real snake_case domain keys, matching what the backend actually
+  // returns (`scenario_scores.py`'s `missing` list is built from
+  // `scenario.weights` keys, e.g. "environmental_burden") -- the
+  // fixture previously used already-formatted English words here,
+  // which happened to survive `domainLabel`'s humanize-fallback
+  // unchanged and masked that this fixture didn't match the real API
+  // contract.
+  domains_missing: ["environmental_burden", "resource_accessibility"],
   stability_label: "Data-limited",
   data_confidence: null,
   monte_carlo: null,
@@ -86,6 +95,16 @@ const dataLimitedExplanation: ScoreExplanationResponse = {
 };
 
 describe("GeographyDetail (tract, missing data)", () => {
+  beforeEach(() => {
+    vi.mocked(api.getAllTractBoundaries).mockResolvedValue({
+      type: "FeatureCollection",
+      features: [],
+      scenario_id: "default_integrated_screen_v1",
+      data_mode: "demo",
+    });
+    vi.mocked(api.getDomains).mockResolvedValue({ domains: [] });
+  });
+
   it("never displays a missing score as zero -- it shows a dash and an explicit no-score message", async () => {
     vi.mocked(api.getTractProfile).mockResolvedValueOnce(profileFixture);
     vi.mocked(api.explainScore).mockResolvedValueOnce(dataLimitedExplanation);
@@ -101,8 +120,12 @@ describe("GeographyDetail (tract, missing data)", () => {
     );
 
     await waitFor(() => expect(screen.getByText(/isn't enough data to compute a combined score/)).toBeInTheDocument());
-    // The score display must render an em dash placeholder, never "0".
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // The score display must render an em dash placeholder, never "0". The
+    // headline ScreeningScore component's own accessible name is the
+    // authoritative check -- both it and the collapsed "How this was
+    // calculated" disclosure legitimately render a second "—" glyph, so a
+    // bare screen.getByText("—") is ambiguous by design here, not a bug.
+    expect(screen.getByRole("img", { name: /screening score: not available/i })).toBeInTheDocument();
     expect(screen.queryByText("0", { selector: "p" })).not.toBeInTheDocument();
   });
 
@@ -121,7 +144,115 @@ describe("GeographyDetail (tract, missing data)", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText(/Environmental burden, Resource accessibility/)).toBeInTheDocument(),
+      expect(screen.getByText(/Environmental conditions, Community resources/)).toBeInTheDocument(),
     );
+  });
+
+  it("discloses a metric missing from a present domain by name, never silently dropping it from the driver list", async () => {
+    // A domain can itself have a real, scored contribution while still
+    // being missing one of its constituent metrics (e.g. a source that
+    // failed for just that measure) -- the "Why this area appears here"
+    // driver list must not silently show only what happened to load; it
+    // must name what's absent, the same "insufficient data" contract that
+    // applies to a wholly missing domain, applied per-metric.
+    const partiallyMissingExplanation: ScoreExplanationResponse = {
+      ...dataLimitedExplanation,
+      score: 62,
+      coverage_fraction: 0.6,
+      domains: [
+        {
+          domain: "Health burden",
+          domain_score: 70,
+          configured_weight: 0.2,
+          normalized_weight: 0.2,
+          contribution: 14,
+          metrics: [
+            {
+              metric_id: "diabetes_prevalence",
+              label: "Diabetes prevalence",
+              domain: "Health burden",
+              subdomain: "Chronic disease",
+              raw_value: 12.5,
+              unit: "%",
+              direction: "concern_high",
+              percentile: 70,
+              effective_weight: 0.5,
+              contribution: 14,
+              standard_error: null,
+              low_confidence_limit: null,
+              high_confidence_limit: null,
+              source_id: "cdc_places",
+              citation: "CDC PLACES 2025",
+              plain_language_definition: "Share of adults with diagnosed diabetes.",
+              limitations: "Model-based small-area estimate.",
+            },
+          ],
+        },
+      ],
+      domains_missing: [],
+      stability_label: "Moderately stable",
+    };
+
+    vi.mocked(api.getTractProfile).mockResolvedValueOnce(profileFixture);
+    vi.mocked(api.explainScore).mockResolvedValueOnce(partiallyMissingExplanation);
+    vi.mocked(api.getDomains).mockResolvedValueOnce({
+      domains: [
+        {
+          domain: "Health burden",
+          subdomains: ["Chronic disease"],
+          metrics: [
+            {
+              metric_id: "diabetes_prevalence",
+              label: "Diabetes prevalence",
+              domain: "Health burden",
+              subdomain: "Chronic disease",
+              unit: "%",
+              direction: "concern_high",
+              plain_language_definition: "Share of adults with diagnosed diabetes.",
+              limitations: "Model-based small-area estimate.",
+              citation: "CDC PLACES 2025",
+            },
+            {
+              metric_id: "obesity_rate",
+              label: "Obesity rate",
+              domain: "Health burden",
+              subdomain: "Chronic disease",
+              unit: "%",
+              direction: "concern_high",
+              plain_language_definition: "Share of adults with obesity.",
+              limitations: "Model-based small-area estimate.",
+              citation: "CDC PLACES 2025",
+            },
+          ],
+        },
+      ],
+    });
+
+    renderWithClient(
+      <GeographyDetail
+        selected={{ geographyType: "tract", geoid: "06085500300", displayName: "Census Tract 5003", source: "url" }}
+        scenarioId="default_integrated_screen_v1"
+        onCompare={() => {}}
+        onClearSelection={() => {}}
+        onSelect={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Insufficient data")).toBeInTheDocument());
+    expect(screen.getByText(/Obesity rate/)).toBeInTheDocument();
+    // Not counted as zero or silently folded in as a real driver row --
+    // only the one real, present metric appears as a driver <li>.
+    // Scoped to the top-driver list's own accessible name rather than
+    // a page-wide listitem query, since jsdom does not reliably apply
+    // the UA stylesheet rule hiding a closed <details>'s content from
+    // the accessibility tree the way a real browser does (unrelated
+    // <li>s inside the collapsed "What this result does not mean"
+    // disclosure would otherwise also match).
+    const topDriverList = screen.getByRole("list", { name: "Top factors shaping this profile" });
+    const driverItems = within(topDriverList).getAllByRole("listitem");
+    expect(driverItems).toHaveLength(1);
+    expect(driverItems[0]?.textContent).toContain("Diabetes prevalence");
+    expect(driverItems[0]?.textContent).not.toContain("Obesity rate");
   });
 });

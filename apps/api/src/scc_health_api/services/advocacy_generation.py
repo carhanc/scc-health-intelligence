@@ -40,6 +40,21 @@ def _format_evidence_line(item: EvidenceItem) -> str:
     return f"- {item.label}: {item.value} (source: {item.publisher}, {item.source_vintage})"
 
 
+def _format_retrieved_at(retrieved_at: str) -> str:
+    """Most `retrieved_at` values are already short, human-written strings
+    ("computed at analytics build time", "2026-07-13") -- but some come
+    straight from a data manifest's full ISO 8601 timestamp with
+    microsecond precision and a timezone offset (e.g.
+    "2026-07-15T03:38:38.049106+00:00"), which reads as a raw, machine-
+    generated string when it lands in generated document text (found via
+    live usability review of this pass). Reduce that specific shape to a
+    plain date; anything else passes through unchanged."""
+    try:
+        return datetime.fromisoformat(retrieved_at).date().isoformat()
+    except ValueError:
+        return retrieved_at
+
+
 def generate_sections(
     geography_label: str,
     scenario_label: str | None,
@@ -104,7 +119,8 @@ def generate_sections(
         intervention_scenarios += "\n\n" + access_summary
 
     sources_and_limitations = "\n".join(
-        f"- {e.label}: {e.citation} ({e.publisher}, {e.source_vintage}, retrieved {e.retrieved_at})"
+        f"- {e.label}: {e.citation} ({e.publisher}, {e.source_vintage}, "
+        f"retrieved {_format_retrieved_at(e.retrieved_at)})"
         + (f" -- {e.limitation}" if e.limitation else "")
         for e in evidence
     ) or "No evidence selected."

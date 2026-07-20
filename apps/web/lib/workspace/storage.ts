@@ -5,7 +5,7 @@
 // new npm dependency, since the operations needed (get/put/delete/getAll
 // on one object store) are simple enough not to justify one.
 
-import { type AdvocacyWorkspace, createEmptyWorkspace, migrateWorkspace } from "./schema";
+import { type AdvocacyWorkspace, migrateWorkspace } from "./schema";
 
 const DB_NAME = "scc_health_advocacy";
 const DB_VERSION = 1;
@@ -44,16 +44,38 @@ async function withStore<T>(
   });
 }
 
+/** IndexedDB doesn't enforce the `AdvocacyWorkspace` type -- a record
+ * written before a schema field existed (e.g. `titleIsUserSet`,
+ * `projectGoal`, both added this pass) is read back missing that field
+ * entirely, not just falsy. `migrateWorkspace` already knows how to
+ * safely default every field for exactly this "old or partial shape"
+ * case (docs/design/advocate-intuitive-workspace-research.md §11), but
+ * was previously only ever run on the backup-*import* path -- an
+ * existing project loaded the ordinary way (open the page, switch
+ * projects) never got healed, so e.g. a legacy project's
+ * `titleIsUserSet` stayed `undefined` (falsy) forever, silently
+ * re-triggering the auto-title-suggestion logic on every edit even
+ * after a user had renamed it. `migrateWorkspace` also stamps a fresh
+ * `updatedAt`, which is correct for an import (that's a save) but wrong
+ * for a plain read -- it would corrupt `listWorkspaces`' sort order and
+ * misreport "last saved" -- so the original `updatedAt` is restored
+ * after healing. This doesn't write the healed shape back to storage;
+ * it's naturally persisted the next time the workspace is actually
+ * edited and saved. */
+function healWorkspaceShape(raw: AdvocacyWorkspace): AdvocacyWorkspace {
+  return { ...migrateWorkspace(raw), updatedAt: raw.updatedAt };
+}
+
 export async function listWorkspaces(): Promise<AdvocacyWorkspace[]> {
   const all = await withStore<AdvocacyWorkspace[]>("readonly", (store) => store.getAll());
-  return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return all.map(healWorkspaceShape).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function getWorkspace(workspaceId: string): Promise<AdvocacyWorkspace | null> {
   const result = await withStore<AdvocacyWorkspace | undefined>("readonly", (store) =>
     store.get(workspaceId),
   );
-  return result ?? null;
+  return result ? healWorkspaceShape(result) : null;
 }
 
 export async function saveWorkspace(workspace: AdvocacyWorkspace): Promise<void> {
@@ -90,17 +112,33 @@ export function exportWorkspaceJson(workspace: AdvocacyWorkspace): string {
   return JSON.stringify(workspace, null, 2);
 }
 
-/** Parses and migrates an imported workspace file -- never throws on a
- * malformed or old-schema file, always returns a usable workspace
- * (falling back to defaults for anything missing or invalid). */
-export function importWorkspaceJson(json: string): AdvocacyWorkspace {
+export type BackupImportResult =
+  | { ok: true; workspace: AdvocacyWorkspace }
+  | { ok: false; reason: "unparseable" | "not_a_project" };
+
+/** Parses and restores a downloaded project backup file. A file that
+ * genuinely isn't a project backup (not JSON at all, or JSON that isn't
+ * an object -- a bare string/number/array) is reported as a real,
+ * user-visible error instead of silently recovering into a placeholder
+ * project (docs/design/advocate-intuitive-workspace-research.md §11 --
+ * the prior behavior showed no error at all, just a workspace *titled*
+ * "Recovered workspace..."). A file that *is* a plausible object, even
+ * an old or partial shape, still recovers gracefully field-by-field via
+ * `migrateWorkspace` -- this is the deliberate "never silently delete
+ * unsupported fields, fail safely" backward-compatibility contract, not
+ * relaxed by this change. */
+export function importWorkspaceBackup(json: string): BackupImportResult {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(json);
-    return migrateWorkspace(parsed);
+    parsed = JSON.parse(json);
   } catch {
-    return createEmptyWorkspace("Recovered workspace (could not parse the imported file)");
+    return { ok: false, reason: "unparseable" };
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { ok: false, reason: "not_a_project" };
+  }
+  return { ok: true, workspace: migrateWorkspace(parsed) };
 }
 
-export { createEmptyWorkspace } from "./schema";
+export { createEmptyWorkspace, suggestProjectTitle } from "./schema";
 export type { AdvocacyWorkspace } from "./schema";

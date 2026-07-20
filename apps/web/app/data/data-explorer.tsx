@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FreshnessBadge } from "@scc-health/ui";
@@ -7,8 +8,29 @@ import {
   api,
   ApiError,
   type DataExplorerTable,
+  type FreshnessState,
   type SourceStatusEntry,
 } from "@/lib/api";
+
+const AVAILABLE_STATES: FreshnessState[] = ["newest_verified", "intentional_older"];
+const NEEDS_ATTENTION_STATES: FreshnessState[] = ["lagged", "stale"];
+const UNAVAILABLE_STATES: FreshnessState[] = ["draft", "unavailable"];
+
+type StatusFilter = "all" | "available" | "needs_attention" | "unavailable";
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "available", label: "Available and current" },
+  { id: "needs_attention", label: "Needs attention" },
+  { id: "unavailable", label: "Unavailable" },
+];
+
+function matchesStatusFilter(entry: SourceStatusEntry, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "available") return AVAILABLE_STATES.includes(entry.freshness_state);
+  if (filter === "needs_attention") return NEEDS_ATTENTION_STATES.includes(entry.freshness_state);
+  return UNAVAILABLE_STATES.includes(entry.freshness_state);
+}
 
 /**
  * Phase 3 functional transparency tool: every manifest source (publisher,
@@ -74,6 +96,9 @@ export function DataExplorer() {
 }
 
 function SourcesTable() {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
   const query = useQuery({
     queryKey: ["sources"],
     queryFn: api.getSources,
@@ -104,44 +129,89 @@ function SourcesTable() {
     );
   }
 
-  const sorted = [...query.data.sources].sort((a, b) =>
-    a.source_id.localeCompare(b.source_id),
-  );
+  const searchLower = search.trim().toLowerCase();
+  const filtered = query.data.sources
+    .filter((s) => matchesStatusFilter(s, statusFilter))
+    .filter(
+      (s) =>
+        searchLower.length === 0 ||
+        s.publisher.toLowerCase().includes(searchLower) ||
+        s.source_id.toLowerCase().includes(searchLower),
+    )
+    .sort((a, b) => a.publisher.localeCompare(b.publisher) || a.source_id.localeCompare(b.source_id));
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-      <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-        <caption className="sr-only">
-          Data sources with publisher, vintage, freshness, and license
-        </caption>
-        <thead>
-          <tr className="border-b border-[var(--color-border)] bg-[var(--color-background)] text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-            <th scope="col" className="px-3 py-2">
-              Source
-            </th>
-            <th scope="col" className="px-3 py-2">
-              Publisher
-            </th>
-            <th scope="col" className="px-3 py-2">
-              Vintage
-            </th>
-            <th scope="col" className="px-3 py-2">
-              Freshness
-            </th>
-            <th scope="col" className="px-3 py-2">
-              Rows
-            </th>
-            <th scope="col" className="px-3 py-2">
-              License
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((entry) => (
-            <SourceRow key={entry.source_id} entry={entry} />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex-1 min-w-[200px]">
+          <span className="sr-only">Search sources by publisher or name</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by publisher or name…"
+            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-1.5 text-sm"
+          />
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setStatusFilter(f.id)}
+              aria-pressed={statusFilter === f.id}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                statusFilter === f.id
+                  ? "border-[var(--color-interactive)] bg-[var(--color-interactive-subtle)] text-[var(--color-interactive-hover)]"
+                  : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)]"
+              }`}
+            >
+              {f.label}
+            </button>
           ))}
-        </tbody>
-      </table>
+        </div>
+      </div>
+      <p className="text-xs text-[var(--color-text-tertiary)]" role="status">
+        {filtered.length} of {query.data.sources.length} sources
+      </p>
+
+      <div className="scroll-shadow-x overflow-x-auto rounded-lg border border-[var(--color-border)]">
+        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+          <caption className="sr-only">
+            Data sources with publisher, vintage, freshness, and license
+          </caption>
+          <thead>
+            <tr className="border-b border-[var(--color-border)] bg-[var(--color-background)] text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+              <th scope="col" className="px-3 py-2">
+                Publisher
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Vintage
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Freshness
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Rows
+              </th>
+              <th scope="col" className="px-3 py-2">
+                License
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((entry, i) => (
+              // A real, confirmed duplicate exists in the manifest today
+              // (two sources share source_id "osm_overpass_network"),
+              // which previously produced a live React duplicate-key
+              // console error -- the array index disambiguates without
+              // masking that underlying data issue (tracked separately,
+              // not silently hidden here).
+              <SourceRow key={`${entry.source_id}-${i}`} entry={entry} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -156,11 +226,11 @@ function SourceRow({ entry }: { entry: SourceStatusEntry }) {
           rel="noreferrer noopener"
           className="font-medium text-[var(--color-interactive)] underline underline-offset-2"
         >
-          {entry.source_id}
+          {entry.publisher}
         </a>
-      </td>
-      <td className="px-3 py-2 align-top text-[var(--color-text-secondary)]">
-        {entry.publisher}
+        <div className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">
+          <code>{entry.source_id}</code>
+        </div>
       </td>
       <td className="px-3 py-2 align-top">
         <div>{entry.source_vintage}</div>
@@ -327,7 +397,7 @@ function TablePreview({
           {data_mode}
         </p>
       </div>
-      <div className="max-h-[480px] overflow-auto">
+      <div className="scroll-shadow-x max-h-[480px] overflow-auto">
         <table className="w-full min-w-max border-collapse text-left text-xs">
           <caption className="sr-only">
             Preview of {schemaName}.{tableName}

@@ -105,6 +105,7 @@ function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate
               href={item.href}
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
+              title={item.description}
               className={`flex items-center justify-between rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors ${
                 active
                   ? "bg-[var(--color-interactive-subtle)] text-[var(--color-interactive-hover)]"

@@ -3,6 +3,17 @@ import { test, expect } from "@playwright/test";
 const TRACT_GEOID_PATTERN = /^06085\d{6}$/;
 
 test.describe("Explore -- search, selection, and view switching", () => {
+  // These tests assert on the desktop-inline detail panel (selection
+  // wiring: does the right URL/heading appear). Below the 1280px xl
+  // breakpoint, a selected geography opens in a collapsed summary bar +
+  // bottom sheet instead (see MobileSelectedSheet in geography-detail.tsx),
+  // so the same assertions don't apply on the mobile-chromium project --
+  // that layout and its own content are covered in
+  // e2e/explore-mobile-sheet.spec.ts.
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("search by city name finds a real place", async ({ page }) => {
     await page.goto("/explore");
     // First navigation of the suite pays Next.js dev mode's on-demand
@@ -167,5 +178,22 @@ test.describe("Explore -- search, selection, and view switching", () => {
     await page.getByRole("button", { name: "Search" }).click();
 
     await expect(page.getByText("ZIP Code Tabulation Area 94086")).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("what would you like to do next offers Copilot, Prioritize, and Access Lab, each carrying the tract along", async ({
+    page,
+  }) => {
+    await page.goto("/explore?geography=tract&id=06085500100");
+    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
+
+    const copilotLink = page.getByRole("link", { name: "Ask Copilot about this tract" });
+    await expect(copilotLink).toHaveAttribute("href", /\/copilot\?geography=tract&id=06085500100&name=/);
+
+    const accessLabLink = page.getByRole("link", { name: "See its access to care" });
+    await expect(accessLabLink).toHaveAttribute("href", /\/access-lab\?geography=tract&id=06085500100&name=/);
+
+    await accessLabLink.click();
+    await expect(page.getByRole("heading", { name: "How are people traveling?" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Census Tract 5001/i)).toBeVisible();
   });
 });

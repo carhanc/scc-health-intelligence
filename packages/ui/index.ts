@@ -27,10 +27,34 @@ export { Dialog } from "./src/Dialog";
 export { DataTable } from "./src/DataTable";
 export { Tooltip } from "./src/Tooltip";
 
+export { PageIntro } from "./src/PageIntro";
+export { PlainLanguageDefinition } from "./src/PlainLanguageDefinition";
+export { MetricCard } from "./src/MetricCard";
+export { MetricDirectionLabel } from "./src/MetricDirectionLabel";
+export { RankContext } from "./src/RankContext";
+export { ComparisonDelta } from "./src/ComparisonDelta";
+export { BackendWakeState } from "./src/BackendWakeState";
+export { HowCalculatedDisclosure } from "./src/HowCalculatedDisclosure";
+export { GuidedNextStep } from "./src/GuidedNextStep";
+export { MobileBottomSheet } from "./src/MobileBottomSheet";
+export { GlossaryTerm } from "./src/GlossaryTerm";
+export { HorizontalSteps } from "./src/HorizontalSteps";
+export type { HorizontalStep } from "./src/HorizontalSteps";
+
+export {
+  ScreeningScore,
+  SCREENING_SCORE_LABEL,
+  formatScreeningScore,
+  concernBandFor,
+  concernBandLabel,
+  screeningComparisonSentence,
+} from "./src/ScreeningScore";
+export type { ScreeningScoreProps, ConcernBand } from "./src/ScreeningScore";
+
 export {
   CHART_PALETTE,
-  MAP_SEQUENTIAL_SCALE,
-  MAP_NO_DATA_COLOR,
+  CONCERN_SCALE,
+  CONCERN_NO_DATA_COLOR,
   COLOR,
   scoreColorExpression,
 } from "./src/tokens";

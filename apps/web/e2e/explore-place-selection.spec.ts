@@ -8,6 +8,10 @@ import { test, expect } from "@playwright/test";
  * tract inside it" without already knowing a GEOID.
  */
 test.describe("Explore -- selecting a place pans the map to it", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("searching and selecting Sunnyvale outlines it on the map and lets the user click a tract inside it", async ({
     page,
   }) => {
@@ -41,7 +45,11 @@ test.describe("Explore -- selecting a place pans the map to it", () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
     await expect(page).toHaveURL(/geography=tract&id=06085\d{6}/, { timeout: 10_000 });
-    await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("What's driving this score")).toBeVisible();
+    // The raw "Combined concern score" caption now lives behind the
+    // collapsed "How this was calculated" disclosure by design -- the
+    // always-visible proof of a rendered result is the plain-language
+    // screening-view caption in the headline block.
+    await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("What is shaping this profile?")).toBeVisible();
   });
 });

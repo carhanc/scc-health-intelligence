@@ -115,12 +115,29 @@ export interface GeographyBoundaryResponse {
   data_mode: DataMode;
 }
 
+/** The 5 domains every scenario scores (config/scenarios.yml). */
+export type DomainKey =
+  | "health_burden"
+  | "access_barriers"
+  | "environmental_burden"
+  | "resource_accessibility"
+  | "workforce_shortage";
+
 export interface TractBoundaryFeatureProperties {
   tract_geoid_2020: string;
   name: string;
   score: number | null;
   coverage_fraction: number | null;
   stability_label: StabilityLabel | null;
+  /** Scenario-independent (DEC-073) -- the same regardless of which
+   * scenario_id was requested, since a domain's percentile-scale score
+   * doesn't depend on cross-domain weighting. Powers the map's
+   * per-domain layer switcher without an extra request per layer. */
+  health_burden_score: number | null;
+  access_barriers_score: number | null;
+  environmental_burden_score: number | null;
+  resource_accessibility_score: number | null;
+  workforce_shortage_score: number | null;
 }
 
 export interface TractBoundaryFeature {
@@ -556,7 +573,13 @@ export interface OptimizationScenariosResponse {
 
 // --- Phase 7: Utilization ---
 
-export type DataStatus = "observed" | "modeled" | "suppressed";
+// "derived" is a real, distinct backend value (apps/api's advocacy_evidence.py
+// uses it for averaged/composite evidence, e.g. a value averaged across
+// multiple tracts, or the health equity screening score itself) -- found
+// live during this pass's verification, where it was passing through the
+// frontend's plain-language label function untranslated (see
+// dataStatusLabel in lib/advocacy-terms.ts).
+export type DataStatus = "observed" | "modeled" | "suppressed" | "derived";
 
 export interface CountyTrendPoint {
   breakdown_category: string;

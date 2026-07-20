@@ -24,7 +24,7 @@ for (const bp of BREAKPOINTS) {
       page,
     }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: /Find where health needs/i })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Understand health equity/i })).toBeVisible({
         timeout: 15_000,
       });
 
@@ -47,13 +47,13 @@ for (const bp of BREAKPOINTS) {
         await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
       }
 
-      await expect(page.getByRole("link", { name: "Explore a community" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Explore the map" })).toBeVisible();
     });
 
     test("Explore: search, view toggle, and scenario selector remain usable", async ({ page }) => {
       await page.goto("/explore");
       await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByLabel("Priorities")).toBeVisible();
+      await expect(page.getByLabel("Screening view")).toBeVisible();
       await expect(page.getByRole("radio", { name: "Map" })).toBeVisible();
       await expect(page.getByRole("radio", { name: "Table" })).toBeVisible();
 
@@ -67,6 +67,14 @@ for (const bp of BREAKPOINTS) {
       await expect(result).toBeVisible({ timeout: 10_000 });
       await result.click();
 
+      // Below the app's own lg (1024px) breakpoint, the selected-tract
+      // profile opens behind a collapsed summary bar instead of inline
+      // (MobileSelectedSheet) -- open it before asserting on the heading.
+      if (bp.width < 1024) {
+        await page
+          .getByRole("button", { name: /Tap to view its full profile|concern/ })
+          .click();
+      }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
     });
 
@@ -86,12 +94,33 @@ for (const bp of BREAKPOINTS) {
 
     test("Tract detail, comparison, and evidence drawer remain operable", async ({ page }) => {
       await page.goto("/explore?geography=tract&id=06085500100");
+      // Below the app's own lg (1024px) breakpoint, the selected-tract
+      // profile opens behind a collapsed summary bar instead of inline
+      // (MobileSelectedSheet).
+      if (bp.width < 1024) {
+        await page
+          .getByRole("button", { name: /Tap to view its full profile|concern/ })
+          .click();
+      }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText("Combined concern score, this scenario only")).toBeVisible();
+      // The raw "Combined concern score" caption now lives behind the
+      // collapsed "How this was calculated" disclosure by design (docs/
+      // design/health-equity-product-consolidation.md's headline-result
+      // requirement) -- the always-visible proof of a rendered result is
+      // the plain-language screening-view caption in the headline block.
+      await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Compare" }).click();
+      // Tapping Compare from inside the mobile sheet closes it first (the
+      // comparison panel renders as a page-level sibling, not inside the
+      // sheet) -- on desktop the inline panel is unaffected either way.
       await expect(page.getByRole("region", { name: "Compare with another place" })).toBeVisible();
 
+      if (bp.width < 1024) {
+        await page
+          .getByRole("button", { name: /Tap to view its full profile|concern/ })
+          .click();
+      }
       await page.getByRole("button", { name: "View sources & evidence" }).click();
       const dialog = page.getByRole("dialog", { name: "Sources and evidence" });
       await expect(dialog).toBeVisible();
@@ -101,72 +130,116 @@ for (const bp of BREAKPOINTS) {
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Prioritize: scenario selector, custom sliders, and ranked results remain usable", async ({ page }) => {
+    test("Prioritize: ranked-area cards, the priorities disclosure, and custom sliders remain usable", async ({
+      page,
+    }) => {
       await page.goto("/prioritize");
-      await expect(page.getByRole("radio", { name: /Balanced overview/ })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({
+        timeout: 15_000,
+      });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Prioritize must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
-      await page.getByRole("radio", { name: "Custom scenario" }).click();
-      await expect(page.getByLabel("Health burden")).toBeVisible({ timeout: 10_000 });
+      await page.getByRole("button", { name: "Adjust priorities" }).click();
+      await page.getByRole("button", { name: "Create a custom focus" }).click();
+      await expect(page.getByRole("slider", { name: "Health needs" })).toBeVisible({ timeout: 10_000 });
 
       const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Utilization: facility table and tab switching remain usable", async ({ page }) => {
+    test("Utilization: the task chooser, facility table, and tab switching remain usable", async ({ page }) => {
       await page.goto("/utilization");
+      await expect(page.getByRole("heading", { name: "What would you like to understand?" })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth, "Utilization task chooser must not overflow horizontally").toBeLessThanOrEqual(
+        clientWidth + 1,
+      );
+
+      await page.getByRole("button", { name: /^Compare facilities:/ }).click();
       await expect(page.getByText("STANFORD HEALTH CARE")).toBeVisible({ timeout: 15_000 });
 
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth, "Utilization must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+      scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(scrollWidth, "Utilization facility view must not overflow horizontally").toBeLessThanOrEqual(
+        clientWidth + 1,
+      );
     });
 
-    test("Validate: tabs remain reachable and content does not overflow", async ({ page }) => {
+    test("Validate: sections remain reachable and content does not overflow", async ({ page }) => {
       await page.goto("/validate");
-      await expect(page.getByRole("heading", { name: "Validate" })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "Trust, methods, and data quality" })).toBeVisible({
+        timeout: 15_000,
+      });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Validate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
-      await page.getByRole("tab", { name: "Reproducibility" }).click();
+      await page.getByRole("tab", { name: "Reproduce the analysis" }).click();
       await expect(page.getByText("Audit status")).toBeVisible({ timeout: 10_000 });
     });
 
-    test("Advocate: the full geography-to-brief workflow completes and never overflows horizontally", async ({
+    test("Advocate: the full place-to-brief workflow completes and never overflows horizontally", async ({
       page,
     }) => {
       await page.goto("/advocate");
-      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("Where would you like to start?")).toBeVisible({ timeout: 15_000 });
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Advocate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
+      await page.getByRole("button", { name: /^Choose a community:/ }).click();
       await page.getByLabel("Find a place").fill("Sunnyvale");
       await page.getByRole("button", { name: "Search" }).click();
       await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
-      await expect(page.getByText(/evidence item\(s\) found for/)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
+        timeout: 10_000,
+      });
+      await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
+      await expect(page.getByRole("heading", { name: "What facts would you like to use?" })).toBeVisible({
+        timeout: 15_000,
+      });
 
-      await page.locator('input[type="checkbox"][aria-label^="Include"]').first().check();
-      await page.getByRole("button", { name: "Generate" }).click();
+      await page.locator('button[aria-label^="Include "]').first().click();
+      await page.getByRole("button", { name: /^Continue with 1 fact$/ }).click();
+      await page.getByRole("button", { name: /^One-page meeting brief:/ }).click();
+      await page.getByRole("button", { name: "Commissioner / staff" }).click();
+      await page.getByRole("button", { name: "Continue" }).click();
+      await page.getByRole("button", { name: "Create draft" }).click();
       await expect(page.getByText("What is happening?")).toBeVisible({ timeout: 15_000 });
 
       const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(scrollWidth2).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Copilot: search and ask remain usable", async ({ page }) => {
+    test("Copilot: action choice, place search, and a generated answer remain usable", async ({ page }) => {
       await page.goto("/copilot");
-      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("heading", { name: "What would you like help with?" })).toBeVisible({
+        timeout: 15_000,
+      });
 
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth, "Copilot must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+      expect(scrollWidth, "Copilot landing must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
+
+      await page.getByRole("button", { name: /^Explain a community:/ }).click();
+      await expect(page.getByLabel("Find a place")).toBeVisible();
+      await page.getByLabel("Find a place").fill("Gilroy");
+      await page.getByRole("button", { name: "Search" }).click();
+      await page.getByRole("button", { name: /Gilroy/ }).first().click();
+      await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
+      await page.getByRole("button", { name: "Create explanation" }).click();
+      await expect(page.getByRole("heading", { name: "Gilroy city" })).toBeVisible({ timeout: 15_000 });
+
+      scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(scrollWidth, "Copilot result must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
     });
   });
 }

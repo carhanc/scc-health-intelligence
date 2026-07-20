@@ -1,23 +1,30 @@
 import Link from "next/link";
 import { CountywideSnapshot, FreshnessSummary, PrioritySnapshot } from "./overview-snapshot";
 
+// Named after the platform's internal product model (docs/design/
+// health-equity-product-consolidation.md §3) -- Discover, Understand,
+// Compare, Prioritize, Act, Verify. Not rendered as a literal 6-step
+// wizard; these three cards are the entry points into the first three.
 const TASK_CARDS = [
   {
-    title: "Explore a community",
+    step: "Discover",
+    title: "Explore the map",
     description:
-      "Search Sunnyvale, San Jose, a supervisor district, or a census tract, and see its health, access, and resource picture.",
+      "Search Sunnyvale, San Jose, a supervisor district, or a census tract, and see its health equity picture.",
     href: "/explore",
     cta: "Start exploring",
   },
   {
-    title: "See where concerns overlap",
+    step: "Prioritize",
+    title: "See county priorities",
     description:
-      "View every tract ranked by combined health, access, and resource concern, and understand what drives each ranking.",
+      "View every tract ranked by combined concern, and understand what drives each ranking.",
     href: "/explore?tab=table",
     cta: "See the county ranking",
   },
   {
-    title: "Compare two places",
+    step: "Compare",
+    title: "Compare places",
     description:
       "Put two tracts, cities, or districts side by side and see exactly where and why they differ.",
     href: "/explore?compare=1",
@@ -51,15 +58,17 @@ const TRUST_POINTS = [
 export default function OverviewPage() {
   return (
     <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
-      {/* A. Product introduction */}
+      {/* A. Product introduction -- one heading, one short explanation,
+          not a paragraph restating what the cards below already show
+          (docs/design/health-equity-product-consolidation.md's global
+          page requirements). */}
       <section aria-labelledby="hero-heading" className="max-w-3xl">
         <h1 id="hero-heading" className="text-3xl font-semibold leading-tight text-[var(--color-text-primary)] sm:text-4xl">
-          Find where health needs and access barriers overlap in Santa Clara County
+          Understand health equity across Santa Clara County
         </h1>
         <p className="mt-3 text-base text-[var(--color-text-secondary)] sm:text-lg">
-          Explore public health, social, and resource data by neighborhood, understand what
-          drives each area&rsquo;s picture, and build evidence-backed questions for advocacy
-          and planning -- with sources and uncertainty shown at every step.
+          Explore how health needs, access barriers, resources, and local conditions differ from
+          one community to another.
         </p>
       </section>
 
@@ -75,7 +84,10 @@ export default function OverviewPage() {
               href={card.href}
               className="group flex flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-colors hover:border-[var(--color-interactive)]"
             >
-              <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-interactive)]">
+                {card.step}
+              </span>
+              <h3 className="mt-1 text-base font-semibold text-[var(--color-text-primary)]">
                 {card.title}
               </h3>
               <p className="mt-1.5 flex-1 text-sm text-[var(--color-text-secondary)]">

@@ -2,14 +2,23 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
+import { Card, DataModeBadge, ErrorState, LoadingRegion, MetricCard, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type FreshnessState } from "@/lib/api";
 
+const AVAILABLE_STATES: FreshnessState[] = ["newest_verified", "intentional_older"];
+const NEEDS_ATTENTION_STATES: FreshnessState[] = ["lagged", "stale"];
+const UNAVAILABLE_STATES: FreshnessState[] = ["draft", "unavailable"];
+
 /**
- * Plain-language summary of data coverage -- the full source-by-source
- * detail (publisher, vintage, license, live table preview) already
- * exists on the Data page; this panel summarizes and links out rather
- * than duplicating that 300+ line explorer.
+ * Plain-language answer to "Can I trust what I'm seeing?" -- three
+ * grouped statuses (Available and current / Needs attention /
+ * Unavailable) instead of six equal-sized cards, and a group is only
+ * shown when it actually has a source in it (docs/design/product-wide-
+ * flow-simplification-research.md "VALIDATE": "0 draft sources" doesn't
+ * deserve a dominant card if draft sources are never used). The full
+ * source-by-source detail (publisher, vintage, license, live table
+ * preview) already exists on the Data page; this panel summarizes and
+ * links out rather than duplicating that explorer.
  */
 export function CoveragePanel() {
   const query = useQuery({
@@ -44,32 +53,41 @@ export function CoveragePanel() {
     unavailable: 0,
   };
   for (const s of query.data.sources) counts[s.freshness_state]++;
+  const sum = (states: FreshnessState[]) => states.reduce((total, s) => total + counts[s], 0);
 
-  const unavailable = query.data.sources.filter((s) => s.freshness_state === "unavailable");
+  const availableCount = sum(AVAILABLE_STATES);
+  const needsAttentionCount = sum(NEEDS_ATTENTION_STATES);
+  const unavailableCount = sum(UNAVAILABLE_STATES);
+  const unavailableSources = query.data.sources.filter((s) => UNAVAILABLE_STATES.includes(s.freshness_state));
 
   return (
     <div className="space-y-4">
+      <h2 className="text-base font-semibold text-[var(--color-text-primary)]">Can I trust what I&apos;m seeing?</h2>
       <p className="text-sm text-[var(--color-text-secondary)]">
-        This platform draws on {query.data.sources.length} published data sources. In plain terms: most sources are
-        current and were published on their normal schedule; a source flagged &quot;overdue for refresh&quot; or
-        &quot;unavailable&quot; is disclosed here, not silently missing from the numbers you see elsewhere.
+        This platform draws on {query.data.sources.length} published data sources. Most are current and were
+        published on their normal schedule; anything overdue for refresh or unavailable is disclosed below,
+        not silently missing from the numbers you see elsewhere.
       </p>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Recently checked" value={counts.newest_verified} tone="success" />
-        <StatCard label="On normal schedule" value={counts.intentional_older} tone="neutral" />
-        <StatCard label="Refresh due soon" value={counts.lagged} tone="caution" />
-        <StatCard label="Overdue for refresh" value={counts.stale} tone="alert" />
-        <StatCard label="Draft (not used)" value={counts.draft} tone="alert" />
-        <StatCard label="Unavailable" value={counts.unavailable} tone="alert" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {availableCount > 0 && (
+          <MetricCard label="Available and current" value={availableCount} tone="success" />
+        )}
+        {needsAttentionCount > 0 && (
+          <MetricCard label="Needs attention" value={needsAttentionCount} tone="caution" />
+        )}
+        {unavailableCount > 0 && <MetricCard label="Unavailable" value={unavailableCount} tone="alert" />}
       </div>
 
-      {unavailable.length > 0 && (
+      {unavailableSources.length > 0 && (
         <Card>
-          <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Currently unavailable sources</h2>
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Currently unavailable sources</h3>
           <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
-            {unavailable.map((s) => (
-              <li key={s.source_id}>{s.publisher} -- {s.source_id}</li>
+            {unavailableSources.map((s) => (
+              <li key={s.source_id}>
+                <span className="font-medium text-[var(--color-text-primary)]">{s.publisher}</span>{" "}
+                <code className="text-xs text-[var(--color-text-tertiary)]">{s.source_id}</code>
+              </li>
             ))}
           </ul>
         </Card>
@@ -82,30 +100,5 @@ export function CoveragePanel() {
         . <DataModeBadge mode={query.data.warehouse_data_mode} />
       </p>
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "success" | "neutral" | "caution" | "alert";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-[var(--color-success)]"
-      : tone === "caution"
-        ? "text-[var(--color-caution-strong)]"
-        : tone === "alert"
-          ? "text-[var(--color-alert)]"
-          : "text-[var(--color-text-primary)]";
-  return (
-    <Card>
-      <div className={`text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</div>
-      <div className="text-xs text-[var(--color-text-secondary)]">{label}</div>
-    </Card>
   );
 }

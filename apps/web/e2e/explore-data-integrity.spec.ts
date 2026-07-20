@@ -1,6 +1,10 @@
 import { test, expect, request } from "@playwright/test";
 
 test.describe("Explore -- missing data is never rendered as zero", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  });
+
   test("a tract with a null score (if one exists in current live data) shows a dash, never 0", async ({ page }) => {
     // Look for a real tract the live data currently reports as unscored,
     // rather than mocking one -- consistent with this project's "never
@@ -42,11 +46,17 @@ test.describe("Explore -- missing data is never rendered as zero", () => {
     // Expand every domain disclosure and confirm no metric row shows a
     // bare "0" where the underlying value is actually absent -- every
     // metric row must show either a real number+unit or the literal text
-    // "No data".
-    const disclosures = page.locator("details");
-    const count = await disclosures.count();
+    // "No data". The "Domain breakdown" section (docs/design/health-
+    // equity-product-consolidation.md's progressive-disclosure
+    // requirement) now nests a per-domain <details> inside it, so this
+    // clicks every <summary> directly, in document order, rather than
+    // assuming exactly one summary per <details> -- clicking outermost
+    // to innermost this way opens each ancestor before its nested
+    // summaries are reached.
+    const summaries = page.locator("summary");
+    const count = await summaries.count();
     for (let i = 0; i < count; i++) {
-      await disclosures.nth(i).locator("summary").click();
+      await summaries.nth(i).click();
     }
     await expect(page.getByText(/^0$/)).toHaveCount(0);
   });

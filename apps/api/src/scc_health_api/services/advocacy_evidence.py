@@ -186,9 +186,17 @@ def build_scenario_score_evidence(
     return EvidenceItem(
         evidence_id=f"scenario_score:{scenario_id}:{'+'.join(sorted(tracts))}",
         category="scenario_score",
-        label=f"Combined priority score -- {scenario_label}",
+        # "Health equity screening score" matches the frontend's single
+        # canonical label (apps/web/packages/ui/src/ScreeningScore.tsx's
+        # SCREENING_SCORE_LABEL) -- kept in sync by convention since the
+        # two runtimes don't share a constant.
+        label=f"Health equity screening score -- {scenario_label}",
         value=(
-            f"{avg_score:.1f} / 100"
+            # Rounded to the nearest integer, matching every other
+            # surface's display convention (docs/methods/screening-score-
+            # interpretation.md §7) -- raw_value below retains full
+            # precision for anything that needs it.
+            f"{round(avg_score)} / 100"
             + (f" (average across {len(rows)} of {n} tracts)" if n > 1 else "")
         ),
         raw_value=avg_score,

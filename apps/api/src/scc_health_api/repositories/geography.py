@@ -368,6 +368,20 @@ def _table_exists(conn: duckdb.DuckDBPyConnection, schema: str, table: str) -> b
     return bool(row and row[0] > 0)
 
 
+# The 5 domains scored by every scenario (config/scenarios.yml). Listed
+# explicitly rather than discovered dynamically -- matches this module's
+# existing plain-SQL style (no dynamic pivot) and lets a schema-typo bug
+# in a domain name fail loudly (an unknown column) rather than silently
+# produce an empty layer.
+_DOMAIN_NAMES = (
+    "health_burden",
+    "access_barriers",
+    "environmental_burden",
+    "resource_accessibility",
+    "workforce_shortage",
+)
+
+
 def get_all_tract_boundaries_with_scores(
     conn: duckdb.DuckDBPyConnection, scenario_id: str | None
 ) -> list[dict[str, Any]]:
@@ -375,9 +389,19 @@ def get_all_tract_boundaries_with_scores(
     tract is always returned with its identity + geometry; score fields
     are only joined in when a scenario_id is supplied and analytics
     tables exist (never fabricated, never zero -- absent means "no
-    scoring data for this tract/scenario," not "zero concern")."""
+    scoring data for this tract/scenario," not "zero concern").
+
+    Also joins each tract's 5 domain scores from analytics.domain_scores
+    (DEC-073) -- unlike the composite score, domain scores carry no
+    scenario_id (verified directly against the warehouse: the table has
+    no scenario_id column, since a domain's percentile-scale score
+    doesn't depend on how domains are weighted against each other). This
+    powers the Explore map's per-domain layer switcher without any new
+    pipeline computation -- the table already exists and is already
+    populated by every `make data` run."""
     has_scores = bool(scenario_id) and _table_exists(conn, "analytics", "scenario_scores")
     has_stability = bool(scenario_id) and _table_exists(conn, "analytics", "stability_labels")
+    has_domain_scores = _table_exists(conn, "analytics", "domain_scores")
 
     if has_scores:
         score_join = (
@@ -402,29 +426,53 @@ def get_all_tract_boundaries_with_scores(
         stability_join = ""
         stability_col = "NULL AS stability_label"
 
+    if has_domain_scores:
+        domain_joins = "\n".join(
+            f"LEFT JOIN analytics.domain_scores d_{name} "
+            f"ON t.tract_geoid_2020 = d_{name}.tract_geoid_2020 AND d_{name}.domain = '{name}'"
+            for name in _DOMAIN_NAMES
+        )
+        domain_cols = ", ".join(f"d_{name}.score AS {name}_score" for name in _DOMAIN_NAMES)
+    else:
+        domain_joins = ""
+        domain_cols = ", ".join(f"NULL AS {name}_score" for name in _DOMAIN_NAMES)
+
     sql = f"""
         SELECT t.tract_geoid_2020, t.name_long, ST_AsGeoJSON(t.geometry),
-               {score_cols}, {stability_col}
+               {score_cols}, {stability_col}, {domain_cols}
         FROM geo.tracts t
         {score_join}
         {stability_join}
+        {domain_joins}
         ORDER BY t.tract_geoid_2020
     """
     rows = conn.execute(sql, params).fetchall()
 
     features = []
-    for tract_geoid, name_long, geometry_json, score, coverage_fraction, stability_label in rows:
+    for row in rows:
+        (
+            tract_geoid,
+            name_long,
+            geometry_json,
+            score,
+            coverage_fraction,
+            stability_label,
+            *domain_scores,
+        ) = row
+        properties = {
+            "tract_geoid_2020": tract_geoid,
+            "name": name_long,
+            "score": score,
+            "coverage_fraction": coverage_fraction,
+            "stability_label": stability_label,
+        }
+        for name, domain_score in zip(_DOMAIN_NAMES, domain_scores, strict=True):
+            properties[f"{name}_score"] = domain_score
         features.append(
             {
                 "type": "Feature",
                 "geometry": json.loads(geometry_json),
-                "properties": {
-                    "tract_geoid_2020": tract_geoid,
-                    "name": name_long,
-                    "score": score,
-                    "coverage_fraction": coverage_fraction,
-                    "stability_label": stability_label,
-                },
+                "properties": properties,
             }
         )
     return features

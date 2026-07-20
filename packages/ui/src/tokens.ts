@@ -16,22 +16,28 @@ export const CHART_PALETTE = [
   "#d55e00", // vermillion
 ] as const;
 
-/** Single-hue sequential scale (light -> dark) for concern-percentile
- * choropleths. Never red/green -- red is reserved for genuine alerts,
- * never an ordinary high percentile (docs/01_UX_UI_SPEC.md §2/§18). */
-export const MAP_SEQUENTIAL_SCALE = [
-  "#eef6f6",
-  "#cfe6e6",
-  "#a3cfd0",
-  "#6fb3b5",
-  "#3d9396",
-  "#0b6e75",
-  "#063f43",
+/** Five-stop concern gradient (lowest -> highest) for the Explore map
+ * choropleth and any other place-level "combined concern" indicator
+ * (DEC-072, docs/design/health-equity-ux-redesign.md §6). This is a
+ * deliberate reversal of an earlier single-hue "never red/green" rule
+ * -- see DEC-072 for the guardrails that replace it (explicit
+ * "Higher/Lower concern" legend text, non-color redundant cues on every
+ * use, this red kept as a distinct token from COLOR.alert). Keep in
+ * sync with apps/web/app/globals.css's --concern-scale-* properties. */
+export const CONCERN_SCALE = [
+  "#1a5c4a", // lowest concern
+  "#6a9b7f", // low-moderate
+  "#d8cfa8", // moderate (warm neutral)
+  "#e08f3c", // elevated
+  "#c0392b", // highest concern
 ] as const;
 
-/** Distinct neutral fill for tracts with no score for the current
- * scenario -- never part of the sequential scale, never zero. */
-export const MAP_NO_DATA_COLOR = "#e4e0d8";
+/** Distinct gray fill for tracts with no score for the current
+ * scenario -- never part of the concern scale, never a shade that
+ * could be mistaken for "lowest concern." Pair with a hatch pattern in
+ * the actual map paint layer so absence is structurally, not just
+ * chromatically, distinct. */
+export const CONCERN_NO_DATA_COLOR = "#d9d4cc";
 
 export const COLOR = {
   background: "#faf9f7",
@@ -56,13 +62,13 @@ export const COLOR = {
 } as const;
 
 /** Builds a MapLibre GL `interpolate` color-expression stop array for a
- * 0-100 concern percentile using the sequential scale above. */
+ * 0-100 concern percentile using the concern gradient above. */
 export function scoreColorExpression(
   propertyExpression: unknown[],
 ): (string | number | unknown[])[] {
-  const stopCount = MAP_SEQUENTIAL_SCALE.length;
+  const stopCount = CONCERN_SCALE.length;
   const stops: (string | number)[] = [];
-  MAP_SEQUENTIAL_SCALE.forEach((color, i) => {
+  CONCERN_SCALE.forEach((color, i) => {
     stops.push((i / (stopCount - 1)) * 100, color);
   });
   return ["interpolate", ["linear"], propertyExpression, ...stops];
