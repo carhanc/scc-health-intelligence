@@ -66,7 +66,10 @@ def test_generate_sections_formats_a_full_iso_timestamp_retrieved_at_as_a_plain_
 
     passthrough_item = _metric_evidence(retrieved_at="computed at analytics build time")
     passthrough_sections = generate_sections("Sunnyvale city", None, [passthrough_item], "")
-    assert "retrieved computed at analytics build time)" in passthrough_sections["sources_and_limitations"]
+    assert (
+        "retrieved computed at analytics build time)"
+        in passthrough_sections["sources_and_limitations"]
+    )
 
 
 def test_generate_sections_never_omits_evidence_from_the_supports_section() -> None:
