@@ -8,12 +8,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => {
   test("starting from Explore lands directly on Evidence with a plain-English confirmation, not the Place step", async ({
     page,
-    isMobile,
   }) => {
     await page.goto("/explore?geography=tract&id=06085500100");
-    if (isMobile) {
-      await page.getByRole("button", { name: /Tap to view its full profile|concern/ }).click();
-    }
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
 
@@ -89,12 +85,8 @@ test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => 
 
   test("adding evidence a second time, with a real project already open, asks which project it belongs to", async ({
     page,
-    isMobile,
   }) => {
     await page.goto("/explore?geography=tract&id=06085500100");
-    if (isMobile) {
-      await page.getByRole("button", { name: /Tap to view its full profile|concern/ }).click();
-    }
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });

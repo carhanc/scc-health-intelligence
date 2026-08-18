@@ -30,12 +30,12 @@ test.describe("Overview", () => {
   test("primary task cards navigate to the correct Explore states", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Explore the map" }).click();
+    await page.getByRole("link", { name: "Explore a community" }).click();
     await expect(page).toHaveURL(/\/explore$/);
 
     await page.goto("/");
     await page.getByRole("link", { name: "See county priorities" }).click();
-    await expect(page).toHaveURL(/\/explore\?tab=table/);
+    await expect(page).toHaveURL(/\/explore$/);
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
 
     await page.goto("/");
