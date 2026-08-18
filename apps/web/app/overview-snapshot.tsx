@@ -142,9 +142,18 @@ export function PrioritySnapshot() {
                   <RankContext rank={rec.rank} total={totalTractsQuery.data.total_tracts} />
                 </div>
               )}
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Top driver: {rec.supporting_evidence[0]?.label ?? "see full breakdown"}
-              </p>
+              {rec.supporting_evidence[0] ? (
+                <>
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    Top driver: {rec.supporting_evidence[0].label}
+                    {rec.supporting_evidence[0].raw_value !== null &&
+                      ` (${rec.supporting_evidence[0].raw_value.toLocaleString()} ${rec.supporting_evidence[0].unit})`}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-tertiary)]">{rec.supporting_evidence[0].citation}</p>
+                </>
+              ) : (
+                <p className="text-xs text-[var(--color-text-secondary)]">Top driver: see full breakdown</p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {rec.stability_label && <StabilityBadge label={rec.stability_label} />}

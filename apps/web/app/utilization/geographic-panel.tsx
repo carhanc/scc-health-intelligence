@@ -6,7 +6,16 @@ import { Badge, DataModeBadge, DataTable, ErrorState, LoadingRegion, SkeletonTex
 import { api, ApiError, type TractUtilization, type ZipObservedEncounters } from "@/lib/api";
 import { crosswalkQualityLabel, pattypeGroupLabel, rateReliabilityLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
+import { useSourcesById } from "@/lib/use-sources";
+import { SourceCitationLine } from "../source-citation";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
+
+// Both tables (the modeled tract allocation and the observed ZIP counts)
+// trace to the same single upstream HCAI file -- consistent with how
+// FacilityPanel and TrendsPanel already cite this dataset elsewhere in
+// Utilization, rather than the plain "HCAI" prose these two tables had
+// with no link.
+const HCAI_PATIENT_ORIGIN_SOURCE_ID = "hcai_patient_origin_market_share";
 
 /**
  * Geographic view: two DISTINCT, never-merged tables -- real observed
@@ -26,6 +35,7 @@ export function GeographicPanel() {
 
 function TractSection() {
   const tractNames = useTractNames();
+  const sourcesById = useSourcesById();
   const query = useQuery({
     queryKey: ["utilization-tracts"],
     queryFn: () => api.getTractUtilizationList({ order: "rate_desc", limit: 408 }),
@@ -164,6 +174,13 @@ function TractSection() {
         {lowReliability.length} have a flagged, unreliable estimate because area-based allocation
         breaks down for a few large, sparsely-populated tracts. <DataModeBadge mode={query.data.data_mode} />
       </p>
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+        <SourceCitationLine
+          sourceId={HCAI_PATIENT_ORIGIN_SOURCE_ID}
+          fallbackText="HCAI, patient origin market share, 2024"
+          sourcesById={sourcesById}
+        />
+      </p>
 
       <div className="mt-3">
         <DataTable
@@ -179,6 +196,7 @@ function TractSection() {
 }
 
 function ZipSection() {
+  const sourcesById = useSourcesById();
   const query = useQuery({
     queryKey: ["utilization-zips"],
     queryFn: () => api.getZipObserved(),
@@ -226,6 +244,13 @@ function ZipSection() {
         encounters among Santa Clara County residents, by the patient&apos;s own ZIP code -- HCAI&apos;s
         actual published geography, before any allocation to tracts.{" "}
         <DataModeBadge mode={query.data.data_mode} />
+      </p>
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+        <SourceCitationLine
+          sourceId={HCAI_PATIENT_ORIGIN_SOURCE_ID}
+          fallbackText="HCAI, patient origin market share, 2024"
+          sourcesById={sourcesById}
+        />
       </p>
 
       <div className="mt-3">

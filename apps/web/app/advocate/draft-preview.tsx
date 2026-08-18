@@ -108,9 +108,19 @@ export function DraftPreview({
   }
 
   function handleDownloadCsv() {
-    const header = "evidence_id,label,value,data_status,publisher,source_vintage,citation,limitation";
+    const header = "evidence_id,label,value,data_status,publisher,source_vintage,source_url,citation,limitation";
     const rows = brief.evidence_used.map((e) =>
-      [e.evidence_id, e.label, e.value, e.data_status, e.publisher, e.source_vintage, e.citation, e.limitation ?? ""]
+      [
+        e.evidence_id,
+        e.label,
+        e.value,
+        e.data_status,
+        e.publisher,
+        e.source_vintage,
+        e.source_url ?? "",
+        e.citation,
+        e.limitation ?? "",
+      ]
         .map((field) => `"${String(field).replace(/"/g, '""')}"`)
         .join(","),
     );
@@ -218,7 +228,19 @@ export function DraftPreview({
                 {brief.evidence_used.map((e) => (
                   <li key={e.evidence_id} className="text-xs text-[var(--color-text-secondary)]">
                     <span className="font-medium text-[var(--color-text-primary)]">{e.label}</span> --{" "}
-                    {e.publisher}, {e.source_vintage}
+                    {e.source_url ? (
+                      <a
+                        href={e.source_url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="font-medium text-[var(--color-interactive)] underline underline-offset-2 print:no-underline print:text-inherit"
+                      >
+                        {e.publisher}
+                      </a>
+                    ) : (
+                      e.publisher
+                    )}
+                    , {e.source_vintage}
                     {e.limitation && <>. {e.limitation}</>}
                   </li>
                 ))}
