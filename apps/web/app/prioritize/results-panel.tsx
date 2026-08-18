@@ -17,10 +17,11 @@ import {
   ScreeningScore,
   SCREENING_SCORE_LABEL,
 } from "@scc-health/ui";
-import { api, ApiError, type CustomDomainContribution, type StabilityLabel } from "@/lib/api";
+import { api, ApiError, type CustomDomainContribution, type MemoDomainLine, type StabilityLabel } from "@/lib/api";
 import { domainLabel } from "@/lib/labels";
 import { useTractNames } from "@/lib/use-tract-names";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
+import { WeightBreakdown } from "../weight-breakdown";
 import { RankedAreaCard, type RankedAreaCardData } from "./ranked-area-card";
 
 // The concise default view shows this many areas as cards; "View all 408
@@ -74,13 +75,19 @@ export function ResultsPanel({
 
   // Real top-factor drivers for a NAMED scenario's top areas -- a custom
   // weighting already carries domain_contributions per tract in its own
-  // response, so this second request only fires for named scenarios, and
-  // only once (not per card, not per interaction).
+  // response, so this second request only fires for named scenarios. Its
+  // top_n grows to cover every tract once "View all" is open (a single,
+  // deliberate, user-initiated request, not one per row/interaction) so
+  // "Show drivers" never dead-ends on a tract outside the concise top 10.
   const memoQuery = useQuery({
-    queryKey: ["prioritize-memo-top-factors", scenarioSelection.kind === "named" ? scenarioSelection.scenarioId : null],
+    queryKey: [
+      "prioritize-memo-top-factors",
+      scenarioSelection.kind === "named" ? scenarioSelection.scenarioId : null,
+      showAll,
+    ],
     queryFn: () =>
       scenarioSelection.kind === "named"
-        ? api.getDecisionMemo({ scenarioId: scenarioSelection.scenarioId }, DEFAULT_VISIBLE_COUNT)
+        ? api.getDecisionMemo({ scenarioId: scenarioSelection.scenarioId }, showAll ? 408 : DEFAULT_VISIBLE_COUNT)
         : Promise.reject(new Error("not a named scenario")),
     enabled: scenarioSelection.kind === "named",
     retry: 1,
@@ -287,6 +294,8 @@ export function ResultsPanel({
             row={expandedRow}
             name={tractNames.get(expandedRow.tract_geoid_2020) ?? null}
             scenarioId={scenarioId}
+            weightsUsed={memoQuery.data?.weights_used}
+            topDomains={memoByTract.get(expandedRow.tract_geoid_2020)?.top_domains}
           />
         </div>
       )}
@@ -306,10 +315,14 @@ function ExplainCard({
   row,
   name,
   scenarioId,
+  weightsUsed,
+  topDomains,
 }: {
   row: RankedRow;
   name: string | null;
   scenarioId: string | null;
+  weightsUsed?: Record<string, number>;
+  topDomains?: MemoDomainLine[];
 }) {
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-4">
@@ -330,9 +343,40 @@ function ExplainCard({
               </li>
             ))}
         </ul>
+      ) : weightsUsed || (topDomains && topDomains.length > 0) ? (
+        <div className="mt-2 space-y-3">
+          {weightsUsed && (
+            <div>
+              <p className="text-xs font-medium text-[var(--color-text-secondary)]">This scenario's weighting:</p>
+              <div className="mt-1.5">
+                <WeightBreakdown weights={weightsUsed} compact />
+              </div>
+            </div>
+          )}
+          {topDomains && topDomains.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+                What's driving this tract's score:
+              </p>
+              <ul className="mt-1.5 space-y-1.5">
+                {[...topDomains]
+                  .sort((a, b) => b.contribution - a.contribution)
+                  .map((d) => (
+                    <li key={d.domain} className="flex items-center justify-between text-xs">
+                      <span className="text-[var(--color-text-secondary)]">{d.label}</span>
+                      <span className="tabular-nums text-[var(--color-text-primary)]">
+                        {d.domain_score.toFixed(0)} score, contributed{" "}
+                        <strong className="font-semibold">{d.contribution.toFixed(1)} pts</strong>
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+        </div>
       ) : (
         <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-          Domain-by-domain drivers for a named scenario are shown in Explore's full evidence view.
+          Domain-by-domain drivers for this tract are still loading.
         </p>
       )}
       {row.domains_missing.length > 0 && (
