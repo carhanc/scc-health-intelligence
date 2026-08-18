@@ -35,7 +35,7 @@ test.describe("Overview", () => {
 
     await page.goto("/");
     await page.getByRole("link", { name: "See county priorities" }).click();
-    await expect(page).toHaveURL(/\/explore$/);
+    await expect(page).toHaveURL(/\/explore\?tab=table/);
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
 
     await page.goto("/");

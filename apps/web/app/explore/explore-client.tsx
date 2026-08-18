@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { SkeletonText } from "@scc-health/ui";
 import { SearchPanel } from "./search-panel";
 import { ExploreTable } from "./explore-table";
 import { GeographyDetail } from "./geography-detail";
@@ -17,17 +19,39 @@ import { DEFAULT_WEIGHTS } from "../prioritize/weight-sliders";
 
 const DEFAULT_SCENARIO_ID = "default_integrated_screen_v1";
 
+// MapLibre touches window/canvas at module load time -- must stay
+// client-only. Only loaded once the browse view actually needs it (a
+// tract is not yet selected), never while a full profile is open.
+const ExploreMap = dynamic(() => import("./explore-map").then((m) => m.ExploreMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[420px] w-full items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-sunken)]">
+      <SkeletonText lines={2} className="w-48" />
+    </div>
+  ),
+});
+
+type BrowseView = "map" | "table";
+
 /** Explore's job is to understand ONE place deeply -- browsing/ranking
- * every tract at once is Prioritize's job, not this page's. The map that
- * used to sit here was removed after direct, repeated feedback that its
- * relationship to the screening view was unclear and it added visual
- * noise without a clear payoff; the sortable table already does the
- * "see and pick a tract" job the map did, and removing it frees the full
- * page width for a much less cramped selected-place profile. */
+ * every tract at once is Prioritize's job, not this page's. The map is
+ * the visual way to find that one place: it shows exactly the same
+ * scores as the current screening view above it (never a different
+ * calculation), and clicking a tract opens the same full profile a
+ * search or table row would. It stays scoped to the "browsing" state --
+ * once a tract is selected, the page shows that tract's full profile
+ * instead of competing with it for space, with a clear way back to
+ * browsing. */
 export function ExploreClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showChangeView, setShowChangeView] = useState(false);
+  // "See county priorities" on Overview deep-links straight to the
+  // ranked table (?tab=table); every other entry point defaults to the
+  // map, which is the primary way to find one place.
+  const [browseView, setBrowseView] = useState<BrowseView>(
+    searchParams.get("tab") === "table" ? "table" : "map",
+  );
 
   const selected: SelectedGeography | null = parseSelectedGeographyFromParams(
     searchParams.get("geography"),
@@ -162,14 +186,65 @@ export function ExploreClient() {
             onSelect={handleGeographySelect}
           />
           <div className="mt-5">
-            <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Or browse all 408 tracts</h2>
-            <div className="mt-2.5">
-              <ExploreTable
-                scenarioId={scenarioId}
-                selectedTractId={null}
-                onSelectTract={handleGeographySelect}
-              />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Or browse all 408 tracts</h2>
+              <div
+                role="group"
+                aria-label="Browse view"
+                className="flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] text-xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => setBrowseView("map")}
+                  aria-pressed={browseView === "map"}
+                  className={`px-3 py-1.5 font-medium ${
+                    browseView === "map"
+                      ? "bg-[var(--color-interactive)] text-[var(--color-text-on-interactive)]"
+                      : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
+                  }`}
+                >
+                  Map
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBrowseView("table")}
+                  aria-pressed={browseView === "table"}
+                  className={`border-l border-[var(--color-border)] px-3 py-1.5 font-medium ${
+                    browseView === "table"
+                      ? "bg-[var(--color-interactive)] text-[var(--color-text-on-interactive)]"
+                      : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
+                  }`}
+                >
+                  Table
+                </button>
+              </div>
             </div>
+            {browseView === "map" ? (
+              <div className="mt-2.5">
+                <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+                  Shaded by <strong className="font-medium text-[var(--color-text-primary)]">{currentViewLabel}</strong>
+                  &rsquo;s score (same weighting shown above) &mdash; click any tract to open its full profile. A
+                  fully keyboard- and screen-reader-operable table with the same data is available in{" "}
+                  <button
+                    type="button"
+                    onClick={() => setBrowseView("table")}
+                    className="text-[var(--color-interactive)] underline underline-offset-2"
+                  >
+                    Table view
+                  </button>
+                  .
+                </p>
+                <ExploreMap scenarioId={scenarioId} selected={selected} onSelect={handleGeographySelect} />
+              </div>
+            ) : (
+              <div className="mt-2.5">
+                <ExploreTable
+                  scenarioId={scenarioId}
+                  selectedTractId={null}
+                  onSelectTract={handleGeographySelect}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

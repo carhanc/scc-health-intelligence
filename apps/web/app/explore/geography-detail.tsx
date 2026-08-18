@@ -35,6 +35,7 @@ import { GLOSSARY } from "@/lib/glossary";
 import { useSourcesById } from "@/lib/use-sources";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
 import { SourceCitationLine } from "../source-citation";
+import { CitedValue } from "../cited-value";
 import { concernBandLabel, domainComparisonPhrase } from "./layers";
 
 export function GeographyDetail({
@@ -104,8 +105,8 @@ function ExploreOrientation() {
             2
           </span>
           <span>
-            <strong className="font-medium text-[var(--color-text-primary)]">Select a tract</strong> from the table
-            below to open its full profile.
+            <strong className="font-medium text-[var(--color-text-primary)]">Select a tract</strong> on the map or
+            table below to open its full profile.
           </span>
         </li>
         <li className="flex gap-2.5">
@@ -569,7 +570,13 @@ function SimpleDriverRow({
     <li>
       <span className="text-sm font-medium text-[var(--color-text-primary)]">{metric.label}</span>
       <p className="text-sm text-[var(--color-text-secondary)]">
-        {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
+        {metric.raw_value !== null ? (
+          <CitedValue sourceId={metric.source_id} sourcesById={sourcesById}>
+            {metric.raw_value.toLocaleString()} {metric.unit}
+          </CitedValue>
+        ) : (
+          "No data"
+        )}
         {metric.percentile !== null && (
           <> · {domainComparisonPhrase(metric.percentile).toLowerCase()}</>
         )}
@@ -605,7 +612,13 @@ function DriverRow({
         </Badge>
       </div>
       <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-        {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
+        {metric.raw_value !== null ? (
+          <CitedValue sourceId={metric.source_id} sourcesById={sourcesById}>
+            {metric.raw_value.toLocaleString()} {metric.unit}
+          </CitedValue>
+        ) : (
+          "No data"
+        )}
         {metric.percentile !== null && (
           <>
             {" "}
@@ -786,7 +799,13 @@ function DomainDisclosure({
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <span className="font-medium text-[var(--color-text-primary)]">{metric.label}</span>
               <span className="tabular-nums text-[var(--color-text-secondary)]">
-                {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
+                {metric.raw_value !== null ? (
+                  <CitedValue sourceId={metric.source_id} sourcesById={sourcesById}>
+                    {metric.raw_value.toLocaleString()} {metric.unit}
+                  </CitedValue>
+                ) : (
+                  "No data"
+                )}
               </span>
             </div>
             <PercentileBar
@@ -846,7 +865,13 @@ function EvidenceContent({
                 <tr key={metric.metric_id} className="border-b border-[var(--color-border)]">
                   <td className="py-1.5 pr-2">{metric.label}</td>
                   <td className="py-1.5 pr-2 tabular-nums">
-                    {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
+                    {metric.raw_value !== null ? (
+                      <CitedValue sourceId={metric.source_id} sourcesById={sourcesById}>
+                        {metric.raw_value.toLocaleString()} {metric.unit}
+                      </CitedValue>
+                    ) : (
+                      "No data"
+                    )}
                   </td>
                   <td className="py-1.5 text-[var(--color-text-secondary)]">
                     <SourceCitationLine

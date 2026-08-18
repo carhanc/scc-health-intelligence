@@ -17,8 +17,19 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Explore (initial browse table, no selection) has no serious or critical violations", async ({ page }) => {
+  test("Explore (initial map browse view, no selection) has no serious or critical violations", async ({ page }) => {
     await page.goto("/explore");
+    await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
+      timeout: 15_000,
+    });
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+
+  test("Explore (browse table view, no selection) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/explore");
+    await page.getByRole("button", { name: "Table", exact: true }).click();
     await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");

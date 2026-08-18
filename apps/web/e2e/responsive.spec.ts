@@ -69,10 +69,21 @@ for (const bp of BREAKPOINTS) {
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
     });
 
+    test("Explore browse map: the default map view does not overflow horizontally", async ({ page }) => {
+      await page.goto("/explore");
+      await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
+        timeout: 15_000,
+      });
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+    });
+
     test("Explore browse table: table remains readable (horizontally scrollable if needed, not clipped)", async ({
       page,
     }) => {
       await page.goto("/explore");
+      await page.getByRole("button", { name: "Table", exact: true }).click();
       const table = page.getByRole("table");
       await expect(table).toBeVisible({ timeout: 15_000 });
       // A data table with many columns may legitimately need its own

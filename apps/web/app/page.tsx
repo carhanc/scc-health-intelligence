@@ -19,7 +19,7 @@ const TASK_CARDS = [
     title: "See county priorities",
     description:
       "View every tract ranked by combined concern, and understand what drives each ranking.",
-    href: "/explore",
+    href: "/explore?tab=table",
     cta: "See the county ranking",
   },
   {
