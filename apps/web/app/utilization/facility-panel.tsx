@@ -14,6 +14,8 @@ import {
 } from "@scc-health/ui";
 import { api, ApiError, type UtilFacilitySummary } from "@/lib/api";
 import { dispositionKeyLabel, languageKeyLabel, payerKeyLabel } from "@/lib/labels";
+import { useSourcesById } from "@/lib/use-sources";
+import { SourceCitationLine } from "../source-citation";
 
 /**
  * Facility view: real, observed HCAI ED-characteristics data for every
@@ -23,6 +25,7 @@ import { dispositionKeyLabel, languageKeyLabel, payerKeyLabel } from "@/lib/labe
  */
 export function FacilityPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const sourcesById = useSourcesById();
 
   const listQuery = useQuery({
     queryKey: ["utilization-facilities"],
@@ -95,7 +98,13 @@ export function FacilityPanel() {
       </p>
       <p className="text-sm text-[var(--color-text-secondary)]">
         Real, observed 2024 emergency-department characteristics reported by each Santa Clara
-        County facility to HCAI. Select a row to see its payer mix, disposition pattern, and
+        County facility to{" "}
+        <SourceCitationLine
+          sourceId="hcai_ed_facility_profile"
+          fallbackText="HCAI"
+          sourcesById={sourcesById}
+        />
+        . Select a row to see its payer mix, disposition pattern, and
         language breakdown. <DataModeBadge mode={listQuery.data.data_mode} />
       </p>
       <p className="text-xs text-[var(--color-text-tertiary)]">

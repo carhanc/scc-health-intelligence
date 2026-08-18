@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { CUSTOM_SCENARIO_ID } from "./scenario-selector";
 import { DEFAULT_WEIGHTS, normalizeWeights } from "./weight-sliders";
 import { FocusPicker } from "../focus-picker";
+import { WeightBreakdown } from "../weight-breakdown";
 import { TaskPageHeader } from "../task-page-header";
 import { ResultsPanel } from "./results-panel";
 import { ConstraintsPanel } from "./constraints-panel";
@@ -65,6 +66,9 @@ export function PrioritizeClient() {
     (scenariosQuery.data?.scenarios ?? []).map((s) => [s.scenario_id, s.label]),
   );
   const currentFocusLabel = isCustom ? "Custom focus" : (scenarioLabels[scenarioId] ?? "Health equity overview");
+  const currentWeights = isCustom
+    ? normalizeWeights(customWeights)
+    : scenariosQuery.data?.scenarios.find((s) => s.scenario_id === scenarioId)?.weights;
 
   const scenarioSelection = isCustom
     ? ({ kind: "custom" as const, weights: normalizeWeights(customWeights) })
@@ -77,16 +81,23 @@ export function PrioritizeClient() {
         purpose="See which census tracts show the highest overlapping screening concern under the selected view. This is a screening tool, not a prediction or a guarantee that any specific intervention would help."
       />
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium text-[var(--color-text-primary)]">{currentFocusLabel}</span>
-        <button
-          type="button"
-          onClick={() => setShowAdjust((v) => !v)}
-          aria-expanded={showAdjust}
-          className="font-medium text-[var(--color-interactive)] hover:underline"
-        >
-          {showAdjust ? "Hide priorities" : "Adjust priorities"}
-        </button>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-medium text-[var(--color-text-primary)]">{currentFocusLabel}</span>
+          <button
+            type="button"
+            onClick={() => setShowAdjust((v) => !v)}
+            aria-expanded={showAdjust}
+            className="font-medium text-[var(--color-interactive)] hover:underline"
+          >
+            {showAdjust ? "Hide priorities" : "Adjust priorities"}
+          </button>
+        </div>
+        {currentWeights && (
+          <div className="w-full max-w-sm sm:w-auto sm:min-w-[280px]">
+            <WeightBreakdown weights={currentWeights} compact />
+          </div>
+        )}
       </div>
 
       {showAdjust && (

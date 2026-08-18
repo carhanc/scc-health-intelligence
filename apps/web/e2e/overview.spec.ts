@@ -30,7 +30,7 @@ test.describe("Overview", () => {
   test("primary task cards navigate to the correct Explore states", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Explore the map" }).click();
+    await page.getByRole("link", { name: "Explore a community" }).click();
     await expect(page).toHaveURL(/\/explore$/);
 
     await page.goto("/");

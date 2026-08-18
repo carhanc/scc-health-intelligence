@@ -8,29 +8,20 @@ import { test, expect } from "@playwright/test";
  * respectively.
  */
 test.describe("Usability Task 3 -- compare two cities", () => {
-  // Asserts on the desktop-inline detail panel; below the 1280px xl
-  // breakpoint the same content lives behind a collapsed mobile summary
-  // bar (MobileSelectedSheet), covered separately in
-  // explore-mobile-sheet.spec.ts.
-  test.beforeEach(async ({ isMobile }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
-  });
-
   test("San Jose and Sunnyvale: select a representative tract from each and compare them", async ({ page }) => {
     // Comparisons work tract-to-tract (scores are tract-level, not
-    // aggregated to a city) -- the realistic path is: find a city, let
-    // the map pan/outline it, click one of its tracts, then compare.
+    // aggregated to a city) -- the realistic path is: find a city, then
+    // drill into one of its real highest-concern tracts, then compare.
     await page.goto("/explore");
     await page.getByLabel("Find a place").fill("San Jose");
     await page.getByRole("button", { name: "Search" }).click();
     await page.getByRole("button", { name: /San Jose/ }).first().click();
-    await expect(page.getByText(/dashed outline shows/)).toBeVisible({ timeout: 10_000 });
+    const drillDownHeading = page.getByText(/Highest-concern areas in San Jose/);
+    await expect(drillDownHeading).toBeVisible({ timeout: 10_000 });
 
-    const mapRegion = page.getByRole("application", { name: /Map of Santa Clara County/ });
-    await page.waitForTimeout(1500);
-    const box = await mapRegion.boundingBox();
-    if (!box) throw new Error("map region has no bounding box");
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    // Scoped to the list right after this heading -- the search box
+    // above renders its own <ul><button> results list too.
+    await drillDownHeading.locator("xpath=following-sibling::ul[1]").getByRole("button").first().click();
     await expect(page).toHaveURL(/geography=tract&id=06085\d{6}/, { timeout: 10_000 });
 
     await page.getByRole("button", { name: "Compare" }).click();
@@ -50,10 +41,6 @@ test.describe("Usability Task 3 -- compare two cities", () => {
 });
 
 test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", () => {
-  test.beforeEach(async ({ isMobile }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
-  });
-
   test("the stability badge and its explanation are visible right next to the headline result, not buried", async ({
     page,
   }) => {
@@ -80,10 +67,6 @@ test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", ()
 });
 
 test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limitations", () => {
-  test.beforeEach(async ({ isMobile }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
-  });
-
   test("the evidence drawer lists a source citation for every metric, and each domain disclosure shows its limitation", async ({
     page,
   }) => {
@@ -91,7 +74,13 @@ test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limit
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
 
     // Path A: expand a domain and read one metric's limitation inline.
-    await page.locator("details summary").first().click();
+    // Scoped to the first <details> after the "Conditions" heading --
+    // the map's own MapLibre attribution control is itself a native
+    // <details><summary> element and, now that the map stays mounted on
+    // this page, would otherwise win a page-wide `.first()` lookup ahead
+    // of the real domain disclosures.
+    const conditionsHeading = page.getByText("Conditions that may shape health equity here");
+    await conditionsHeading.locator("xpath=following::details[1]/summary").click();
     await expect(page.getByText(/Limitation:/).first()).toBeVisible();
 
     // Path B: the evidence drawer -- every metric row must show a
@@ -108,10 +97,6 @@ test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limit
 });
 
 test.describe("Usability Task 7 -- understand what the platform cannot conclude", () => {
-  test.beforeEach(async ({ isMobile }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
-  });
-
   test("the Overview trust section and the tract score panel both state the non-causal, screening-only framing in plain language", async ({
     page,
   }) => {

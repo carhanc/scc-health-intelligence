@@ -184,7 +184,19 @@ function EvidenceCard({
           <p className="text-sm font-medium text-[var(--color-text-primary)]">{item.label}</p>
           <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">{item.value}</p>
           <p className="mt-1.5 text-xs text-[var(--color-text-tertiary)]">
-            Source: {item.publisher}
+            Source:{" "}
+            {item.source_url ? (
+              <a
+                href={item.source_url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="font-medium text-[var(--color-interactive)] underline underline-offset-2"
+              >
+                {item.publisher}
+              </a>
+            ) : (
+              item.publisher
+            )}
             {" · "}
             <span title={dataStatusDefinition(item.data_status)}>{dataStatusLabel(item.data_status)}</span>
             {item.limitation && ` · ${item.limitation}`}

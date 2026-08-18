@@ -1,58 +1,64 @@
 "use client";
 
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SegmentedControl, SkeletonText, ScreeningScore } from "@scc-health/ui";
-import { api, type TractBoundaryFeatureProperties } from "@/lib/api";
-import { useMediaQuery } from "@/lib/use-media-query";
+import { api } from "@/lib/api";
+import { SkeletonText } from "@scc-health/ui";
 import { SearchPanel } from "./search-panel";
 import { ExploreTable } from "./explore-table";
-import { GeographyDetail, MobileSelectedSheet } from "./geography-detail";
+import { GeographyDetail } from "./geography-detail";
 import { ComparisonPanel } from "./comparison-panel";
 import { parseSelectedGeographyFromParams, type SelectedGeography } from "./selection";
-import { MAP_LAYERS } from "./layers";
-
-const ExploreMap = dynamic(() => import("./explore-map").then((m) => m.ExploreMap), {
-  ssr: false,
-  loading: () => <SkeletonText lines={6} className="h-[480px]" />,
-});
+import { FocusPicker } from "../focus-picker";
+import { WeightBreakdown } from "../weight-breakdown";
+import { CUSTOM_SCENARIO_ID } from "../prioritize/scenario-selector";
+import { DEFAULT_WEIGHTS } from "../prioritize/weight-sliders";
 
 const DEFAULT_SCENARIO_ID = "default_integrated_screen_v1";
 
+// MapLibre touches window/canvas at module load time -- must stay
+// client-only. Only loaded once the browse view actually needs it (a
+// tract is not yet selected), never while a full profile is open.
+const ExploreMap = dynamic(() => import("./explore-map").then((m) => m.ExploreMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[420px] w-full items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-sunken)]">
+      <SkeletonText lines={2} className="w-48" />
+    </div>
+  ),
+});
+
+type BrowseView = "map" | "table";
+
+/** Explore's job is to understand ONE place deeply -- browsing/ranking
+ * every tract at once is Prioritize's job, not this page's. The map is
+ * the visual way to find that one place: it shows exactly the same
+ * scores as the current screening view above it (never a different
+ * calculation), and clicking a tract opens the same full profile a
+ * search or table row would. It stays scoped to the "browsing" state --
+ * once a tract is selected, the page shows that tract's full profile
+ * instead of competing with it for space, with a clear way back to
+ * browsing. */
 export function ExploreClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Matches the lg breakpoint the sidebar+map grid itself activates at
-  // (1024px, see the grid comment below) -- below it, a selected
-  // geography opens in a bottom sheet instead of the inline sidebar
-  // profile, since the tall inline panel is what pushed the map far down
-  // the page on mobile before the first redesign pass (fixed for the
-  // *search box* then; the *selected-profile* panel had the same
-  // underlying "very long single column" problem, addressed there and
-  // preserved here). The two-surface sidebar+map layout (vs. the prior
-  // three-column one) needs only one fixed-width column, so it can
-  // activate at a narrower breakpoint than before -- more devices get
-  // the map-dominant desktop experience, not just very wide screens.
-  const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
+  const [showChangeView, setShowChangeView] = useState(false);
+  // "See county priorities" on Overview deep-links straight to the
+  // ranked table (?tab=table); every other entry point defaults to the
+  // map, which is the primary way to find one place.
+  const [browseView, setBrowseView] = useState<BrowseView>(
+    searchParams.get("tab") === "table" ? "table" : "map",
+  );
 
-  // Lifted from ExploreMap so the sidebar's "Quick preview" can render
-  // hovered-tract data while nothing is selected -- in that state the
-  // map itself stays completely unobscured (no floating hover card),
-  // per docs/design/final-score-map-and-intuitiveness-review.md's
-  // hover/selection interaction model.
-  const [hoveredTract, setHoveredTract] = useState<TractBoundaryFeatureProperties | null>(null);
-
-  // Only a well-formed, in-county canonical GEOID is ever treated as a
-  // real selection -- this is what stops a malformed or hand-edited URL
-  // from reaching the profile API (Phase 5 hotfix: see selection.ts).
   const selected: SelectedGeography | null = parseSelectedGeographyFromParams(
     searchParams.get("geography"),
     searchParams.get("id"),
   );
   const scenarioId = searchParams.get("scenario") ?? DEFAULT_SCENARIO_ID;
-  const view = (searchParams.get("tab") as "map" | "table" | null) ?? "map";
+  const isCustom = scenarioId === CUSTOM_SCENARIO_ID;
   const comparing = searchParams.get("compare") === "1";
 
   const scenariosQuery = useQuery({
@@ -74,9 +80,6 @@ export function ExploreClient() {
     [router, searchParams],
   );
 
-  // The one canonical selection entry point -- map, table, and search all
-  // call this with the same SelectedGeography shape, so they can never
-  // again disagree about what a "selection" is (Phase 5 hotfix).
   function handleGeographySelect(selection: SelectedGeography) {
     updateParams({ geography: selection.geographyType, id: selection.geoid, compare: null });
   }
@@ -86,173 +89,181 @@ export function ExploreClient() {
   }
 
   const activeScenario = scenariosQuery.data?.scenarios.find((s) => s.scenario_id === scenarioId);
+  const currentViewLabel = isCustom ? "Custom view" : (activeScenario?.label ?? "Health equity overview");
 
   return (
     <div className="mx-auto max-w-[var(--container-max)] px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
-      {/* Compact header -- a page title, the scenario picker (this is the
-          one control that changes the computed score itself, so it
-          belongs at page level, not buried in the sidebar), and the
-          Map/Table toggle, in place of the prior six stacked
-          label+control+description rows a user had to read past before
-          any map content appeared (docs/design/
-          health-equity-product-consolidation.md §2/§7). */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-[var(--color-text-primary)] sm:text-2xl">Explore health equity</h1>
-        <SegmentedControl
-          label="View"
-          value={view}
-          onChange={(value) => updateParams({ tab: value === "map" ? null : value })}
-          options={[
-            { value: "map", label: "Map" },
-            { value: "table", label: "Table" },
-          ]}
-        />
-      </div>
+      <h1 className="text-xl font-semibold text-[var(--color-text-primary)] sm:text-2xl">Explore health equity</h1>
+      <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">
+        Choose a community to see its screening score and exactly what drives it, with every number sourced.
+      </p>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="font-medium text-[var(--color-text-primary)]">Screening view</span>
-          <select
-            value={scenarioId}
-            onChange={(e) => updateParams({ scenario: e.target.value })}
-            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-2.5 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus-ring)]"
+      {/* SCREENING VIEW -- collapsed by default (matches Prioritize's own
+          "Adjust priorities" pattern, so this control looks and behaves
+          the same everywhere it appears) with the active view's real
+          weighting always visible next to it, not behind a click. Every
+          tract's score below uses this weighting -- there is exactly one
+          place on this page that states the numbers, not two. */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-[var(--color-text-secondary)]">Screening view:</span>
+          <span className="font-medium text-[var(--color-text-primary)]">{currentViewLabel}</span>
+          <button
+            type="button"
+            onClick={() => setShowChangeView((v) => !v)}
+            aria-expanded={showChangeView}
+            className="font-medium text-[var(--color-interactive)] hover:underline"
           >
-            {scenariosQuery.data?.scenarios.map((s) => (
-              <option key={s.scenario_id} value={s.scenario_id}>
-                {s.label}
-              </option>
-            ))}
-            {!scenariosQuery.data && <option value={scenarioId}>Health equity overview</option>}
-          </select>
-        </label>
-        {activeScenario && (
-          <p className="text-xs text-[var(--color-text-secondary)]">{activeScenario.description}</p>
+            {showChangeView ? "Hide" : "Change view"}
+          </button>
+        </div>
+        {activeScenario && !isCustom && (
+          <div className="w-full sm:w-auto sm:min-w-[280px]">
+            <WeightBreakdown weights={activeScenario.weights} compact />
+          </div>
         )}
       </div>
 
-      {/* Two surfaces, not three: a sidebar (search + guide, or search +
-          selected profile) and the map, which now gets the large
-          majority of the horizontal space instead of a narrow middle
-          column (docs/design/health-equity-product-consolidation.md §4).
-          The sidebar needs real width for the selected profile's driver
-          rows to stay legible, so this activates at lg (1024px) --
-          narrower than the prior 3-column layout could, since there's
-          only one fixed-width column now, not two. */}
-      <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="order-1 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto lg:pr-1">
-          <SearchPanel selected={selected} onSelect={handleGeographySelect} compact={!!selected} />
-          {!selected && view === "map" && (
-            <div className="mt-4">
-              <QuickPreview properties={hoveredTract} />
-            </div>
-          )}
-          {isDesktopLayout ? (
-            <div className="mt-4">
-              <GeographyDetail
-                selected={selected}
-                scenarioId={scenarioId}
-                onCompare={() => updateParams({ compare: "1" })}
-                onClearSelection={handleClearSelection}
-                onSelect={handleGeographySelect}
-              />
-            </div>
-          ) : null}
-          {comparing && selected?.geographyType === "tract" && (
-            <div className="mt-4">
-              <ComparisonPanel
-                baseTractGeoid={selected.geoid}
-                scenarioId={scenarioId}
-                onClose={() => updateParams({ compare: null })}
-              />
-            </div>
-          )}
+      {showChangeView && (
+        <div className="mt-3 max-w-2xl rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
+          <FocusPicker
+            selectedScenarioId={scenarioId}
+            onSelect={(id) => {
+              updateParams({ scenario: id === DEFAULT_SCENARIO_ID ? null : id });
+              setShowChangeView(false);
+            }}
+            customWeights={DEFAULT_WEIGHTS}
+            onCustomWeightsChange={() => {
+              // Explore's per-tract driver detail (raw values, percentiles,
+              // citations) only exists for the 8 precomputed named
+              // scenarios -- a custom weighting has no equivalent
+              // metric-level data to show here honestly. Prioritize
+              // already supports full custom weighting with a real,
+              // recomputed ranked list, so that's where "Create a custom
+              // focus" sends the user instead of faking support for it here.
+              router.push("/prioritize");
+            }}
+          />
+          <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+            Want to set your own weights and see how rankings change?{" "}
+            <Link href="/prioritize" className="text-[var(--color-interactive)] underline underline-offset-2">
+              Adjust priorities in Prioritize →
+            </Link>
+          </p>
         </div>
+      )}
 
-        <div className="order-2">
-          {view === "map" ? (
-            <ExploreMap
-              scenarioId={scenarioId}
-              selected={selected}
-              onSelect={handleGeographySelect}
-              onHoverChange={setHoveredTract}
-            />
-          ) : (
-            <ExploreTable
-              scenarioId={scenarioId}
-              selectedTractId={selected?.geographyType === "tract" ? selected.geoid : null}
-              onSelectTract={handleGeographySelect}
-            />
-          )}
-        </div>
+      <div className="mt-5">
+        <SearchPanel selected={selected} onSelect={handleGeographySelect} compact={!!selected} />
       </div>
 
-      {/* Below lg, the sidebar's selected-profile content moves into the
-          mobile bottom sheet instead of the scrolling column above (same
-          split point the mobile-sheet pass already validated); this
-          renders in normal document flow, after the map, matching the
-          existing mobile interaction (map first, collapsed bar beneath
-          it, full profile on demand). */}
-      {!isDesktopLayout && (
-        <div className="mt-4">
-          <MobileSelectedSheet
-            selected={selected}
+      {/* The map is mounted continuously across selection (never
+          unmounted-and-remounted) so clicking a tract actually shows the
+          zoom-in animation and the selected outline, instead of the map
+          vanishing the instant a tract is picked -- direct feedback that
+          the animation was missing after the map was briefly removed.
+          Once something is selected it docks to a shorter height so it
+          doesn't compete with the full profile below it; "Table" is only
+          offered while still browsing. */}
+      {(!!selected || browseView === "map") && (
+        <div className="mt-5">
+          {!selected && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Or browse all 408 tracts</h2>
+              <BrowseViewToggle browseView={browseView} onChange={setBrowseView} />
+            </div>
+          )}
+          <p className="mb-2 mt-2 text-xs text-[var(--color-text-secondary)]">
+            Shaded by <strong className="font-medium text-[var(--color-text-primary)]">{currentViewLabel}</strong>
+            &rsquo;s score (same weighting shown above) &mdash; click any tract to open its full profile.
+            {!selected && (
+              <>
+                {" "}
+                A fully keyboard- and screen-reader-operable table with the same data is available in{" "}
+                <button
+                  type="button"
+                  onClick={() => setBrowseView("table")}
+                  className="text-[var(--color-interactive)] underline underline-offset-2"
+                >
+                  Table view
+                </button>
+                .
+              </>
+            )}
+          </p>
+          <ExploreMap
             scenarioId={scenarioId}
-            onCompare={() => updateParams({ compare: "1" })}
-            onClearSelection={handleClearSelection}
+            selected={selected}
             onSelect={handleGeographySelect}
+            compact={!!selected}
           />
         </div>
       )}
+      {!selected && browseView === "table" && (
+        <div className="mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Or browse all 408 tracts</h2>
+            <BrowseViewToggle browseView={browseView} onChange={setBrowseView} />
+          </div>
+          <div className="mt-2.5">
+            <ExploreTable scenarioId={scenarioId} selectedTractId={null} onSelectTract={handleGeographySelect} />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4">
+        <GeographyDetail
+          selected={selected}
+          scenarioId={scenarioId}
+          onCompare={() => updateParams({ compare: "1" })}
+          onClearSelection={handleClearSelection}
+          onSelect={handleGeographySelect}
+        />
+        {selected && comparing && selected.geographyType === "tract" && (
+          <div className="mt-4">
+            <ComparisonPanel
+              baseTractGeoid={selected.geoid}
+              scenarioId={scenarioId}
+              onClose={() => updateParams({ compare: null })}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/** The no-selection hover surface: hovering a tract on the map updates
- * this sidebar panel instead of a floating card over the map itself, so
- * the map stays completely unobscured while nothing is selected
- * (docs/design/final-score-map-and-intuitiveness-review.md's hover
- * interaction model -- chosen over a full floating inspector after
- * comparing both against a hybrid used once something *is* selected,
- * see TinyHoverCallout in explore-map.tsx). Contains only what's needed
- * for a first glance: name, the canonical score, concern band, top two
- * domains, a confidence flag when coverage is thin, and a prompt toward
- * the full profile -- never the complete driver analysis, which stays
- * one click away. */
-function QuickPreview({ properties }: { properties: TractBoundaryFeatureProperties | null }) {
-  if (!properties) {
-    return (
-      <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
-        Quick preview -- point at a shaded tract on the map to see its screening score here.
-      </div>
-    );
-  }
-
-  const topDomains = MAP_LAYERS.filter((l) => l.id !== "score" && l.id !== "confidence")
-    .map((l) => ({ label: l.label, value: l.getValue(properties) }))
-    .filter((d): d is { label: string; value: number } => d.value !== null)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 2);
-
+function BrowseViewToggle({
+  browseView,
+  onChange,
+}: {
+  browseView: BrowseView;
+  onChange: (view: BrowseView) => void;
+}) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">Quick preview</p>
-      <p className="mt-1 truncate text-sm font-semibold text-[var(--color-text-primary)]">{properties.name}</p>
-      {properties.score !== null ? (
-        <>
-          <ScreeningScore score={properties.score} mode="compact" className="mt-1" />
-          {topDomains.length > 0 && (
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              Top factors: {topDomains.map((d) => d.label.toLowerCase()).join(", ")}
-            </p>
-          )}
-          {properties.coverage_fraction !== null && properties.coverage_fraction < 0.7 && (
-            <p className="mt-1 text-xs text-[var(--color-caution-strong)]">Limited data for this tract</p>
-          )}
-        </>
-      ) : (
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">No score for this scenario</p>
-      )}
-      <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">Select the tract for its full profile.</p>
+    <div
+      role="group"
+      aria-label="Browse view"
+      className="flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] text-xs"
+    >
+      {([
+        { view: "map", label: "Map" },
+        { view: "table", label: "Table" },
+      ] as const).map(({ view, label }) => (
+        <button
+          key={view}
+          type="button"
+          onClick={() => onChange(view)}
+          aria-pressed={browseView === view}
+          className={`px-3 py-1.5 font-medium ${view === "table" ? "border-l border-[var(--color-border)]" : ""} ${
+            browseView === view
+              ? "bg-[var(--color-interactive)] text-[var(--color-text-on-interactive)]"
+              : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

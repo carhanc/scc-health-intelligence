@@ -47,15 +47,14 @@ for (const bp of BREAKPOINTS) {
         await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
       }
 
-      await expect(page.getByRole("link", { name: "Explore the map" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Explore a community" })).toBeVisible();
     });
 
-    test("Explore: search, view toggle, and scenario selector remain usable", async ({ page }) => {
+    test("Explore: search and screening-view control remain usable", async ({ page }) => {
       await page.goto("/explore");
       await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByLabel("Screening view")).toBeVisible();
-      await expect(page.getByRole("radio", { name: "Map" })).toBeVisible();
-      await expect(page.getByRole("radio", { name: "Table" })).toBeVisible();
+      await expect(page.getByText("Screening view:")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Change view" })).toBeVisible();
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
@@ -67,21 +66,24 @@ for (const bp of BREAKPOINTS) {
       await expect(result).toBeVisible({ timeout: 10_000 });
       await result.click();
 
-      // Below the app's own lg (1024px) breakpoint, the selected-tract
-      // profile opens behind a collapsed summary bar instead of inline
-      // (MobileSelectedSheet) -- open it before asserting on the heading.
-      if (bp.width < 1024) {
-        await page
-          .getByRole("button", { name: /Tap to view its full profile|concern/ })
-          .click();
-      }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
     });
 
-    test("Explore table view: table remains readable (horizontally scrollable if needed, not clipped)", async ({
+    test("Explore browse map: the default map view does not overflow horizontally", async ({ page }) => {
+      await page.goto("/explore");
+      await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
+        timeout: 15_000,
+      });
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+    });
+
+    test("Explore browse table: table remains readable (horizontally scrollable if needed, not clipped)", async ({
       page,
     }) => {
-      await page.goto("/explore?tab=table");
+      await page.goto("/explore");
+      await page.getByRole("button", { name: "Table", exact: true }).click();
       const table = page.getByRole("table");
       await expect(table).toBeVisible({ timeout: 15_000 });
       // A data table with many columns may legitimately need its own
@@ -94,14 +96,6 @@ for (const bp of BREAKPOINTS) {
 
     test("Tract detail, comparison, and evidence drawer remain operable", async ({ page }) => {
       await page.goto("/explore?geography=tract&id=06085500100");
-      // Below the app's own lg (1024px) breakpoint, the selected-tract
-      // profile opens behind a collapsed summary bar instead of inline
-      // (MobileSelectedSheet).
-      if (bp.width < 1024) {
-        await page
-          .getByRole("button", { name: /Tap to view its full profile|concern/ })
-          .click();
-      }
       await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
       // The raw "Combined concern score" caption now lives behind the
       // collapsed "How this was calculated" disclosure by design (docs/
@@ -111,16 +105,8 @@ for (const bp of BREAKPOINTS) {
       await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Compare" }).click();
-      // Tapping Compare from inside the mobile sheet closes it first (the
-      // comparison panel renders as a page-level sibling, not inside the
-      // sheet) -- on desktop the inline panel is unaffected either way.
       await expect(page.getByRole("region", { name: "Compare with another place" })).toBeVisible();
 
-      if (bp.width < 1024) {
-        await page
-          .getByRole("button", { name: /Tap to view its full profile|concern/ })
-          .click();
-      }
       await page.getByRole("button", { name: "View sources & evidence" }).click();
       const dialog = page.getByRole("dialog", { name: "Sources and evidence" });
       await expect(dialog).toBeVisible();

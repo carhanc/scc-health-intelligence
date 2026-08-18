@@ -459,11 +459,37 @@ function CopilotResultView({
                 // this compact form keeps only what the answer didn't
                 // already say (the citation number and publisher).
                 <li key={item.evidence_id} className="text-xs text-[var(--color-text-secondary)]">
-                  [{i + 1}] {item.label} -- {item.publisher}, {item.source_vintage}
+                  [{i + 1}] {item.label} --{" "}
+                  {item.source_url ? (
+                    <a
+                      href={item.source_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="font-medium text-[var(--color-interactive)] underline underline-offset-2"
+                    >
+                      {item.publisher}
+                    </a>
+                  ) : (
+                    item.publisher
+                  )}
+                  , {item.source_vintage}
                 </li>
               ) : (
                 <li key={item.evidence_id} className="text-xs text-[var(--color-text-secondary)]">
-                  [{i + 1}] {item.label}: {item.value} ({item.publisher}, {item.source_vintage})
+                  [{i + 1}] {item.label}: {item.value} (
+                  {item.source_url ? (
+                    <a
+                      href={item.source_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="font-medium text-[var(--color-interactive)] underline underline-offset-2"
+                    >
+                      {item.publisher}
+                    </a>
+                  ) : (
+                    item.publisher
+                  )}
+                  , {item.source_vintage})
                 </li>
               ),
             )}

@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge, Card, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError } from "@/lib/api";
 import { categoryLabel, methodLabel, serviceLevelLabel } from "@/lib/labels";
+import { useSourcesById } from "@/lib/use-sources";
+import { SourceCitationLine } from "../source-citation";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
 
 function formatDistance(miles: number | null): string {
@@ -34,6 +36,7 @@ export function AccessSummaryPanel({
     queryFn: () => api.getTractAccessSummary(tractGeoid),
     retry: 1,
   });
+  const sourcesById = useSourcesById();
 
   if (query.isLoading) {
     return (
@@ -75,6 +78,15 @@ export function AccessSummaryPanel({
           {data.representative_population.toLocaleString()} of {data.n_block_groups_in_tract} sub-areas in this
           tract) -- a real, specific location, not an average.
         </p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--color-text-tertiary)]">
+          Road network: <SourceCitationLine sourceId="osm_overpass_network" fallbackText="OpenStreetMap contributors" sourcesById={sourcesById} />
+          <span>&middot; Population weighting:</span>
+          <SourceCitationLine
+            sourceId="census_cenpop_2020_block_group"
+            fallbackText="U.S. Census Bureau, 2020"
+            sourcesById={sourcesById}
+          />
+        </p>
         <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {relevantResults.map((r) => (
             <div key={r.category} className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
@@ -105,6 +117,13 @@ export function AccessSummaryPanel({
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           Based on the published weekday (Monday) 7am-7pm schedule, not real-time arrivals or a guaranteed
           departure.
+        </p>
+        <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+          <SourceCitationLine
+            sourceId="vta_gtfs"
+            fallbackText="Santa Clara Valley Transportation Authority (VTA), published schedule"
+            sourcesById={sourcesById}
+          />
         </p>
         {data.transit_result.status === "routed" ? (
           <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

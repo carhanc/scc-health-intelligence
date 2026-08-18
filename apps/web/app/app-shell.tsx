@@ -4,6 +4,14 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import { NAV_ITEMS } from "./nav-items";
+import { useSourcesById } from "@/lib/use-sources";
+import type { FreshnessState } from "@scc-health/ui";
+
+// Same grouping already used on Validate/Data (coverage-panel.tsx,
+// data-explorer.tsx) -- kept local rather than a new shared module for
+// three lines, matching that existing precedent.
+const AVAILABLE_STATES: FreshnessState[] = ["newest_verified", "intentional_older"];
+const NEEDS_ATTENTION_STATES: FreshnessState[] = ["lagged", "stale"];
 
 /** Persistent left navigation on desktop, an off-canvas drawer triggered
  * by a header button on small screens (docs/01 §3: "persistent left
@@ -69,6 +77,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <NavList pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
+            <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+              <TrustSignal />
+            </div>
           </nav>
         </div>
       )}
@@ -84,6 +95,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Santa Clara Health Intelligence
           </Link>
           <NavList pathname={pathname} />
+          <div className="mt-auto border-t border-[var(--color-border)] px-2 pt-4">
+            <TrustSignal />
+          </div>
         </div>
       </nav>
 
@@ -91,6 +105,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
     </div>
+  );
+}
+
+/** A persistent, real "can I trust this?" signal reachable from every
+ * page -- a Health Advocacy Commission review found freshness/vintage
+ * information was only visible if a user specifically navigated to
+ * Validate or Data, with nothing in the global shell itself. Computed
+ * from the same real source list Validate and Data already render, not
+ * a separate/fabricated summary -- says nothing while that list is still
+ * loading rather than showing a placeholder or a guess. */
+function TrustSignal() {
+  const sourcesById = useSourcesById();
+  const sources = Array.from(sourcesById.values());
+  if (sources.length === 0) return null;
+
+  const availableCount = sources.filter((s) => AVAILABLE_STATES.includes(s.freshness_state)).length;
+  const needsAttentionCount = sources.filter((s) => NEEDS_ATTENTION_STATES.includes(s.freshness_state)).length;
+  const allCurrent = needsAttentionCount === 0;
+
+  return (
+    <Link
+      href="/validate"
+      className="flex items-start gap-1.5 rounded-[var(--radius-sm)] px-1 py-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-interactive)]"
+    >
+      <span
+        aria-hidden="true"
+        className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+          allCurrent ? "bg-[var(--color-success)]" : "bg-[var(--color-caution)]"
+        }`}
+      />
+      <span>
+        {allCurrent
+          ? `All ${sources.length} data sources current`
+          : `${availableCount} of ${sources.length} sources current`}
+        <br />
+        <span className="underline underline-offset-2">See data status &amp; sources</span>
+      </span>
+    </Link>
   );
 }
 

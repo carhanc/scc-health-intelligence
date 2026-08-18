@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 /** A small, dependency-free SVG bar chart -- the current stack has no
  * chart library installed, and one real series does not justify adding
  * one (docs/design/product-wide-flow-simplification-research.md
@@ -14,7 +16,7 @@ export function TrendBarChart({
   title: string;
   unit: string;
   points: { year: number; value: number | null; suppressed: boolean }[];
-  sourceNote: string;
+  sourceNote: ReactNode;
 }) {
   const width = 640;
   const height = 200;

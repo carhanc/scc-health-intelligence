@@ -4,12 +4,7 @@ const KNOWN_TRACT_A = "06085500100";
 const KNOWN_TRACT_B = "06085503112";
 
 test.describe("Explore -- invalid input, comparison, and evidence disclosure", () => {
-  test("a well-formed but nonexistent tract number produces a clear, recoverable error", async ({ page, isMobile }) => {
-    // The error card renders inside the same desktop-inline-vs-mobile-sheet
-    // split as a successful selection -- below xl it's inside the
-    // (collapsed by default) bottom sheet. Covered on mobile in
-    // explore-mobile-sheet.spec.ts.
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  test("a well-formed but nonexistent tract number produces a clear, recoverable error", async ({ page }) => {
     await page.goto("/explore?geography=tract&id=06085999999");
 
     const error = page.getByRole("alert").filter({ has: page.getByRole("heading", { name: "We couldn't load this place" }) });
@@ -43,8 +38,7 @@ test.describe("Explore -- invalid input, comparison, and evidence disclosure", (
     await expect(page.getByText(/not found/)).not.toBeVisible();
   });
 
-  test("comparison workflow: compare two real tracts and see a plain-language difference", async ({ page, isMobile }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  test("comparison workflow: compare two real tracts and see a plain-language difference", async ({ page }) => {
     await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_A}`);
     await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });
 
@@ -63,8 +57,7 @@ test.describe("Explore -- invalid input, comparison, and evidence disclosure", (
     await expect(page.getByRole("heading", { name: "Domain-by-domain comparison" })).toBeVisible();
   });
 
-  test("evidence disclosure opens on click, is keyboard-dismissable, and returns focus", async ({ page, isMobile }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
+  test("evidence disclosure opens on click, is keyboard-dismissable, and returns focus", async ({ page }) => {
     await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_A}`);
     await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });
 
@@ -82,9 +75,7 @@ test.describe("Explore -- invalid input, comparison, and evidence disclosure", (
 
   test("a fully unreachable backend produces the same visible, recoverable error -- not a blank panel", async ({
     page,
-    isMobile,
   }) => {
-    test.skip(isMobile, "mobile layout covered separately in explore-mobile-sheet.spec.ts");
     // Simulates the whole API being down (not just one bad id) by
     // aborting every request to it -- CLAUDE.md's "a failed source must
     // produce a visible unavailable state" rule applies just as much to

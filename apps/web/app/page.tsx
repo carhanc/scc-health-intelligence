@@ -8,7 +8,7 @@ import { CountywideSnapshot, FreshnessSummary, PrioritySnapshot } from "./overvi
 const TASK_CARDS = [
   {
     step: "Discover",
-    title: "Explore the map",
+    title: "Explore a community",
     description:
       "Search Sunnyvale, San Jose, a supervisor district, or a census tract, and see its health equity picture.",
     href: "/explore",
