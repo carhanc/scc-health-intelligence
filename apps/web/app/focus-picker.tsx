@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import { CUSTOM_SCENARIO_ID } from "./prioritize/scenario-selector";
 import { WeightSliders, DEFAULT_WEIGHTS } from "./prioritize/weight-sliders";
 import { RECOMMENDED_FOCUS_ID, COMMON_FOCUS_IDS, FOCUS_BLURBS, UNAVAILABLE_FOCUS_AREAS } from "./focus-options";
+import { WeightBreakdown } from "./weight-breakdown";
 
 /** "What would you like to focus on?" -- the real backend scenarios,
  * reframed in plain language: one recommended option shown prominently,
@@ -62,8 +63,22 @@ export function FocusPicker({
   const shownIds = new Set([RECOMMENDED_FOCUS_ID, ...COMMON_FOCUS_IDS]);
   const more = scenarios.filter((s) => !shownIds.has(s.scenario_id));
 
-  function OptionCard({ id, label, blurb, prominent }: { id: string; label: string; blurb: string; prominent?: boolean }) {
+  function OptionCard({
+    id,
+    label,
+    blurb,
+    weights,
+    prominent,
+  }: {
+    id: string;
+    label: string;
+    blurb: string;
+    weights: Record<string, number>;
+    prominent?: boolean;
+  }) {
     const isSelected = selectedScenarioId === id;
+    const weightValues = Object.values(weights);
+    const isEqual = weightValues.length > 0 && weightValues.every((v) => Math.abs(v - weightValues[0]!) < 0.001);
     return (
       <button
         type="button"
@@ -84,25 +99,44 @@ export function FocusPicker({
             </span>
           )}
         </p>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{blurb}</p>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {blurb}
+          {prominent && isEqual && " Every factor below counts equally -- this view does not favor any one of them."}
+        </p>
+        <div className="mt-3">
+          <WeightBreakdown weights={weights} compact />
+        </div>
       </button>
     );
   }
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        Every view below uses the same 5 factors -- weighted differently. The bars under each option show
+        exactly how much each factor counts toward that view's score, so no weighting here is a hidden or
+        arbitrary choice.
+      </p>
+
       {recommended && (
         <OptionCard
           id={recommended.scenario_id}
           label={recommended.label}
           blurb={FOCUS_BLURBS[recommended.scenario_id] ?? recommended.description}
+          weights={recommended.weights}
           prominent
         />
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {common.map((s) => (
-          <OptionCard key={s.scenario_id} id={s.scenario_id} label={s.label} blurb={FOCUS_BLURBS[s.scenario_id] ?? s.description} />
+          <OptionCard
+            key={s.scenario_id}
+            id={s.scenario_id}
+            label={s.label}
+            blurb={FOCUS_BLURBS[s.scenario_id] ?? s.description}
+            weights={s.weights}
+          />
         ))}
       </div>
 
@@ -118,7 +152,13 @@ export function FocusPicker({
       {showMore && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {more.map((s) => (
-            <OptionCard key={s.scenario_id} id={s.scenario_id} label={s.label} blurb={FOCUS_BLURBS[s.scenario_id] ?? s.description} />
+            <OptionCard
+              key={s.scenario_id}
+              id={s.scenario_id}
+              label={s.label}
+              blurb={FOCUS_BLURBS[s.scenario_id] ?? s.description}
+              weights={s.weights}
+            />
           ))}
           {UNAVAILABLE_FOCUS_AREAS.map((u) => (
             <div key={u.id} className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border)] p-4">
@@ -135,7 +175,21 @@ export function FocusPicker({
       {!showCustom ? (
         <button
           type="button"
-          onClick={() => setShowCustom(true)}
+          onClick={() => {
+            // Prefilling from the currently selected named scenario's real
+            // weights (rather than always resetting to a flat 20/20/20/20/20)
+            // is what actually lets someone "play around" starting from a
+            // view they already recognize, per the Health Advocacy
+            // Commission's explicit feedback that the weighting felt
+            // arbitrary until they could move it themselves.
+            const current = scenarios.find((s) => s.scenario_id === selectedScenarioId);
+            if (current && selectedScenarioId !== CUSTOM_SCENARIO_ID) {
+              onCustomWeightsChange(
+                Object.fromEntries(Object.entries(current.weights).map(([domain, w]) => [domain, w * 100])),
+              );
+            }
+            setShowCustom(true);
+          }}
           className="block text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-interactive)] hover:underline"
         >
           Create a custom focus
