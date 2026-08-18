@@ -17,7 +17,6 @@ import {
   GuidedNextStep,
   MetricDirectionLabel,
   GlossaryTerm,
-  MobileBottomSheet,
   ScreeningScore,
   formatScreeningScore,
   SCREENING_SCORE_LABEL,
@@ -35,7 +34,6 @@ import { domainLabel } from "@/lib/labels";
 import { GLOSSARY } from "@/lib/glossary";
 import { useSourcesById } from "@/lib/use-sources";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
-import { WeightBreakdown } from "../weight-breakdown";
 import { SourceCitationLine } from "../source-citation";
 import { concernBandLabel, domainComparisonPhrase } from "./layers";
 
@@ -59,152 +57,6 @@ export function GeographyDetail({
     return <ExploreOrientation />;
   }
   return <SelectedGeographyDetail selected={selected} scenarioId={scenarioId} onCompare={onCompare} onClearSelection={onClearSelection} onSelect={onSelect} />;
-}
-
-/** The mobile equivalent of `GeographyDetail`: a persistent collapsed
- * summary bar (place, concern category, rank -- reachable without
- * opening anything) plus a "View full profile" trigger that opens the
- * exact same `SelectedGeographyDetail` content in a bottom sheet. The
- * map stays visible above the collapsed bar; opening the sheet is a
- * real modal (native <dialog>, so a genuine focus trap + Escape-to-close
- * is appropriate once the map really is covered).
- *
- * Deliberately two states (collapsed / expanded), not three -- a third
- * "intermediate" height with drag-to-resize was in scope per this task's
- * instructions but was judged, given this pass's time budget, a
- * meaningfully larger engineering effort (drag physics, snap points, a
- * keyboard/screen-reader equivalent for the drag gesture) than a
- * two-state sheet, which already satisfies the collapsed-state content
- * requirement and the "map stays visible, sheet doesn't trap focus
- * incorrectly" requirements. Recorded as a real, disclosed scope
- * decision (see the final report), not a silent omission. */
-export function MobileSelectedSheet({
-  selected,
-  scenarioId,
-  onCompare,
-  onClearSelection,
-  onSelect,
-}: {
-  selected: SelectedGeography | null;
-  scenarioId: string;
-  onCompare: () => void;
-  onClearSelection: () => void;
-  onSelect: (selection: SelectedGeography) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!selected) {
-    return <ExploreOrientation />;
-  }
-
-  return (
-    <div>
-      <MobileCollapsedSummary selected={selected} scenarioId={scenarioId} onExpand={() => setExpanded(true)} />
-      <MobileBottomSheet
-        open={expanded}
-        onClose={() => setExpanded(false)}
-        title={selected.displayName || "Selected place"}
-      >
-        <SelectedGeographyDetail
-          selected={selected}
-          scenarioId={scenarioId}
-          onCompare={() => {
-            // ComparisonPanel renders as a sibling of this sheet in
-            // explore-client.tsx, not inside it -- leaving the sheet open
-            // would strand the comparison workflow behind the modal's
-            // backdrop, genuinely unreachable (live-verified: the sheet
-            // stayed open and covered the newly-rendered panel entirely).
-            setExpanded(false);
-            onCompare();
-          }}
-          onClearSelection={() => {
-            setExpanded(false);
-            onClearSelection();
-          }}
-          onSelect={(next) => {
-            setExpanded(false);
-            onSelect(next);
-          }}
-        />
-      </MobileBottomSheet>
-    </div>
-  );
-}
-
-function MobileCollapsedSummary({
-  selected,
-  scenarioId,
-  onExpand,
-}: {
-  selected: SelectedGeography;
-  scenarioId: string;
-  onExpand: () => void;
-}) {
-  // Same query keys TractDetail/PlaceDetail/DistrictDetail's own queries
-  // use -- TanStack Query dedupes identical in-flight/cached queries
-  // across components, so this never issues a second network request
-  // once the sheet's own SelectedGeographyDetail (mounted alongside this,
-  // per Dialog always rendering its children regardless of open state)
-  // has fetched it.
-  const explainQuery = useQuery({
-    queryKey: ["explain-score", scenarioId, selected.geoid],
-    queryFn: () => api.explainScore(scenarioId, selected.geoid),
-    retry: 1,
-    enabled: selected.geographyType === "tract",
-  });
-  const placeQuery = useQuery({
-    queryKey: ["place-profile", selected.geoid],
-    queryFn: () => api.getPlaceProfile(selected.geoid),
-    retry: 1,
-    enabled: selected.geographyType === "place",
-  });
-  const districtQuery = useQuery({
-    queryKey: ["district-profile", Number(selected.geoid)],
-    queryFn: () => api.getSupervisorDistrictProfile(Number(selected.geoid)),
-    retry: 1,
-    enabled: selected.geographyType === "supervisor_district",
-  });
-
-  const explanation = selected.geographyType === "tract" ? explainQuery.data : undefined;
-  const mc = explanation?.monte_carlo;
-
-  // A place or district selected purely from a URL round-trip carries its
-  // raw GEOID as `displayName` (selection.ts) -- resolved here from the
-  // fetched profile the same way the desktop panel's own heading does, so
-  // the collapsed bar never shows a bare place GEOID like "0668000"
-  // (Phase 6.5's "never show a raw place GEOID" rule, extended to this
-  // pass's new mobile summary).
-  const resolvedName =
-    selected.geographyType === "place"
-      ? placeQuery.data?.name_long
-      : selected.geographyType === "supervisor_district"
-        ? districtQuery.data
-          ? `Supervisor District ${districtQuery.data.district_number}`
-          : undefined
-        : selected.displayName;
-
-  return (
-    <button
-      type="button"
-      onClick={onExpand}
-      className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left shadow-[var(--shadow-sm)]"
-    >
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{resolvedName ?? "Loading…"}</p>
-        {explanation?.score != null ? (
-          <div className="text-xs text-[var(--color-text-secondary)]">
-            <ScreeningScore score={explanation.score} mode="compact" />
-            {mc?.median_rank != null && <> · #{Math.round(mc.median_rank)} countywide</>}
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--color-text-secondary)]">Tap to view its full profile</p>
-        )}
-      </div>
-      <span aria-hidden="true" className="flex-none text-sm font-medium text-[var(--color-interactive)]">
-        View profile →
-      </span>
-    </button>
-  );
 }
 
 /** Non-modal orientation shown only while nothing is selected -- replaced
@@ -252,8 +104,8 @@ function ExploreOrientation() {
             2
           </span>
           <span>
-            <strong className="font-medium text-[var(--color-text-primary)]">Select a shaded tract</strong> on the
-            map, or a row in Table view, to open its full profile.
+            <strong className="font-medium text-[var(--color-text-primary)]">Select a tract</strong> from the table
+            below to open its full profile.
           </span>
         </li>
         <li className="flex gap-2.5">
@@ -402,11 +254,9 @@ function TractDetail({
     queryFn: () => api.explainScore(scenarioId, tractGeoid),
     retry: 1,
   });
-  // Same query key ExploreMap uses for its boundaries fetch -- reads from
-  // the shared TanStack Query cache instead of a second network request
-  // in the common case where the map is already mounted, giving a real
-  // countywide denominator instead of a hardcoded "408"
-  // (docs/design/explore-health-equity-research.md §4).
+  // Gives the comparison sentence a real countywide denominator instead
+  // of a hardcoded "408" (docs/design/explore-health-equity-research.md
+  // §4).
   const boundariesQuery = useQuery({
     queryKey: ["tract-boundaries", scenarioId],
     queryFn: () => api.getAllTractBoundaries(scenarioId),
@@ -537,37 +387,34 @@ function TractDetail({
         <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
           This is a screening signal for closer review, not a diagnosis or causal conclusion.
         </p>
-        {/* WEIGHTING -- a Health Advocacy Commission review found no page
-            ever showed a named scenario's actual numeric weights, only a
-            qualitative blurb, which read as an unexplained/arbitrary
-            choice. This is the same real weights (configured_weight) the
-            scenario is scored with, visible immediately, not behind a
-            disclosure or a trip to a different page. */}
-        {explanation.domains.length > 0 && (
-          <div className="mt-3 max-w-sm">
-            <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-              {explanation.scenario_label}&rsquo;s weighting:
-            </p>
-            <div className="mt-1.5">
-              <WeightBreakdown
-                weights={Object.fromEntries(explanation.domains.map((d) => [d.domain, d.configured_weight]))}
-                compact
-              />
-            </div>
-          </div>
-        )}
+        {/* Weighting itself is shown once, at the page level next to the
+            view picker (a Health Advocacy Commission review found it
+            duplicated here and there, pushing the page down with two
+            near-identical blocks) -- this is just a plain-language
+            pointer back to it. */}
+        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+          Scored under <strong className="font-medium text-[var(--color-text-primary)]">{explanation.scenario_label}</strong>
+          &rsquo;s weighting (shown above the search box).
+        </p>
       </div>
 
-      {/* DOMAIN SUMMARY -- every domain, simple rows, county-relative
-          comparison phrases instead of raw decimals or "domain score"
-          language. */}
+      {/* CONDITIONS -- one list, not two: each domain row already shows
+          weight%, score, and the plain-language comparison phrase
+          collapsed, so a reader gets the full at-a-glance picture without
+          a separate always-open "summary" list duplicating the same five
+          domains right above the expandable "breakdown" (the exact
+          redundancy a Health Advocacy Commission review flagged as part
+          of "so much information"). */}
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
           Conditions that may shape health equity here
         </h3>
-        <div className="mt-2.5 space-y-3">
+        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+          Each row can be expanded for its exact metrics, raw values, and sources.
+        </p>
+        <div className="mt-2.5 space-y-2">
           {explanation.domains.map((domain) => (
-            <DomainSummaryRow key={domain.domain} domain={domain} />
+            <DomainDisclosure key={domain.domain} domain={domain} sourcesById={sourcesById} />
           ))}
         </div>
         {explanation.domains_missing.length > 0 && (
@@ -585,7 +432,7 @@ function TractDetail({
           <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">What is shaping this profile?</h3>
           <ul className="mt-2 space-y-2.5" aria-label="Top factors shaping this profile">
             {rankedMetrics.slice(0, 3).map((metric) => (
-              <SimpleDriverRow key={metric.metric_id} metric={metric} />
+              <SimpleDriverRow key={metric.metric_id} metric={metric} sourcesById={sourcesById} />
             ))}
           </ul>
           <details className="mt-2.5 group">
@@ -664,22 +511,9 @@ function TractDetail({
       </GuidedNextStep>
 
       {/* PROGRESSIVE DISCLOSURE -- everything a methodology report needs,
-          none of it required to understand the headline result. */}
+          none of it required to understand the headline result. Domain
+          detail lives in the "Conditions" list above, not repeated here. */}
       <div className="mt-6 space-y-2">
-        <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
-          <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-primary)]">
-            Domain breakdown
-          </summary>
-          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-            Every domain below can be expanded to see the exact metrics, raw values, and sources behind it.
-          </p>
-          <div className="mt-3 space-y-2">
-            {explanation.domains.map((domain) => (
-              <DomainDisclosure key={domain.domain} domain={domain} sourcesById={sourcesById} />
-            ))}
-          </div>
-        </details>
-
         <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
           <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-primary)]">
             How this was calculated
@@ -715,38 +549,22 @@ function TractDetail({
   );
 }
 
-/** One domain, reduced to what a first-time reader needs: the label, an
- * accessible percentile bar, and a plain-language comparison phrase
- * that always states the concern direction explicitly -- never a bare
- * "higher"/"lower" alongside a technical "domain score" number (docs/
- * design/health-equity-product-consolidation.md's domain-summary
- * requirement). The full per-metric breakdown (raw values, sources,
- * limitations) stays one click away in the "Domain breakdown"
- * disclosure -- this row is deliberately not a duplicate of it. */
-function DomainSummaryRow({ domain }: { domain: DomainContributionDetail }) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-medium text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</span>
-        {domain.domain_score === null && <Badge tone="neutral">No data</Badge>}
-      </div>
-      <PercentileBar percentile={domain.domain_score} label={`${domainLabel(domain.domain)} county percentile`} />
-      {domain.domain_score !== null && (
-        <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-          {domainComparisonPhrase(domain.domain_score)}
-        </p>
-      )}
-    </div>
-  );
-}
-
 /** One driver, reduced to what a first-time reader needs to understand
  * *why* -- never the point-contribution arithmetic ("13.0 of 34.7
  * points") that belongs in "See all factors" instead. Raw value and
  * unit remain visible alongside the percentile (CLAUDE.md's "raw value
  * and unit must be visible alongside percentiles" rule applies at the
- * metric level regardless of where in the hierarchy a metric appears). */
-function SimpleDriverRow({ metric }: { metric: MetricContribution }) {
+ * metric level regardless of where in the hierarchy a metric appears).
+ * The citation is shown here too, not only after opening "See all
+ * factors" -- a Health Advocacy Commission review found the top-line
+ * drivers had no visible source at all. */
+function SimpleDriverRow({
+  metric,
+  sourcesById,
+}: {
+  metric: MetricContribution;
+  sourcesById: Map<string, SourceStatusEntry>;
+}) {
   return (
     <li>
       <span className="text-sm font-medium text-[var(--color-text-primary)]">{metric.label}</span>
@@ -759,11 +577,12 @@ function SimpleDriverRow({ metric }: { metric: MetricContribution }) {
       {/* A compact visual track, not just text -- docs/design/final-
           score-map-and-intuitiveness-review.md's "what is shaping this
           score" requirement asks for an immediate visual marker per
-          factor, not only a sentence. Reuses the same PercentileBar the
-          domain-summary rows already use, so a factor and a domain read
-          as the same kind of thing at a glance. */}
+          factor, not only a sentence. */}
       <PercentileBar percentile={metric.percentile} label={`${metric.label} county percentile`} />
       <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{metric.plain_language_definition}</p>
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+        <SourceCitationLine sourceId={metric.source_id} fallbackText={metric.citation} sourcesById={sourcesById} />
+      </p>
     </li>
   );
 }
@@ -923,23 +742,37 @@ function DomainDisclosure({
 }) {
   return (
     <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 open:pb-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-        <span className="text-sm font-medium text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</span>
-        <span className="flex items-center gap-2">
-          <span className="text-xs text-[var(--color-text-tertiary)]">
-            {Math.round(domain.configured_weight * 100)}% of this scenario
-          </span>
-          {domain.domain_score !== null ? (
-            <span className="tabular-nums text-sm text-[var(--color-text-secondary)]">
-              {Math.round(domain.domain_score)}/100
+      <summary className="cursor-pointer list-none">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</span>
+          <span className="flex items-center gap-2">
+            <span className="text-xs text-[var(--color-text-tertiary)]">
+              {Math.round(domain.configured_weight * 100)}% of this scenario
             </span>
-          ) : (
-            <Badge tone="neutral">No data</Badge>
-          )}
-          <span aria-hidden="true" className="text-xs text-[var(--color-text-tertiary)] group-open:rotate-180">
-            ▼
+            {domain.domain_score !== null ? (
+              <span className="tabular-nums text-sm text-[var(--color-text-secondary)]">
+                {Math.round(domain.domain_score)}/100
+              </span>
+            ) : (
+              <Badge tone="neutral">No data</Badge>
+            )}
+            <span aria-hidden="true" className="text-xs text-[var(--color-text-tertiary)] group-open:rotate-180">
+              ▼
+            </span>
           </span>
-        </span>
+        </div>
+        {/* Visible collapsed, not just when expanded -- this row alone
+            replaces the always-open "Domain summary" list this component
+            used to duplicate (removing that list was the fix; this line
+            is why removing it didn't lose the at-a-glance value it gave). */}
+        {domain.domain_score !== null && (
+          <div className="mt-1.5">
+            <PercentileBar percentile={domain.domain_score} label={`${domainLabel(domain.domain)} county percentile`} />
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              {domainComparisonPhrase(domain.domain_score)}
+            </p>
+          </div>
+        )}
       </summary>
       {domain.domain_score !== null && (
         <p className="mt-2 text-xs text-[var(--color-text-secondary)]">

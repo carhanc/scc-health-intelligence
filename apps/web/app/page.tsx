@@ -8,7 +8,7 @@ import { CountywideSnapshot, FreshnessSummary, PrioritySnapshot } from "./overvi
 const TASK_CARDS = [
   {
     step: "Discover",
-    title: "Explore the map",
+    title: "Explore a community",
     description:
       "Search Sunnyvale, San Jose, a supervisor district, or a census tract, and see its health equity picture.",
     href: "/explore",
@@ -19,7 +19,7 @@ const TASK_CARDS = [
     title: "See county priorities",
     description:
       "View every tract ranked by combined concern, and understand what drives each ranking.",
-    href: "/explore?tab=table",
+    href: "/explore",
     cta: "See the county ranking",
   },
   {
