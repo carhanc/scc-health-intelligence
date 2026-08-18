@@ -28,11 +28,15 @@ import {
   type ScoreExplanationResponse,
   type DomainContributionDetail,
   type MetricContribution,
+  type SourceStatusEntry,
 } from "@/lib/api";
 import type { SelectedGeography } from "./selection";
 import { domainLabel } from "@/lib/labels";
 import { GLOSSARY } from "@/lib/glossary";
+import { useSourcesById } from "@/lib/use-sources";
 import { UseInAdvocateButton } from "../use-in-advocate-button";
+import { WeightBreakdown } from "../weight-breakdown";
+import { SourceCitationLine } from "../source-citation";
 import { concernBandLabel, domainComparisonPhrase } from "./layers";
 
 export function GeographyDetail({
@@ -386,6 +390,7 @@ function TractDetail({
   onClearSelection: () => void;
 }) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const sourcesById = useSourcesById();
 
   const profileQuery = useQuery({
     queryKey: ["tract-profile", tractGeoid],
@@ -491,7 +496,10 @@ function TractDetail({
           </p>
           <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Tract {profile.tract_geoid_2020}</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {profile.name_long} · <DataModeBadge mode={profile.data_mode} />
+            {profile.name_long} · <DataModeBadge mode={profile.data_mode} />{" "}
+            <Link href="/data" className="text-[var(--color-interactive)] underline underline-offset-2">
+              See every source &amp; how current it is
+            </Link>
           </p>
         </div>
       </div>
@@ -529,6 +537,25 @@ function TractDetail({
         <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
           This is a screening signal for closer review, not a diagnosis or causal conclusion.
         </p>
+        {/* WEIGHTING -- a Health Advocacy Commission review found no page
+            ever showed a named scenario's actual numeric weights, only a
+            qualitative blurb, which read as an unexplained/arbitrary
+            choice. This is the same real weights (configured_weight) the
+            scenario is scored with, visible immediately, not behind a
+            disclosure or a trip to a different page. */}
+        {explanation.domains.length > 0 && (
+          <div className="mt-3 max-w-sm">
+            <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+              {explanation.scenario_label}&rsquo;s weighting:
+            </p>
+            <div className="mt-1.5">
+              <WeightBreakdown
+                weights={Object.fromEntries(explanation.domains.map((d) => [d.domain, d.configured_weight]))}
+                compact
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* DOMAIN SUMMARY -- every domain, simple rows, county-relative
@@ -571,6 +598,7 @@ function TractDetail({
                   key={metric.metric_id}
                   metric={metric}
                   isStrongDriver={(metric.contribution ?? 0) >= meanMetricContribution * 1.5}
+                  sourcesById={sourcesById}
                 />
               ))}
             </ul>
@@ -647,7 +675,7 @@ function TractDetail({
           </p>
           <div className="mt-3 space-y-2">
             {explanation.domains.map((domain) => (
-              <DomainDisclosure key={domain.domain} domain={domain} />
+              <DomainDisclosure key={domain.domain} domain={domain} sourcesById={sourcesById} />
             ))}
           </div>
         </details>
@@ -681,7 +709,7 @@ function TractDetail({
       </div>
 
       <Dialog open={evidenceOpen} onClose={() => setEvidenceOpen(false)} title="Sources and evidence" variant="side">
-        <EvidenceContent explanation={explanation} />
+        <EvidenceContent explanation={explanation} sourcesById={sourcesById} />
       </Dialog>
     </div>
   );
@@ -740,7 +768,15 @@ function SimpleDriverRow({ metric }: { metric: MetricContribution }) {
   );
 }
 
-function DriverRow({ metric, isStrongDriver }: { metric: MetricContribution; isStrongDriver: boolean }) {
+function DriverRow({
+  metric,
+  isStrongDriver,
+  sourcesById,
+}: {
+  metric: MetricContribution;
+  isStrongDriver: boolean;
+  sourcesById: Map<string, SourceStatusEntry>;
+}) {
   return (
     <li className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -766,7 +802,9 @@ function DriverRow({ metric, isStrongDriver }: { metric: MetricContribution; isS
       {metric.limitations && (
         <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">Limitation: {metric.limitations}</p>
       )}
-      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{metric.citation}</p>
+      <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+        <SourceCitationLine sourceId={metric.source_id} fallbackText={metric.citation} sourcesById={sourcesById} />
+      </p>
     </li>
   );
 }
@@ -876,12 +914,21 @@ function ScoreSummary({
   );
 }
 
-function DomainDisclosure({ domain }: { domain: DomainContributionDetail }) {
+function DomainDisclosure({
+  domain,
+  sourcesById,
+}: {
+  domain: DomainContributionDetail;
+  sourcesById: Map<string, SourceStatusEntry>;
+}) {
   return (
     <details className="group rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 open:pb-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
         <span className="text-sm font-medium text-[var(--color-text-primary)]">{domainLabel(domain.domain)}</span>
         <span className="flex items-center gap-2">
+          <span className="text-xs text-[var(--color-text-tertiary)]">
+            {Math.round(domain.configured_weight * 100)}% of this scenario
+          </span>
           {domain.domain_score !== null ? (
             <span className="tabular-nums text-sm text-[var(--color-text-secondary)]">
               {Math.round(domain.domain_score)}/100
@@ -917,6 +964,13 @@ function DomainDisclosure({ domain }: { domain: DomainContributionDetail }) {
             {metric.limitations && (
               <p className="mt-0.5 text-xs text-[var(--color-text-tertiary)]">Limitation: {metric.limitations}</p>
             )}
+            <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
+              <SourceCitationLine
+                sourceId={metric.source_id}
+                fallbackText={metric.citation}
+                sourcesById={sourcesById}
+              />
+            </p>
           </div>
         ))}
       </div>
@@ -924,7 +978,13 @@ function DomainDisclosure({ domain }: { domain: DomainContributionDetail }) {
   );
 }
 
-function EvidenceContent({ explanation }: { explanation: ScoreExplanationResponse }) {
+function EvidenceContent({
+  explanation,
+  sourcesById,
+}: {
+  explanation: ScoreExplanationResponse;
+  sourcesById: Map<string, SourceStatusEntry>;
+}) {
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--color-text-secondary)]">
@@ -955,7 +1015,13 @@ function EvidenceContent({ explanation }: { explanation: ScoreExplanationRespons
                   <td className="py-1.5 pr-2 tabular-nums">
                     {metric.raw_value !== null ? `${metric.raw_value.toLocaleString()} ${metric.unit}` : "No data"}
                   </td>
-                  <td className="py-1.5 text-[var(--color-text-secondary)]">{metric.citation}</td>
+                  <td className="py-1.5 text-[var(--color-text-secondary)]">
+                    <SourceCitationLine
+                      sourceId={metric.source_id}
+                      fallbackText={metric.citation}
+                      sourcesById={sourcesById}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

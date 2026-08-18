@@ -13,6 +13,7 @@ import { GeographyDetail, MobileSelectedSheet } from "./geography-detail";
 import { ComparisonPanel } from "./comparison-panel";
 import { parseSelectedGeographyFromParams, type SelectedGeography } from "./selection";
 import { MAP_LAYERS } from "./layers";
+import { WeightBreakdown } from "../weight-breakdown";
 
 const ExploreMap = dynamic(() => import("./explore-map").then((m) => m.ExploreMap), {
   ssr: false,
@@ -129,6 +130,23 @@ export function ExploreClient() {
           <p className="text-xs text-[var(--color-text-secondary)]">{activeScenario.description}</p>
         )}
       </div>
+
+      {/* Connects "the view I picked" to "why the map and every score
+          look the way they do" -- a Health Advocacy Commission review
+          found no copy anywhere made this link explicit, and the
+          screening view's actual weighting was never shown alongside the
+          control that picks it. */}
+      {activeScenario && (
+        <div className="mt-2 max-w-sm rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-3">
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            The map colors and every tract&rsquo;s score below use {activeScenario.label}&rsquo;s weighting,
+            shown here:
+          </p>
+          <div className="mt-2">
+            <WeightBreakdown weights={activeScenario.weights} compact />
+          </div>
+        </div>
+      )}
 
       {/* Two surfaces, not three: a sidebar (search + guide, or search +
           selected profile) and the map, which now gets the large
