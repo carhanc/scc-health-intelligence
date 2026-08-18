@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge, DataModeBadge, DataTable, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type CountyTrendPoint } from "@/lib/api";
+import { useSourcesById } from "@/lib/use-sources";
+import { SourceCitationLine } from "../source-citation";
 import { TrendBarChart } from "./trend-bar-chart";
 
 const BREAKDOWNS = [
@@ -13,6 +15,17 @@ const BREAKDOWNS = [
   { id: "sex", label: "Sex" },
   { id: "expected_payer", label: "Expected payer" },
 ];
+
+// Each breakdown chip queries a distinct real HCAI table (real
+// source_ids from DATA_MANIFEST.json) -- the citation shown with the
+// chart follows whichever one is actually selected, not a single static
+// "HCAI" mention regardless of breakdown.
+const BREAKDOWN_SOURCE_IDS: Record<string, string> = {
+  disposition: "hcai_ed_patient_county_disposition",
+  race_group: "hcai_ed_patient_county_race_group",
+  sex: "hcai_ed_patient_county_sex",
+  expected_payer: "hcai_ed_patient_county_expected_payer",
+};
 
 /**
  * County-level trends over time (2008-2024): the one HCAI product that
@@ -67,7 +80,9 @@ export function TrendsPanel() {
           description={query.error instanceof ApiError ? query.error.message : "Couldn't load county ED trends."}
         />
       )}
-      {query.data && <TrendsTable points={query.data.points} dataMode={query.data.data_mode} />}
+      {query.data && (
+        <TrendsTable points={query.data.points} dataMode={query.data.data_mode} sourceId={BREAKDOWN_SOURCE_IDS[breakdown]} />
+      )}
     </div>
   );
 }
@@ -75,10 +90,13 @@ export function TrendsPanel() {
 function TrendsTable({
   points,
   dataMode,
+  sourceId,
 }: {
   points: CountyTrendPoint[];
   dataMode: "live" | "demo";
+  sourceId?: string;
 }) {
+  const sourcesById = useSourcesById();
   const suppressedCount = points.filter((p) => p.is_suppressed).length;
 
   // Lead with the single real category that has the most total encounters
@@ -144,7 +162,13 @@ function TrendsTable({
               value: p.encounters,
               suppressed: p.is_suppressed,
             }))}
-            sourceNote="HCAI, Santa Clara County, observed"
+            sourceNote={
+              sourceId ? (
+                <SourceCitationLine sourceId={sourceId} fallbackText="HCAI, Santa Clara County, observed" sourcesById={sourcesById} />
+              ) : (
+                "HCAI, Santa Clara County, observed"
+              )
+            }
           />
         </div>
       )}

@@ -6,8 +6,18 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Badge, DataTable, DataModeBadge, ErrorState, LoadingRegion, SkeletonText } from "@scc-health/ui";
 import { api, ApiError, type FacilitySummary } from "@/lib/api";
 import { categoryLabel } from "@/lib/labels";
+import { useSourcesById } from "@/lib/use-sources";
+import { SourceCitationLine } from "../source-citation";
 
 const CATEGORIES = ["hospital", "clinic", "food_retailer", "transit_hub"] as const;
+
+// The real, disclosed source_ids behind this table's facilities (real
+// values from DATA_MANIFEST.json -- the API does not return a source_id
+// per facility, so this is a fixed, honest list of what backs the whole
+// table, not a per-row lookup). A Health Advocacy Commission review asked
+// for direct links to data sources here, not just a publisher name in
+// prose.
+const RESOURCE_SOURCE_IDS = ["hcai_facility_attributes", "hrsa_health_center_sites", "usda_snap_retailers", "vta_gtfs"];
 
 /**
  * The accessible, sortable, keyboard-operable alternative to a resource
@@ -19,6 +29,7 @@ const CATEGORIES = ["hospital", "clinic", "food_retailer", "transit_hub"] as con
  */
 export function ResourceBrowser() {
   const [category, setCategory] = useState<string>("hospital");
+  const sourcesById = useSourcesById();
 
   const query = useQuery({
     queryKey: ["access-facilities", category],
@@ -95,9 +106,18 @@ export function ResourceBrowser() {
       </div>
 
       <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-        Observed facility locations and published attributes from official sources (HCAI, HRSA, USDA SNAP, VTA
-        GTFS) and one County-published supplemental layer, deduplicated across sources. Does not confirm current
-        capacity, appointment availability, insurance acceptance, or language access.
+        Observed facility locations and published attributes from official sources and one County-published
+        supplemental layer, deduplicated across sources. Does not confirm current capacity, appointment
+        availability, insurance acceptance, or language access.
+      </p>
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-tertiary)]">
+        Sources:
+        {RESOURCE_SOURCE_IDS.map((id, i) => (
+          <span key={id}>
+            <SourceCitationLine sourceId={id} fallbackText={id} sourcesById={sourcesById} />
+            {i < RESOURCE_SOURCE_IDS.length - 1 && ";"}
+          </span>
+        ))}
       </p>
 
       <div className="mt-3">
