@@ -42,8 +42,12 @@ test.describe("Accessibility (axe-core)", () => {
     await page.goto("/explore?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
     // Expand a domain disclosure and open the evidence drawer so their
-    // content is included in the scan too.
-    await page.locator("details summary").first().click();
+    // content is included in the scan too. Scoped past the "Conditions"
+    // heading -- the map's own MapLibre attribution control is itself a
+    // native <details><summary> element and would otherwise win a
+    // page-wide `.first()` lookup ahead of the real domain disclosures.
+    const conditionsHeading = page.getByText("Conditions that may shape health equity here");
+    await conditionsHeading.locator("xpath=following::details[1]/summary").click();
     await page.getByRole("button", { name: "View sources & evidence" }).click();
     await expect(page.getByRole("dialog", { name: "Sources and evidence" })).toBeVisible();
 

@@ -123,6 +123,7 @@ export function ExploreMap({
   selected,
   onSelect,
   onHoverChange,
+  compact = false,
 }: {
   scenarioId: string;
   selected: SelectedGeography | null;
@@ -133,6 +134,11 @@ export function ExploreMap({
    * interaction model -- the map itself stays completely unobscured
    * while nothing is selected). */
   onHoverChange?: (properties: TractBoundaryFeatureProperties | null) => void;
+  /** A shorter, docked form used once a tract is selected -- the map
+   * stays mounted (not swapped for the profile) so the click-to-zoom
+   * animation and the selected-tract outline are actually visible,
+   * instead of the map unmounting the instant a tract is picked. */
+  compact?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -368,6 +374,16 @@ export function ExploreMap({
     }
   }, [mapReady, boundariesQuery.data]);
 
+  // The map container's height changes (full <-> compact) when a tract
+  // is selected/cleared -- MapLibre's own ResizeObserver normally
+  // catches this, but an explicit resize() is a cheap, defensive
+  // guarantee the canvas never renders stretched after that CSS change.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    map.resize();
+  }, [compact, mapReady]);
+
   // Switching the active layer repaints the already-loaded source with a
   // different fill-color/filter expression -- no new network request,
   // since every layer's values are already present on each feature from
@@ -472,7 +488,13 @@ export function ExploreMap({
           available height rather than a small fixed box, while staying
           bounded so a shorter laptop screen never has to scroll inside
           the map to find its own legend/controls. */}
-      <div className="relative h-[calc(100vh-260px)] min-h-[480px] max-h-[820px] w-full">
+      <div
+        className={
+          compact
+            ? "relative h-[280px] w-full sm:h-[320px]"
+            : "relative h-[calc(100vh-260px)] min-h-[480px] max-h-[820px] w-full"
+        }
+      >
         {boundariesQuery.isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-surface)]">
             <LoadingRegion label="Loading map data">

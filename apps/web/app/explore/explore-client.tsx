@@ -157,97 +157,113 @@ export function ExploreClient() {
         <SearchPanel selected={selected} onSelect={handleGeographySelect} compact={!!selected} />
       </div>
 
-      {selected ? (
-        <div className="mt-4">
-          <GeographyDetail
-            selected={selected}
-            scenarioId={scenarioId}
-            onCompare={() => updateParams({ compare: "1" })}
-            onClearSelection={handleClearSelection}
-            onSelect={handleGeographySelect}
-          />
-          {comparing && selected.geographyType === "tract" && (
-            <div className="mt-4">
-              <ComparisonPanel
-                baseTractGeoid={selected.geoid}
-                scenarioId={scenarioId}
-                onClose={() => updateParams({ compare: null })}
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="mt-4">
-          <GeographyDetail
-            selected={null}
-            scenarioId={scenarioId}
-            onCompare={() => updateParams({ compare: "1" })}
-            onClearSelection={handleClearSelection}
-            onSelect={handleGeographySelect}
-          />
-          <div className="mt-5">
+      {/* The map is mounted continuously across selection (never
+          unmounted-and-remounted) so clicking a tract actually shows the
+          zoom-in animation and the selected outline, instead of the map
+          vanishing the instant a tract is picked -- direct feedback that
+          the animation was missing after the map was briefly removed.
+          Once something is selected it docks to a shorter height so it
+          doesn't compete with the full profile below it; "Table" is only
+          offered while still browsing. */}
+      {(!!selected || browseView === "map") && (
+        <div className="mt-5">
+          {!selected && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Or browse all 408 tracts</h2>
-              <div
-                role="group"
-                aria-label="Browse view"
-                className="flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] text-xs"
-              >
-                <button
-                  type="button"
-                  onClick={() => setBrowseView("map")}
-                  aria-pressed={browseView === "map"}
-                  className={`px-3 py-1.5 font-medium ${
-                    browseView === "map"
-                      ? "bg-[var(--color-interactive)] text-[var(--color-text-on-interactive)]"
-                      : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
-                  }`}
-                >
-                  Map
-                </button>
+              <BrowseViewToggle browseView={browseView} onChange={setBrowseView} />
+            </div>
+          )}
+          <p className="mb-2 mt-2 text-xs text-[var(--color-text-secondary)]">
+            Shaded by <strong className="font-medium text-[var(--color-text-primary)]">{currentViewLabel}</strong>
+            &rsquo;s score (same weighting shown above) &mdash; click any tract to open its full profile.
+            {!selected && (
+              <>
+                {" "}
+                A fully keyboard- and screen-reader-operable table with the same data is available in{" "}
                 <button
                   type="button"
                   onClick={() => setBrowseView("table")}
-                  aria-pressed={browseView === "table"}
-                  className={`border-l border-[var(--color-border)] px-3 py-1.5 font-medium ${
-                    browseView === "table"
-                      ? "bg-[var(--color-interactive)] text-[var(--color-text-on-interactive)]"
-                      : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
-                  }`}
+                  className="text-[var(--color-interactive)] underline underline-offset-2"
                 >
-                  Table
+                  Table view
                 </button>
-              </div>
-            </div>
-            {browseView === "map" ? (
-              <div className="mt-2.5">
-                <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
-                  Shaded by <strong className="font-medium text-[var(--color-text-primary)]">{currentViewLabel}</strong>
-                  &rsquo;s score (same weighting shown above) &mdash; click any tract to open its full profile. A
-                  fully keyboard- and screen-reader-operable table with the same data is available in{" "}
-                  <button
-                    type="button"
-                    onClick={() => setBrowseView("table")}
-                    className="text-[var(--color-interactive)] underline underline-offset-2"
-                  >
-                    Table view
-                  </button>
-                  .
-                </p>
-                <ExploreMap scenarioId={scenarioId} selected={selected} onSelect={handleGeographySelect} />
-              </div>
-            ) : (
-              <div className="mt-2.5">
-                <ExploreTable
-                  scenarioId={scenarioId}
-                  selectedTractId={null}
-                  onSelectTract={handleGeographySelect}
-                />
-              </div>
+                .
+              </>
             )}
+          </p>
+          <ExploreMap
+            scenarioId={scenarioId}
+            selected={selected}
+            onSelect={handleGeographySelect}
+            compact={!!selected}
+          />
+        </div>
+      )}
+      {!selected && browseView === "table" && (
+        <div className="mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Or browse all 408 tracts</h2>
+            <BrowseViewToggle browseView={browseView} onChange={setBrowseView} />
+          </div>
+          <div className="mt-2.5">
+            <ExploreTable scenarioId={scenarioId} selectedTractId={null} onSelectTract={handleGeographySelect} />
           </div>
         </div>
       )}
+
+      <div className="mt-4">
+        <GeographyDetail
+          selected={selected}
+          scenarioId={scenarioId}
+          onCompare={() => updateParams({ compare: "1" })}
+          onClearSelection={handleClearSelection}
+          onSelect={handleGeographySelect}
+        />
+        {selected && comparing && selected.geographyType === "tract" && (
+          <div className="mt-4">
+            <ComparisonPanel
+              baseTractGeoid={selected.geoid}
+              scenarioId={scenarioId}
+              onClose={() => updateParams({ compare: null })}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BrowseViewToggle({
+  browseView,
+  onChange,
+}: {
+  browseView: BrowseView;
+  onChange: (view: BrowseView) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Browse view"
+      className="flex overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] text-xs"
+    >
+      {([
+        { view: "map", label: "Map" },
+        { view: "table", label: "Table" },
+      ] as const).map(({ view, label }) => (
+        <button
+          key={view}
+          type="button"
+          onClick={() => onChange(view)}
+          aria-pressed={browseView === view}
+          className={`px-3 py-1.5 font-medium ${view === "table" ? "border-l border-[var(--color-border)]" : ""} ${
+            browseView === view
+              ? "bg-[var(--color-interactive)] text-[var(--color-text-on-interactive)]"
+              : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

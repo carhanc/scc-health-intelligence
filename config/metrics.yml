@@ -506,7 +506,7 @@ metrics:
     plain_language_definition: "Whether this tract contains at least one currently-Designated HRSA Medically Underserved Area/Population (MUA/P) area, matched directly via the source data's own census-tract field."
     interpretation: "A direct designation match (not a distance proxy) -- HRSA's MUA_DET.csv carries a real census-tract identifier for each MUA/P record, joined here via a verified tract-code format match (46 of 48 Santa Clara County MUA/P records matched; 2 did not match any current 2020 tract and are excluded, logged in the pipeline run output, not silently dropped)."
     limitations: "Binary presence/absence, not a graded intensity; 2 of 48 source MUA/P records could not be matched to a current tract boundary."
-    citation: "HRSA MUA_DET.csv."
+    citation: "U.S. Health Resources and Services Administration (HRSA), Medically Underserved Areas/Populations (MUA/P) designations, detail file (public domain)."
 
   - metric_id: hpsa_proximity_score
     label: "Nearby Health Professional Shortage Area intensity (straight-line)"
@@ -524,4 +524,4 @@ metrics:
     plain_language_definition: "Sum of nearby (within 10 miles), currently-Designated, facility-anchored HPSA scores, each weighted by 1/(1+distance in miles) from the tract's internal point."
     interpretation: "A screening-only straight-line proximity proxy (method=straight_line_screening), not a network-distance or area-overlap-based HPSA assignment. Only facility-anchored HPSA records with real point coordinates and 'Designated' (active) status are included (39 of 148 Santa Clara County HPSA records) -- area-based HPSA records without point geometry, and Withdrawn/Proposed-for-Withdrawal records, are excluded from this score and remain visible only in the raw resources.hrsa_hpsa table."
     limitations: "Excludes the majority of HPSA records (109 of 148) that lack usable point geometry or active status; not a substitute for a true polygon-based HPSA-to-tract overlay, which would require HPSA boundary geometry this platform does not currently ingest."
-    citation: "HRSA BCD_HPSA_FCT_DET_PC/DH/MH.csv."
+    citation: "U.S. Health Resources and Services Administration (HRSA), Health Professional Shortage Area (HPSA) designations -- primary care, dental, and mental health facility detail files (public domain)."
