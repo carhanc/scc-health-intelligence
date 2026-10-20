@@ -68,7 +68,7 @@ export function AccessSummaryPanel({
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-            Nearest clinical care -- {mode === "walk" ? "walking" : "driving"}
+            Nearest clinical care: {mode === "walk" ? "walking" : "driving"}
           </h2>
           <DataModeBadge mode={data.data_mode} />
         </div>
@@ -76,7 +76,7 @@ export function AccessSummaryPanel({
           Modeled from real street-network routing, not a straight-line estimate. Describes this tract&apos;s
           largest-population sub-area (block group {data.representative_block_group_geoid}, population{" "}
           {data.representative_population.toLocaleString()} of {data.n_block_groups_in_tract} sub-areas in this
-          tract) -- a real, specific location, not an average.
+          tract). It is a real, specific location, not an average.
         </p>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--color-text-tertiary)]">
           Road network: <SourceCitationLine sourceId="osm_overpass_network" fallbackText="OpenStreetMap contributors" sourcesById={sourcesById} />

@@ -12,9 +12,9 @@ export function GuidedNextStep({
   children: ReactNode;
 }) {
   return (
-    <div className="mt-4 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-strong)] px-4 py-3">
-      <p className="text-xs font-medium text-[var(--color-text-secondary)]">{prompt}</p>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm">{children}</div>
+    <div className="mt-4 rounded-[var(--radius-md)] bg-[var(--color-interactive-subtle)] px-4 py-3.5">
+      <p className="text-sm font-medium text-[var(--color-text-primary)]">{prompt}</p>
+      <div className="mt-2 flex flex-col gap-1.5 text-sm">{children}</div>
     </div>
   );
 }

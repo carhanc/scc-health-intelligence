@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { setQuery } from "@/lib/url-state";
+import { useSearchParams } from "next/navigation";
 import { FreshnessBadge } from "@scc-health/ui";
 import {
   api,
@@ -40,7 +41,6 @@ function matchesStatusFilter(entry: SourceStatusEntry, filter: StatusFilter): bo
  * data-explorer/status page" requirement with real data, not a mockup.
  */
 export function DataExplorer() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSchema = searchParams.get("schema");
   const selectedTable = searchParams.get("table");
@@ -49,7 +49,7 @@ export function DataExplorer() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("schema", schemaName);
     params.set("table", tableName);
-    router.push(`/data?${params.toString()}`);
+    setQuery("/data", params);
   }
 
   return (
@@ -243,7 +243,7 @@ function SourceRow({ entry }: { entry: SourceStatusEntry }) {
         <FreshnessBadge state={entry.freshness_state} />
       </td>
       <td className="px-3 py-2 align-top tabular-nums">
-        {entry.row_count === null ? "—" : entry.row_count.toLocaleString()}
+        {entry.row_count === null ? "n/a" : entry.row_count.toLocaleString()}
       </td>
       <td className="px-3 py-2 align-top text-[var(--color-text-secondary)]">
         {entry.license_or_terms}
@@ -429,7 +429,7 @@ function TablePreview({
 }
 
 function formatCell(value: unknown): string {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "n/a";
   if (typeof value === "boolean") return value ? "true" : "false";
   return String(value);
 }

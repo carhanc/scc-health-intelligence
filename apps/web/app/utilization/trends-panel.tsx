@@ -28,7 +28,7 @@ const BREAKDOWN_SOURCE_IDS: Record<string, string> = {
 };
 
 /**
- * County-level trends over time (2008-2024): the one HCAI product that
+ * County-level trends over time: the one HCAI product that
  * IS a genuine, real time series -- native to county of residence
  * (Santa Clara is the only county in this file, since it's already
  * filtered to county residents), never allocated to a smaller
@@ -44,11 +44,15 @@ export function TrendsPanel() {
     retry: 1,
   });
 
+  const years = (query.data?.points ?? []).map((p) => p.service_year);
+  const yearRange = years.length > 0 ? `${Math.min(...years)}-${Math.max(...years)}` : null;
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        Real, observed Santa Clara County emergency-department encounter counts by year, 2008-2024,
-        native to the county as a whole -- not allocated to any smaller geography.
+        Real, observed Santa Clara County emergency-department encounter counts by year
+        {yearRange ? `, ${yearRange}` : ""}, native to the county as a whole, not allocated to any smaller
+        geography.
       </p>
 
       <div className="flex flex-wrap gap-2">

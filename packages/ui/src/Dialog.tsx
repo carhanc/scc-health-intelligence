@@ -11,7 +11,7 @@ interface DialogProps {
   /** "side" renders as a right-anchored drawer (evidence panels); "center"
    * renders as a centered modal; "bottom" renders as a bottom-anchored
    * sheet (mobile tract-selection flows, MobileBottomSheet). */
-  variant?: "side" | "center" | "bottom";
+  variant?: "side" | "center" | "bottom" | "wide";
 }
 
 /** Built on the native <dialog> element, which provides a real focus
@@ -41,7 +41,9 @@ export function Dialog({ open, onClose, title, children, variant = "center" }: D
       ? "fixed inset-y-0 right-0 m-0 h-full max-h-full w-full max-w-md rounded-l-[var(--radius-lg)]"
       : variant === "bottom"
         ? "fixed inset-x-0 bottom-0 m-0 max-h-[85vh] w-full rounded-t-[var(--radius-lg)]"
-        : "max-w-lg rounded-[var(--radius-lg)]";
+        : variant === "wide"
+          ? "m-auto max-h-[88vh] w-[min(64rem,calc(100vw-2rem))] rounded-[var(--radius-lg)]"
+          : "max-w-lg rounded-[var(--radius-lg)]";
 
   return (
     <dialog
@@ -51,7 +53,7 @@ export function Dialog({ open, onClose, title, children, variant = "center" }: D
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
-          <h2 id={titleId} className="text-base font-semibold text-[var(--color-text-primary)]">
+          <h2 id={titleId} className="font-sans text-base font-semibold text-[var(--color-text-primary)]">
             {title}
           </h2>
           <button
@@ -71,7 +73,7 @@ export function Dialog({ open, onClose, title, children, variant = "center" }: D
           </button>
         </div>
         {/* tabIndex makes the scrollable region itself keyboard-operable
-            (arrow/Page keys scroll it directly) -- a scrollable region
+            (arrow/Page keys scroll it directly), a scrollable region
             that can only be reached by tabbing through its focusable
             descendants fails WCAG 2.1.1 for content that has none, or
             content past the last focusable child (axe-core

@@ -71,10 +71,10 @@ export function ComparePanel({
         </h3>
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           {inBoth.length >= 7
-            ? "This is a robust set of priority places -- the ranking does not depend heavily on which of these two priorities is used."
+            ? "This is a robust set of priority places. The ranking does not depend heavily on which of these two priorities is used."
             : inBoth.length >= 4
-              ? "About half the top places carry over -- some priority places are shared, but the choice of scenario meaningfully changes the picture."
-              : "Few places carry over -- the choice of scenario substantially changes which places rank highest."}
+              ? "About half the top places carry over; some priority places are shared, but the choice of scenario meaningfully changes the picture."
+              : "Few places carry over; the choice of scenario substantially changes which places rank highest."}
         </p>
       </Card>
 

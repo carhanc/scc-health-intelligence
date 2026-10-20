@@ -25,7 +25,7 @@ export function CitedValue({
       href={source.landing_page}
       target="_blank"
       rel="noreferrer noopener"
-      title={`Source: ${source.publisher} (${source.source_vintage}) -- opens the original data source`}
+      title={`Source: ${source.publisher} (${source.source_vintage}), opens the original data source`}
       className="underline decoration-dotted decoration-[var(--color-text-tertiary)] underline-offset-2 hover:text-[var(--color-interactive)] hover:decoration-[var(--color-interactive)]"
     >
       {children}

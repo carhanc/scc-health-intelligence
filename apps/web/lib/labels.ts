@@ -124,7 +124,7 @@ export function crosswalkQualityLabel(quality: string): string {
 
 const RATE_RELIABILITY_LABELS: Record<string, string> = {
   plausible_range: "Within a plausible range",
-  low_reliability: "Unreliable estimate -- do not use",
+  low_reliability: "Unreliable estimate: do not use",
 };
 
 export function rateReliabilityLabel(reliability: string): string {

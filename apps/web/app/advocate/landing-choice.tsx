@@ -21,7 +21,7 @@ export function LandingChoice({
           type="button"
           onClick={onChooseCommunity}
           aria-label="Choose a community: Find a place and review evidence from the platform."
-          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] p-5 text-left transition-colors hover:border-[var(--color-interactive)] hover:bg-[var(--color-interactive-subtle)]"
+          className="choice-card"
         >
           <p className="text-base font-semibold text-[var(--color-text-primary)]">Choose a community</p>
           <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">
@@ -33,7 +33,7 @@ export function LandingChoice({
           type="button"
           onClick={onChooseDocument}
           aria-label="Review a document: Upload a document and find passages that may support your project."
-          className="rounded-[var(--radius-lg)] border border-[var(--color-border)] p-5 text-left transition-colors hover:border-[var(--color-interactive)] hover:bg-[var(--color-interactive-subtle)]"
+          className="choice-card"
         >
           <p className="text-base font-semibold text-[var(--color-text-primary)]">Review a document</p>
           <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">

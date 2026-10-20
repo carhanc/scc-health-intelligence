@@ -71,3 +71,6 @@ docs/design/screenshots/*
 # Logs
 *.log
 logs/
+
+# v2 visual-review screenshots (regenerable)
+docs/design/v2/screenshots/*

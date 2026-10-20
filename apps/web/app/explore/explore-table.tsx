@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable, StabilityBadge, LoadingRegion, SkeletonText, ErrorState } from "@scc-health/ui";
 import { api, ApiError, type TractScenarioScore } from "@/lib/api";
+import { useTractNames } from "@/lib/use-tract-names";
 import { isValidGeographyId, type SelectedGeography } from "./selection";
 
 /**
@@ -28,12 +29,22 @@ export function ExploreTable({
     retry: 1,
   });
 
+  const names = useTractNames();
+
   const columns = useMemo<ColumnDef<TractScenarioScore, unknown>[]>(
     () => [
       {
+        id: "name",
+        header: "Neighborhood",
+        accessorFn: (row) => names.get(row.tract_geoid_2020) ?? `Tract ${row.tract_geoid_2020}`,
+        cell: (info) => <span className="font-medium text-[var(--color-text-primary)]">{info.getValue() as string}</span>,
+      },
+      {
         accessorKey: "tract_geoid_2020",
-        header: "Census tract number",
-        cell: (info) => <span className="tabular-nums">{info.getValue() as string}</span>,
+        header: "Tract ID",
+        cell: (info) => (
+          <span className="tabular-nums text-[var(--color-text-secondary)]">{info.getValue() as string}</span>
+        ),
       },
       {
         accessorKey: "score",
@@ -65,7 +76,7 @@ export function ExploreTable({
         },
       },
     ],
-    [],
+    [names],
   );
 
   if (scoresQuery.isLoading) {
@@ -103,7 +114,7 @@ export function ExploreTable({
         onSelectTract({
           geographyType: "tract",
           geoid: row.tract_geoid_2020,
-          displayName: `Tract ${row.tract_geoid_2020}`,
+          displayName: names.get(row.tract_geoid_2020) ?? `Tract ${row.tract_geoid_2020}`,
           source: "table",
         });
       }}

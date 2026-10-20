@@ -18,7 +18,7 @@ export function ConstraintsPanel() {
       <p className="text-sm text-[var(--color-text-secondary)]">
         These scenarios explore how many new mobile-service sites, at what distance threshold, and
         with or without an equity requirement, could reach the most health-burden-weighted
-        population -- the same modeled planning scenarios shown in the Access Lab. Site-count,
+        population: the same modeled planning scenarios shown in the Access Lab. Site-count,
         distance, and equity constraints are varied across scenarios rather than freely adjustable,
         so every result shown here reflects a specific, disclosed, pre-vetted combination of
         assumptions.

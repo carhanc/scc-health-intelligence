@@ -2,94 +2,113 @@
 @source "../../../packages/ui";
 
 /*
- * Design tokens — full system built Phase 5, per docs/01_UX_UI_SPEC.md §18
- * and docs/design/design-system.md. Restrained civic-tech palette: warm-gray
- * background, deep navy/slate text, blue/teal interactive emphasis, amber for
- * caution/uncertainty, red reserved for serious alerts only (never ordinary
- * high percentiles). Every color pair below is contrast-checked against its
- * expected background for WCAG 2.2 AA (4.5:1 normal text, 3:1 large text/UI).
+ * Design tokens, v2 ("Valley"). See docs/design/v2/design-brief.md.
+ *
+ * Direction: calm, editorial, civic. Cool near-white paper with ink text,
+ * one deep-spruce brand/interactive color, and a single warm accent
+ * (apricot) reserved for the map's concern ramp and key highlights.
+ * Every text/background pair below was contrast-checked for WCAG 2.2 AA
+ * (4.5:1 normal text, 3:1 large text/UI); the lowest text pair is 5.0:1.
  */
+@theme {
+  /* Type floor raised: the old scale put ~200 labels at 12px. Nothing
+   * a reader needs should sit below 13px. */
+  --text-xs: 0.8125rem; /* 13px: captions, meta */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9375rem; /* 15px: secondary text, UI */
+  --text-sm--line-height: 1.55;
+  --text-base: 1.0625rem; /* 17px: body */
+  --text-base--line-height: 1.6;
+  --text-lg: 1.1875rem; /* 19px */
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.5rem; /* 24px */
+  --text-xl--line-height: 1.25;
+  --text-2xl: 1.875rem; /* 30px */
+  --text-2xl--line-height: 1.2;
+  --text-3xl: 2.375rem; /* 38px */
+  --text-3xl--line-height: 1.1;
+}
+
 :root {
   /* Surfaces */
-  --color-background: #faf9f7; /* page background, warm off-white */
-  --color-surface: #ffffff; /* cards, panels, drawers */
-  --color-surface-raised: #ffffff; /* modals/popovers -- distinguished by shadow, not fill */
-  --color-surface-sunken: #f2efe9; /* nested/inset areas (table stripe, code blocks) */
+  --color-background: #f4f6f4; /* page: cool, faintly green-tinted near-white */
+  --color-surface: #ffffff; /* panels, cards, drawers */
+  --color-surface-raised: #ffffff; /* floating panels: distinguished by shadow */
+  --color-surface-sunken: #e9edea; /* inset areas, table stripe */
 
-  /* Text */
-  --color-text-primary: #1e2933; /* deep slate, body/headings -- 13.6:1 on background */
-  --color-text-secondary: #4b5a67; /* supporting text/labels -- 7.2:1 on background */
-  --color-text-tertiary: #5c6874; /* de-emphasized meta (timestamps, IDs) -- 4.88:1 minimum, AA even against tinted surfaces (was #6b7885, which measured 4.29:1 against --color-background and 3.86:1 against --color-interactive-subtle via axe-core -- fails AA; found during Phase 5 automated a11y testing) */
+  /* Text (ink) */
+  --color-text-primary: #12241f; /* 14.9:1 on background */
+  --color-text-secondary: #3f514b; /* 7.8:1 */
+  --color-text-tertiary: #566761; /* 5.0:1 minimum, AA on every tinted surface */
   --color-text-on-interactive: #ffffff;
 
   /* Borders */
-  --color-border: #d9d4cc; /* default hairline */
-  --color-border-strong: #b8b0a2; /* table rules, active dividers */
+  --color-border: #dce1de;
+  --color-border-strong: #b9c2be;
 
-  /* Interactive (teal) */
-  --color-interactive: #0b6e75;
-  --color-interactive-hover: #085158;
-  --color-interactive-subtle: #e3f0f0; /* selected-row / hover-fill background */
-  --color-focus-ring: #0b6e75;
+  /* Interactive: deep spruce */
+  --color-interactive: #0f5f57; /* 7.5:1 on white */
+  --color-interactive-hover: #0b4740;
+  --color-interactive-subtle: #e0eeeb;
+  --color-focus-ring: #0f5f57;
 
-  /* Caution (amber) -- uncertainty, stale, assumption-sensitive */
+  /* Accent: apricot. Used sparingly: map ramp, one highlight per view. */
+  --color-accent: #e8892b;
+  --color-accent-strong: #9a4a0a; /* text-safe, 6.3:1 on white */
+  --color-accent-subtle: #fdf0de;
+
+  /* Caution (uncertainty, stale, assumption-sensitive) */
   --color-caution: #b8720a;
-  --color-caution-subtle: #fbf0dc;
-  --color-caution-strong: #7a4c07;
+  --color-caution-subtle: #fbefd9;
+  --color-caution-strong: #6e4100;
 
-  /* Alert (red) -- reserved for genuine failures, never ordinary high percentiles */
+  /* Alert: genuine failures only, never an ordinary high score */
   --color-alert: #b3261e;
   --color-alert-subtle: #fbe9e8;
 
-  /* Success (muted green) -- used sparingly: solved/optimal, data available */
-  --color-success: #2f6b3a;
-  --color-success-subtle: #e7f2e8;
+  /* Success: current / available, used sparingly */
+  --color-success: #2a6a3c;
+  --color-success-subtle: #e4f1e7;
 
-  /* Neutral (unavailable / no-data / demo) */
-  --color-neutral: #6b7885;
-  --color-neutral-subtle: #eceae5;
+  /* Neutral (unavailable / no data / demo) */
+  --color-neutral: #5d6d68;
+  --color-neutral-subtle: #e9edea;
 
-  /* Radius */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  /* Radius: one family */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
 
-  /* Shadow -- subtle, reserved for true overlays (drawer/dialog/popover), never flat cards */
-  --shadow-sm: 0 1px 2px 0 rgb(30 41 51 / 0.06);
-  --shadow-md: 0 4px 16px -2px rgb(30 41 51 / 0.12), 0 2px 6px -2px rgb(30 41 51 / 0.08);
-  --shadow-lg: 0 12px 32px -4px rgb(30 41 51 / 0.18), 0 4px 12px -4px rgb(30 41 51 / 0.1);
+  /* Elevation: only for things that float over other content */
+  --shadow-sm: 0 1px 2px 0 rgb(18 36 31 / 0.06);
+  --shadow-md: 0 6px 20px -4px rgb(18 36 31 / 0.16), 0 2px 6px -2px rgb(18 36 31 / 0.08);
+  --shadow-lg: 0 16px 40px -8px rgb(18 36 31 / 0.22), 0 4px 12px -4px rgb(18 36 31 / 0.1);
 
   /* Layout */
-  --container-max: 1440px;
-  --nav-width: 15rem;
-  --context-bar-height: 3.25rem;
+  --container-max: 1280px;
+  --topbar-height: 4rem;
 
-  /* Chart categorical palette -- Okabe-Ito colorblind-safe qualitative set.
-   * Keep in sync with packages/ui/src/tokens.ts CHART_PALETTE (MapLibre/SVG
-   * paint expressions need literal values, not CSS custom properties). */
-  --chart-1: #0072b2; /* blue */
-  --chart-2: #e69f00; /* orange */
-  --chart-3: #009e73; /* bluish green */
-  --chart-4: #cc79a7; /* reddish purple */
-  --chart-5: #56b4e9; /* sky blue */
-  --chart-6: #d55e00; /* vermillion */
+  /* Chart categorical palette -- Okabe-Ito colorblind-safe qualitative
+   * set. Keep in sync with packages/ui/src/tokens.ts CHART_PALETTE. */
+  --chart-1: #0072b2;
+  --chart-2: #e69f00;
+  --chart-3: #009e73;
+  --chart-4: #cc79a7;
+  --chart-5: #56b4e9;
+  --chart-6: #d55e00;
 
-  /* Concern gradient (DEC-072) for the Explore map choropleth and any
-   * other place-level "combined concern" indicator -- five stops,
-   * lowest concern (muted teal/green) through highest concern (dark
-   * red/red-orange), colorblind-simulation and contrast verified
-   * (docs/design/health-equity-ux-visual-review.md). This intentionally
-   * reverses the earlier single-hue "never red/green" rule; see DEC-072
-   * for the full rationale and the guardrails that replace it. Keep in
-   * sync with packages/ui/src/tokens.ts CONCERN_SCALE. This red is a
-   * distinct token from --color-alert (system/data-freshness alerts)
-   * and must never be merged with it. */
-  --concern-scale-1: #1a5c4a; /* lowest concern */
-  --concern-scale-2: #6a9b7f; /* low-moderate */
-  --concern-scale-3: #d8cfa8; /* moderate (warm neutral) */
-  --concern-scale-4: #e08f3c; /* elevated */
-  --concern-scale-5: #c0392b; /* highest concern */
-  --concern-no-data: #d9d4cc; /* gray; paired with a hatch pattern on the map, never a flat color alone */
+  /* Concern ramp (supersedes DEC-072's teal-to-red, see DEC-090). A
+   * sequential warm ramp: one direction, "more" reads as darker and
+   * warmer, and no red/green pair that fails common color-vision
+   * deficiencies. Five classes with evenly stepped lightness (relative
+   * luminance .83, .60, .38, .18, .05). Keep in sync with
+   * packages/ui/src/tokens.ts CONCERN_SCALE. */
+  --concern-scale-1: #a8d98c; /* lowest concern: soft green */
+  --concern-scale-2: #f1e08a; /* low-moderate: pale yellow */
+  --concern-scale-3: #f2a950; /* moderate: amber */
+  --concern-scale-4: #d4533a; /* elevated: red-orange */
+  --concern-scale-5: #7f1a2c; /* highest concern: deep red */
+  --concern-no-data: #cfd6d3; /* cool gray; always paired with a hatch on the map */
 }
 
 html,
@@ -100,6 +119,92 @@ body {
 
 body {
   font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Panel content eases in when the panel changes state (browse, then
+ * neighborhood). Short and quiet; reduced-motion users get none. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-panel-in {
+  animation: panel-in 220ms ease-out both;
+}
+
+/* A large, top-aligned choice card (task choosers on Utilization, Advocate,
+ * Copilot). Buttons center their content vertically by default, which made
+ * cards of different text lengths look ragged; this pins content to the top
+ * and puts the affordance arrow on the bottom edge. */
+@layer components {
+  .choice-card {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 1.25rem;
+    text-align: left;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    transition:
+      border-color 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+  .choice-card:hover {
+    border-color: var(--color-interactive);
+    box-shadow: var(--shadow-sm);
+  }
+  .choice-card::after {
+    content: "\2192";
+    margin-top: auto;
+    padding-top: 1rem;
+    font-weight: 500;
+    color: var(--color-interactive);
+  }
+}
+
+/* Page and section titles use the editorial serif; UI headings (h3 and
+ * below) stay in the sans so controls and labels read as UI. In the base
+ * layer so a utility class such as `font-sans` on a heading still wins. */
+@layer base {
+  /* WCAG 2.2 target size: every standalone control is at least 24px tall.
+     Inline links inside a sentence are unaffected (min-height does not apply to them). */
+  button,
+  summary,
+  [role="tab"] {
+    min-height: 1.5rem;
+  }
+  a:not(p a) {
+    min-height: 1.5rem;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+  }
+
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
+  }
 }
 
 /* Tabular numerals everywhere a number appears in a table/comparison, so

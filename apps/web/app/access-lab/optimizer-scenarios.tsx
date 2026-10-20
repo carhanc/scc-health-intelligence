@@ -67,7 +67,7 @@ export function OptimizerScenarios() {
       <p className="text-sm text-[var(--color-text-secondary)]">
         These are <strong className="font-semibold text-[var(--color-text-primary)]">modeled planning scenarios</strong>{" "}
         exploring where a limited number of new mobile-service sites near existing transit stops could reach the
-        most health-burden-weighted population -- not a decided plan, a real deployment, or a guarantee of health
+        most health-burden-weighted population, not a decided plan, a real deployment, or a guarantee of health
         outcomes. Candidate sites are real VTA transit stops; coverage distance is a straight-line screening
         estimate. <DataModeBadge mode={query.data.data_mode} />
       </p>
@@ -145,7 +145,7 @@ function ScenarioCard({
         </dl>
       ) : (
         <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-          No combination of sites under these constraints satisfies the requirement -- for example, the equity
+          No combination of sites under these constraints satisfies the requirement; for example, the equity
           requirement cannot be met with this few sites at this distance threshold. This is a real, informative
           result, not an error.
         </p>

@@ -45,7 +45,7 @@ export function concernBandLabel(value: number, noun: string): string {
  * underlying precise value, never shown as a second competing headline
  * number (docs/methods/screening-score-interpretation.md §7). */
 export function formatScreeningScore(score: number | null): string {
-  return score === null ? "—" : String(Math.round(score));
+  return score === null ? "N/A" : String(Math.round(score));
 }
 
 /** The one canonical public comparison sentence. `comparisonPercentile`
@@ -146,34 +146,39 @@ export function ScreeningScore({
     );
   }
 
-  // full mode -- the dominant headline treatment.
+  // full mode -- the dominant headline treatment: a large serif numeral
+  // beside its plain-language meaning.
   return (
     <div role="img" aria-label={name} className={className}>
-      <div className="flex items-baseline gap-2">
-        <span className="text-4xl font-bold tabular-nums text-[var(--color-text-primary)] sm:text-[2.75rem]">
-          {formatted}
-        </span>
-        <span className="text-lg text-[var(--color-text-tertiary)]">/100</span>
+      <div className="flex items-center gap-5">
+        <div className="shrink-0">
+          <div className="flex items-baseline gap-1">
+            <span className="font-serif text-[3.75rem] font-medium leading-none tabular-nums text-[var(--color-text-primary)]">
+              {formatted}
+            </span>
+            <span className="text-base text-[var(--color-text-tertiary)]">/100</span>
+          </div>
+          <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">{SCREENING_SCORE_LABEL}</p>
+        </div>
+        {score !== null && (
+          <p className="text-base font-semibold leading-snug text-[var(--color-text-primary)]">
+            {band!.label} overlapping screening concern
+          </p>
+        )}
       </div>
-      <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-interactive)]">
-        {SCREENING_SCORE_LABEL}
-      </p>
       {score === null ? (
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
           {missingReason ?? "There isn't enough data to compute a combined score for this tract under this scenario."}
         </p>
       ) : (
         <>
-          <p className="mt-2 text-lg font-semibold text-[var(--color-text-primary)]">
-            {band!.label} overlapping screening concern
-          </p>
           {comparison && (
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
               {comparison}
               {scenarioLabel ? ` under ${scenarioLabel}.` : "."}
             </p>
           )}
-          <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">
+          <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
             0 = lower screening concern · 100 = higher screening concern
           </p>
         </>

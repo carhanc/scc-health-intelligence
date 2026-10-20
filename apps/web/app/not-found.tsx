@@ -7,8 +7,8 @@ export default function NotFound() {
     <div className="mx-auto max-w-[var(--container-max)] px-4 py-16 sm:px-6 lg:px-10">
       <EmptyState
         title="Page not found"
-        description="There's nothing at this address. Try one of the links in the navigation, or return to the overview."
-        secondaryAction={{ label: "Return to overview", href: "/" }}
+        description="There's nothing at this address. Try one of the links in the navigation, or return to the map."
+        secondaryAction={{ label: "Return to the map", href: "/" }}
       />
     </div>
   );

@@ -66,7 +66,7 @@ export function RankedAreaCard({ area }: { area: RankedAreaCardData }) {
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Link
-          href={`/explore?geography=tract&id=${encodeURIComponent(area.tractGeoid)}${
+          href={`/?geography=tract&id=${encodeURIComponent(area.tractGeoid)}${
             area.scenarioId ? `&scenario=${encodeURIComponent(area.scenarioId)}` : ""
           }`}
           className="text-xs font-medium text-[var(--color-interactive)] hover:underline"

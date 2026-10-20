@@ -20,7 +20,7 @@ export function MethodsPanel() {
           How the health equity screening score is built
         </h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          The 0-100 number shown throughout this platform (Explore, Prioritize, Compare, Advocate) is a screening
+          The 0-100 number shown throughout this platform (the map, Advanced ranking, Compare, Advocate) is a screening
           and prioritization signal, not a direct measurement of health equity: 0 means lower overlapping
           screening concern, 100 means higher, and a low score does not certify a place as healthy or equitable.
         </p>
@@ -28,25 +28,25 @@ export function MethodsPanel() {
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">1. Metric.</strong> Each published
             measure (e.g. the share of adults with diabetes) is converted to a percentile against every other
-            Santa Clara County tract -- so a raw value is always shown alongside where it stands countywide.
+            Santa Clara County tract, so a raw value is always shown alongside where it stands countywide.
           </li>
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">2. Subdomain, then domain.</strong>{" "}
             Related metrics average into a subdomain, then subdomains average into one of five domains (health
             needs, access barriers, environmental conditions, community resources, workforce shortage). A tract
-            missing too many subdomains gets no domain score at all -- never a zero standing in for missing data.
+            missing too many subdomains gets no domain score at all, never a zero standing in for missing data.
           </li>
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">3. Scenario weighting.</strong> A
             named screening view (or a custom weighting on the Prioritize page) combines the five domain scores
             into one 0-100 health equity screening score, using a weighted average. A domain missing for a tract
-            has its weight excluded and the rest renormalized, not treated as zero -- see
+            has its weight excluded and the rest renormalized, not treated as zero; see
             &quot;coverage_fraction&quot; on any score.
           </li>
           <li>
             <strong className="font-medium text-[var(--color-text-primary)]">4. Uncertainty and sensitivity.</strong>{" "}
             Every score also carries a Monte Carlo uncertainty range and a stability label showing how much the
-            ranking would change under a different reasonable weighting -- see the Uncertainty &amp; sensitivity tab.
+            ranking would change under a different reasonable weighting; see the Uncertainty &amp; sensitivity tab.
           </li>
         </ol>
       </Card>
@@ -114,7 +114,7 @@ function ScenarioWeights() {
     <Card>
       <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Scenario weights</h2>
       <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-        The exact weight each named scenario gives each domain -- also available as a downloadable, hashed record
+        The exact weight each named scenario gives each domain, also available as a downloadable, hashed record
         on the Reproducibility tab.
       </p>
       <div

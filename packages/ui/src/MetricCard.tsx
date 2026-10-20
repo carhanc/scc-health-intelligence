@@ -31,8 +31,8 @@ export function MetricCard({
 
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <p className={`text-3xl font-semibold tabular-nums ${valueColor}`}>{value}</p>
-      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{label}</p>
+      <p className={`font-serif text-4xl font-medium tabular-nums ${valueColor}`}>{value}</p>
+      <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">{label}</p>
       {direction && <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{direction}</p>}
       {detail && <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">{detail}</p>}
     </div>

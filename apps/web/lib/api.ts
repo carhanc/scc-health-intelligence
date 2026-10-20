@@ -5,6 +5,7 @@
 // configuration this module needs.
 
 import type { Feature, Geometry } from "geojson";
+import { cleanDeep } from "./text-clean";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -1019,7 +1020,7 @@ async function apiGet<T>(path: string): Promise<T> {
     }
     throw new ApiError(message, response.status, errorCode, geographyType, requestedId);
   }
-  return (await response.json()) as T;
+  return cleanDeep((await response.json()) as T);
 }
 
 export const api = {
@@ -1163,7 +1164,7 @@ export const api = {
       }
       throw new ApiError(message, response.status);
     }
-    return (await response.json()) as CustomScoreResponse;
+    return cleanDeep((await response.json()) as CustomScoreResponse);
   },
   getPrioritizeExportCsvUrl: (
     params: { scenarioId: string } | { weights: Record<string, number> },
@@ -1242,7 +1243,7 @@ export const api = {
       }
       throw new ApiError(message, response.status);
     }
-    return (await response.json()) as GeneratedBriefResponse;
+    return cleanDeep((await response.json()) as GeneratedBriefResponse);
   },
 
   // --- Phase 8: Document Intelligence ---
@@ -1263,7 +1264,7 @@ export const api = {
       }
       throw new ApiError(message, response.status);
     }
-    return (await response.json()) as DocumentAnalysisResponse;
+    return (await response.json()) as DocumentAnalysisResponse; // quoted passages stay verbatim
   },
 
   // --- Phase 8: Copilot ---
@@ -1297,6 +1298,6 @@ export const api = {
       }
       throw new ApiError(message, response.status);
     }
-    return (await response.json()) as CopilotAskResponse;
+    return cleanDeep((await response.json()) as CopilotAskResponse);
   },
 };

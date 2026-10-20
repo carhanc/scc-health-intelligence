@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { setQuery } from "@/lib/url-state";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabPanel } from "@scc-health/ui";
 import { api } from "@/lib/api";
 import { CUSTOM_SCENARIO_ID } from "./scenario-selector";
 import { DEFAULT_WEIGHTS, normalizeWeights } from "./weight-sliders";
-import { FocusPicker } from "../focus-picker";
-import { WeightBreakdown } from "../weight-breakdown";
+import { LensPicker } from "../map-home/lens-picker";
 import { TaskPageHeader } from "../task-page-header";
 import { ResultsPanel } from "./results-panel";
 import { ConstraintsPanel } from "./constraints-panel";
@@ -34,15 +34,15 @@ function parseWeightsParam(raw: string | null): Record<string, number> | null {
 }
 
 export function PrioritizeClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [showAdjust, setShowAdjust] = useState(false);
   const [showConstraints, setShowConstraints] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
 
   const scenarioId = searchParams.get("scenario") ?? "default_integrated_screen_v1";
   const isCustom = scenarioId === CUSTOM_SCENARIO_ID;
-  const customWeights = parseWeightsParam(searchParams.get("weights")) ?? DEFAULT_WEIGHTS;
+  const urlWeights = parseWeightsParam(searchParams.get("weights"));
+  const [customRaw, setCustomRaw] = useState<Record<string, number>>(urlWeights ?? DEFAULT_WEIGHTS);
+  const customWeights = urlWeights ?? DEFAULT_WEIGHTS;
   const activeTab = (searchParams.get("tab") as TabId | null) ?? "results";
   const compareScenarioId = searchParams.get("compareScenario") ?? "";
 
@@ -53,10 +53,24 @@ export function PrioritizeClient() {
         if (value === null) params.delete(key);
         else params.set(key, value);
       }
-      router.push(`/prioritize?${params.toString()}`);
+      setQuery("/prioritize", params);
     },
-    [router, searchParams],
+    [searchParams],
   );
+
+  // Sliders feel instant; the URL (and the ranking request) follows a moment later.
+  useEffect(() => {
+    if (!isCustom) return;
+    const t = setTimeout(() => {
+      const next = JSON.stringify(customRaw);
+      if (next !== searchParams.get("weights")) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("weights", next);
+        setQuery("/prioritize", params, "replace");
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [customRaw, isCustom]);
 
   const scenariosQuery = useQuery({
     queryKey: ["prioritize-scenario-labels"],
@@ -65,56 +79,29 @@ export function PrioritizeClient() {
   const scenarioLabels = Object.fromEntries(
     (scenariosQuery.data?.scenarios ?? []).map((s) => [s.scenario_id, s.label]),
   );
-  const currentFocusLabel = isCustom ? "Custom focus" : (scenarioLabels[scenarioId] ?? "Health equity overview");
-  const currentWeights = isCustom
-    ? normalizeWeights(customWeights)
-    : scenariosQuery.data?.scenarios.find((s) => s.scenario_id === scenarioId)?.weights;
 
   const scenarioSelection = isCustom
     ? ({ kind: "custom" as const, weights: normalizeWeights(customWeights) })
     : ({ kind: "named" as const, scenarioId });
 
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <TaskPageHeader
         title="Find areas for closer review"
         purpose="See which census tracts show the highest overlapping screening concern under the selected view. This is a screening tool, not a prediction or a guarantee that any specific intervention would help."
       />
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-medium text-[var(--color-text-primary)]">{currentFocusLabel}</span>
-          <button
-            type="button"
-            onClick={() => setShowAdjust((v) => !v)}
-            aria-expanded={showAdjust}
-            className="font-medium text-[var(--color-interactive)] hover:underline"
-          >
-            {showAdjust ? "Hide priorities" : "Adjust priorities"}
-          </button>
-        </div>
-        {currentWeights && (
-          <div className="w-full max-w-sm sm:w-auto sm:min-w-[280px]">
-            <WeightBreakdown weights={currentWeights} compact />
-          </div>
-        )}
+      <div className="mt-6 max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-surface)] p-5">
+        <LensPicker
+          scenarioId={scenarioId}
+          onSelectNamed={(id) => updateParams({ scenario: id === "default_integrated_screen_v1" ? null : id, weights: null })}
+          onSelectCustom={() => updateParams({ scenario: CUSTOM_SCENARIO_ID, weights: JSON.stringify(customRaw) })}
+          customWeights={customRaw}
+          onCustomChange={setCustomRaw}
+        />
       </div>
 
-      {showAdjust && (
-        <div className="mt-3 max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4">
-          <FocusPicker
-            selectedScenarioId={scenarioId}
-            onSelect={(id) => {
-              updateParams({ scenario: id === "default_integrated_screen_v1" ? null : id, weights: null });
-              setShowAdjust(false);
-            }}
-            customWeights={customWeights}
-            onCustomWeightsChange={(w) => updateParams({ scenario: CUSTOM_SCENARIO_ID, weights: JSON.stringify(w) })}
-          />
-        </div>
-      )}
-
-      <div className="mt-5">
+      <div className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs
             items={TAB_ITEMS}

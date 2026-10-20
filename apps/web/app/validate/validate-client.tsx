@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { setQuery } from "@/lib/url-state";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabPanel } from "@scc-health/ui";
 import { TaskPageHeader } from "../task-page-header";
 import { CoveragePanel } from "./coverage-panel";
@@ -28,7 +29,6 @@ const TAB_ITEMS = [
  * shouldn't have to know which of the two to enter first (docs/design/
  * product-wide-flow-simplification-research.md "VALIDATE"). */
 export function ValidateClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = (searchParams.get("tab") as TabId | null) ?? "overview";
 
@@ -39,13 +39,13 @@ export function ValidateClient() {
         if (value === null) params.delete(key);
         else params.set(key, value);
       }
-      router.push(`/validate?${params.toString()}`);
+      setQuery("/validate", params);
     },
-    [router, searchParams],
+    [searchParams],
   );
 
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <TaskPageHeader
         title="Trust, methods, and data quality"
         purpose="See what data is current, how scores are built, and what the platform cannot tell you."

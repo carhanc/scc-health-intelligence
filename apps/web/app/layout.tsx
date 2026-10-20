@@ -1,21 +1,34 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Newsreader, Public_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppShell } from "./app-shell";
 
-const inter = Inter({
+// Public Sans for UI and data (neutral, built for government sites, real
+// tabular figures); Newsreader for headlines and large numerals, a screen
+// serif with optical sizes. See docs/design/v2/design-brief.md.
+const publicSans = Public_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 });
 
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-serif",
+  display: "swap",
+  style: ["normal", "italic"],
+});
+
 export const metadata: Metadata = {
-  title: "Santa Clara Health Intelligence",
+  title: {
+    default: "Santa Clara Health Intelligence",
+    template: "%s | Santa Clara Health Intelligence",
+  },
   description:
-    "Find where health needs, access barriers, and service gaps overlap in Santa Clara County. Explore public data, test transparent scenarios, and build evidence-backed questions for advocacy and planning.",
+    "Where in Santa Clara County does health need the most support, and why? An open, fully cited map of every neighborhood, built from public data, with the method and uncertainty shown.",
 };
 
 export default function RootLayout({
@@ -24,13 +37,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${publicSans.variable} ${newsreader.variable}`}>
       <body>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
         {/* Anonymous, aggregate page-view counts and real-user performance
-            timing only (Vercel Web Analytics / Speed Insights) -- no custom
+            timing only (Vercel Web Analytics / Speed Insights), no custom
             events, no cookies, no tracking of search terms, uploaded
             filenames, or anything typed into Advocate/Copilot. Both
             components are no-ops outside a real Vercel deployment, so local

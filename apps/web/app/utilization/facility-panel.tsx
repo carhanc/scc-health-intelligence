@@ -109,7 +109,7 @@ export function FacilityPanel() {
       </p>
       <p className="text-xs text-[var(--color-text-tertiary)]">
         &quot;Licensed beds&quot; and &quot;total ED encounters&quot; are shown side by side as a
-        capacity-versus-demand comparison -- this is not an occupancy rate or an over-capacity
+        capacity-versus-demand comparison; this is not an occupancy rate or an over-capacity
         claim, since no public data reports actual bed-day usage. For each facility&apos;s real
         travel-time catchment and how it overlaps neighboring facilities&apos; service areas, see
         the Access Lab.
@@ -154,7 +154,7 @@ function FacilityDetail({ oshpdId }: { oshpdId: string }) {
     <Card>
       <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{facility.facility_name}</h3>
       <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-        {facility.city} -- {facility.total_ed_encounters?.toLocaleString() ?? "unknown"} ED encounters in 2024
+        {facility.city}: {facility.total_ed_encounters?.toLocaleString() ?? "unknown"} ED encounters in 2024
         (observed, not modeled).
       </p>
 

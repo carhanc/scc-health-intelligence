@@ -1,10 +1,12 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { setQuery } from "@/lib/url-state";
+import { useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { SegmentedControl, Tabs, TabPanel } from "@scc-health/ui";
 import { SearchPanel } from "../explore/search-panel";
 import { parseSelectedGeographyFromParams, type SelectedGeography } from "../explore/selection";
+import { useTractNames } from "@/lib/use-tract-names";
 import { TaskPageHeader } from "../task-page-header";
 import { AccessSummaryPanel } from "./access-summary-panel";
 import { ResourceBrowser } from "./resource-browser";
@@ -30,7 +32,6 @@ const TAB_ITEMS = [
  * anything to show in them (docs/design/product-wide-flow-
  * simplification-research.md "ACCESS LAB"). */
 export function AccessLabClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // parseSelectedGeographyFromParams only ever knows the raw GEOID (a
@@ -46,8 +47,14 @@ export function AccessLabClient() {
     searchParams.get("id"),
   );
   const nameParam = searchParams.get("name");
-  const selected: SelectedGeography | null =
-    parsedSelected && nameParam ? { ...parsedSelected, displayName: nameParam } : parsedSelected;
+  // A link without a name (a shared URL, the header search) still reads as
+  // "Census Tract 5001.00", never the bare 11-digit ID.
+  const tractNames = useTractNames();
+  const knownName =
+    parsedSelected?.geographyType === "tract" ? tractNames.get(parsedSelected.geoid) : undefined;
+  const selected: SelectedGeography | null = parsedSelected
+    ? { ...parsedSelected, displayName: nameParam ?? knownName ?? parsedSelected.displayName }
+    : null;
   const mode: Mode = searchParams.get("mode") === "drive" ? "drive" : "walk";
   const activeTab = (searchParams.get("tab") as TabId | null) ?? "summary";
   const tractGeoid = selected?.geographyType === "tract" ? selected.geoid : null;
@@ -59,9 +66,9 @@ export function AccessLabClient() {
         if (value === null) params.delete(key);
         else params.set(key, value);
       }
-      router.push(`/access-lab?${params.toString()}`);
+      setQuery("/access-lab", params);
     },
-    [router, searchParams],
+    [searchParams],
   );
 
   function handleGeographySelect(selection: SelectedGeography) {
@@ -69,7 +76,7 @@ export function AccessLabClient() {
   }
 
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <TaskPageHeader
         title="Understand access to care"
         purpose="Choose a community to see modeled travel to healthcare and essential resources."
