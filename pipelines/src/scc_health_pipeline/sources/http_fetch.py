@@ -52,6 +52,9 @@ def fetch_with_retry(
 
     if dest_path.exists():
         existing_sha = _sha256_of_file(dest_path)
+        # A reused file was retrieved when it was written, not now. Stamping it
+        # with today's date would make an old download look freshly checked.
+        original_retrieval = datetime.fromtimestamp(dest_path.stat().st_mtime, UTC)
         return RawArtifact(
             resource_id=resource.resource_id,
             source_id=source_id,
@@ -60,7 +63,7 @@ def fetch_with_retry(
             sha256=existing_sha,
             bytes=dest_path.stat().st_size,
             content_type=resource.expected_content_type,
-            retrieved_at=datetime.now(UTC).isoformat(),
+            retrieved_at=original_retrieval.isoformat(),
             status="cached",
             notes="Reused existing immutable raw artifact; delete data/raw to force refresh.",
         )

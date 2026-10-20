@@ -1,8 +1,11 @@
 """HCAI Patient Origin/Market Share (Pivot Profile) -- Inpatient, ED, and
 Ambulatory Surgery.
 
-Verified live 2026-07-12. Dataset on data.chhs.ca.gov (CKAN package
-dcb1799d-ddfa-485e-bc35-f86357f08e01), most recent year 2024. Workbook has
+Verified live 2026-07-12; link re-verified 2026-10-20. Dataset on
+data.chhs.ca.gov (CKAN package dcb1799d-ddfa-485e-bc35-f86357f08e01). HCAI
+now publishes 2024 and 2025 together in one workbook, so rows are filtered to
+REPORTING_YEAR (2024) below; that keeps this source on the same year as the ED
+facility profile and the tract allocation built from it. Workbook has
 3 sheets: "Patient Origin" and "Market Share" are interactive Excel
 PivotTable UI views (not parsed -- same pattern as the ED facility
 profile workbook), "Data" is the real flat table, confirmed live: columns
@@ -46,7 +49,7 @@ ADAPTER_VERSION = "1.0.0"
 
 _URL = (
     "https://data.chhs.ca.gov/dataset/dcb1799d-ddfa-485e-bc35-f86357f08e01/resource/"
-    "940326be-d80f-4e2b-9cba-1f9e3b912cd7/download/2024-patient-origin-market-share.xlsx"
+    "940326be-d80f-4e2b-9cba-1f9e3b912cd7/download/2024-2025-patient-origin-market-share.xlsx"
 )
 REPORTING_YEAR = 2024
 
@@ -112,6 +115,12 @@ class HcaiPatientOriginAdapter:
             raise ValueError(f"Failed to parse the '{_DATA_SHEET}' sheet: {exc}") from exc
 
         df = pl.from_pandas(parsed.dataframe)
+        if "year" not in df.columns:
+            raise ValueError(
+                "The 'Data' sheet has no 'year' column; cannot isolate the reporting year."
+            )
+        # The workbook can hold more than one year; never label other years as REPORTING_YEAR.
+        df = df.filter(pl.col("year").cast(pl.Int64, strict=False) == REPORTING_YEAR)
         df = df.with_columns(
             [
                 pl.col("oshpd_id").cast(pl.Utf8),

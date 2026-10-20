@@ -1,10 +1,12 @@
 """HCAI Emergency Department characteristics by patient county of residence.
 
-Verified live 2026-07-12. Dataset "Hospital Emergency Department -
-Characteristics by Patient County of Residence" (data.chhs.ca.gov, CKAN
-package b91d0f25-d2b1-4c9f-b22d-13be3a6c5c90). Published as separate CSVs
+Verified live 2026-07-12; download links re-verified 2026-10-20 after HCAI
+replaced the 2024 files with 2025 releases on 2026-09-17 (same columns).
+Dataset "Hospital Emergency Department - Characteristics by Patient County of
+Residence" (data.chhs.ca.gov, CKAN package
+b91d0f25-d2b1-4c9f-b22d-13be3a6c5c90). Published as separate CSVs
 per breakdown, not one combined file: disposition, race group, sex,
-expected payer, each 2008-2024 with masked/suppressed cells preserved
+expected payer, each 2008-2025 with masked/suppressed cells preserved
 (never treated as zero -- an `AnnotationCode`/`AnnotationDesc` column
 documents the suppression reason directly in the source).
 
@@ -39,19 +41,19 @@ _SANTA_CLARA_COUNTY_NAME = "Santa Clara"
 _BREAKDOWN_URLS = {
     "disposition": (
         "https://data.chhs.ca.gov/dataset/b91d0f25-d2b1-4c9f-b22d-13be3a6c5c90/resource/"
-        "be06665a-7695-4a0b-af07-f0556d7e6707/download/disposition_ed_2024masked.csv"
+        "be06665a-7695-4a0b-af07-f0556d7e6707/download/disposition_ed_2025_masked_.csv"
     ),
     "race_group": (
         "https://data.chhs.ca.gov/dataset/b91d0f25-d2b1-4c9f-b22d-13be3a6c5c90/resource/"
-        "fd061afe-9bf2-48d9-bd2d-bb7965ebdf2b/download/racegroup_ed_2024_masked.csv"
+        "fd061afe-9bf2-48d9-bd2d-bb7965ebdf2b/download/racegroup_ed_2025_masked_.csv"
     ),
     "sex": (
         "https://data.chhs.ca.gov/dataset/b91d0f25-d2b1-4c9f-b22d-13be3a6c5c90/resource/"
-        "3875b73d-4f1f-4fc5-8233-c30e25156961/download/sex_ed_m_2024_masked.csv"
+        "3875b73d-4f1f-4fc5-8233-c30e25156961/download/sex_ed_2025_masked_.csv"
     ),
     "expected_payer": (
         "https://data.chhs.ca.gov/dataset/b91d0f25-d2b1-4c9f-b22d-13be3a6c5c90/resource/"
-        "d5369f5c-6152-40a9-9c2a-309fd2086116/download/expectedpayer_ed_m_2024_masked.csv"
+        "d5369f5c-6152-40a9-9c2a-309fd2086116/download/expectedpayer_ed_2025_masked_.csv"
     ),
 }
 
