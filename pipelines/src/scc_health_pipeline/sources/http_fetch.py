@@ -69,11 +69,19 @@ def fetch_with_retry(
         )
 
     last_error: str = ""
+    # Some servers' caches can hold a stored "request rejected" page for one exact
+    # address. If a response comes back as an error page, retry with a throwaway
+    # query parameter so the cache is bypassed (the file itself is unchanged).
+    bust_cache = False
     for attempt in range(1, context.max_retries + 1):
+        request_url = resource.url
+        if bust_cache:
+            joiner = "&" if "?" in request_url else "?"
+            request_url = f"{request_url}{joiner}cache_bust={int(time.time())}"
         try:
             with httpx.stream(
                 "GET",
-                resource.url,
+                request_url,
                 timeout=context.timeout_seconds,
                 follow_redirects=True,
             ) as response:
@@ -84,6 +92,7 @@ def fetch_with_retry(
                         f"Server returned content-type '{content_type}', expected "
                         f"'{resource.expected_content_type}' -- likely an error page, not data."
                     )
+                    bust_cache = True
                     raise ValueError(last_error)
 
                 tmp_path = dest_path.with_suffix(dest_path.suffix + ".part")
