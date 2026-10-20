@@ -1125,4 +1125,30 @@ time pressure.
 
 ---
 
+### DEC-090 — Design v2: map-first home, four top-bar destinations, "Valley" palette (supersedes DEC-072 color ramp)
+
+**Context:** The product had nine sidebar items organized around datasets and engine features, a home page that was a dashboard of cards, and a teal→red ramp that read as "alarm" for every shade. Users had to understand the platform's internals before finding a neighborhood. Research is summarized with sources in `docs/design/v2/design-brief.md`.
+
+**Decision:** (1) Information architecture: nine sidebar items become four top-bar destinations — Map (`/`), Getting to care (Access Lab + Emergency visits), Take action (Advocate + Copilot), About the data (Trust & methods + Sources). Pages that hold more than one route use sibling tabs; every previous URL still works, `/explore` redirects to `/` with its query string, and `/prioritize` is retained as "Advanced ranking tools". (2) The home page is the county map with one persistent side panel (a left card on desktop, a draggable bottom sheet on phones) that moves from a ranked list to a neighborhood summary. One question controls the lens: "What matters most to you?". (3) Color: a five-step green-to-red concern ramp (`#a8d98c → #f1e08a → #f2a950 → #d4533a → #7f1a2c`, lightness falls from yellow to deep red and adjacent steps stay distinguishable under simulated red-green color blindness, minimum ΔE 16) and a hatched grey no-data state replace the DEC-072 ramp (the user preferred a green-to-red read over the first warm-only draft); interactive color is spruce `#0f5f57`; all text pairs are at least 5.0:1. Meaning is never carried by color alone (rank, value, and band text are always shown). (4) Type: serif headings (Newsreader) over Public Sans, body 17px, and a raised type floor.
+
+**Rationale:** Progressive disclosure and a map-first start let a first-time visitor find their own neighborhood in one action. No scientific method, score, or data path changed; only presentation, navigation, and the color encoding of the same percentile bands.
+
+**Consequences:** Custom weights recolor the map via the existing compute endpoint and show domain-level (not metric-level) contributions because metric explanations are only precomputed for named scenarios. Existing tests that assumed the sidebar or the old Explore page were rewritten. The old ramp is documented as superseded, not deleted, in DEC-072.
+
+---
+
+### DEC-091 — Freshness windows follow the monthly refresh; HCAI links moved to the 2025 releases
+
+**Context:** The live site showed six sources as "overdue for refresh". Two separate causes. First, the freshness classifier gave the HRSA sources a 1-day window and the HCAI facility file a 7-day window, while the platform's documented refresh policy is monthly (`docs/data/refresh-runbook.md`: "nothing here requires daily refresh"). Against a monthly refresh those sources were guaranteed to read overdue within days. Second, the scheduled refresh itself had stopped working: the 2026-10-01 run failed in under two minutes because HCAI replaced its 2024 ED files with 2025 releases on 2026-09-17, so five download links returned 404 and the build (correctly) refused to publish a partial warehouse.
+
+**Decision:** (1) One shared window of 35 days (a monthly cycle plus slack for the scheduled run) for the HRSA sources and the HCAI facility attributes, in both copies of the classifier (`apps/api/.../freshness.py` and `pipelines/.../vintage_audits.py`). A missed run still shows: past 35 days a source reads "lagged", past 70 it reads "stale". Nothing is hidden or relabeled. (2) The four HCAI ED patient-county adapters point at the 2025 files (same columns, years 2008 to 2025). (3) The patient-origin adapter points at the combined 2024-2025 workbook but keeps only 2024 rows, because the old code stamped every row as 2024 and would otherwise have mixed years. That keeps it on the same year as the ED facility profile and the tract allocation. A test covers the multi-year case.
+
+**Rationale:** The honest fix for the first cause is to make the label match the real refresh schedule, not to relax the label until it stops saying "overdue". The honest fix for the second is to repoint to the dataset HCAI actually publishes now, verified against the live catalog, and then actually re-pull everything.
+
+(4) A reused raw download now reports the date it was actually downloaded (the file's own timestamp), not the day the pipeline ran. Before this, re-running the pipeline over cached files stamped every source "retrieved today" without fetching anything, which made old data look freshly checked. A test covers it. The refresh in this change was done with the cache cleared, so every mutable source was genuinely re-downloaded; the only older date is the frozen 2020 TIGER tract boundaries (the Census server rejected that one request, and that vintage never changes).
+
+**Consequences:** The county trend chart now runs through 2025 and its year range is read from the data. Patient-origin numbers are unchanged (still 2024). If HCAI moves links again the monthly run will fail loudly and the last published data stays live, as designed. Not changed: the build-validate-publish rule that one failed source blocks publication.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

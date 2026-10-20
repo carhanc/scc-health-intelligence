@@ -1,8 +1,46 @@
 # STATE.md — Session Continuity Resume Point
 
-**Last updated:** 2026-07-19 (Product-wide flow simplification — new branch `ux/product-wide-flow-simplification`, created from `ux/advocate-flow-simplification`, not merged to `main`)
+**Last updated:** 2026-10-20 (Design v2 — branch `design/v2-redesign`, cut from `ux/product-wide-flow-simplification`; not pushed, not merged to `main`, production untouched)
 
-## Most recent work: Product-wide flow simplification (new branch `ux/product-wide-flow-simplification`)
+## Most recent work: Design v2 (branch `design/v2-redesign`)
+
+A full visual and navigation redesign. Research and decisions: `docs/design/v2/design-brief.md`; decision
+record: `DECISIONS.md` DEC-090. No data pipeline, API, score, or method changed; this is presentation,
+navigation, and color only.
+
+- **Navigation:** nine sidebar items became four top-bar destinations: Map (`/`), Getting to care (Access Lab +
+  Emergency visits), Take action (Advocate + Copilot), About the data (Trust & methods + Sources). Sibling tabs
+  carry multi-page destinations; every old URL still works and `/explore` redirects to `/` with its query kept.
+  `/prioritize` remains as "Advanced ranking tools".
+- **Home is the map** (`apps/web/app/map-home/`): one persistent side panel (left card on desktop, draggable
+  bottom sheet on phones) that moves from "where to look first" to a neighborhood summary (Reasons / Numbers /
+  Confidence tabs). Type-ahead place search, one lens question ("What matters most to you?"), live custom
+  weights that recolor the map, hover sync between list and map.
+- **Color:** green-to-red concern ramp `#a8d98c → #f1e08a → #f2a950 → #d4533a → #7f1a2c`, stretched to the
+  county's actual score range for the overall score (2nd to 98th percentile) so all five steps appear; domain
+  layers are percentile-based and use 0-100. Adjacent steps stay distinguishable under simulated red-green color
+  blindness (min deltaE 16); values, ranks and band text always accompany color; no-data is hatched grey.
+- **Type and look:** Newsreader serif headings over Public Sans, 17px body, "Valley" neutrals with spruce
+  `#0f5f57` as the one interactive color.
+- **Fixed along the way:** ranking-stability badge restored beside the score; focus chips kept keyboard focus;
+  Copilot answer overflowed 2px at 320px; footer/Validate source counts now agree (25 of 32); closed table
+  dialog no longer mounts 408 rows; Access Lab shows a tract's name, not its ID, when opened from a bare link;
+  metric values round to readable digits; user-facing "Explore"/"Overview" wording replaced.
+- **Removed dead code:** old `ExploreClient`, `explore-map.tsx`, Overview snapshot, and the old `TractDetail`.
+  Two data-integrity unit tests now target `TractPanel`.
+- **Tests:** e2e suite rewritten for the new app (`apps/web/e2e/helpers.ts` has the shared search/open helpers;
+  `map-home.spec.ts` replaces the old overview spec). Verification gate last run: tsc, eslint (web + ui),
+  vitest 98/98, `next build`, Playwright desktop + mobile projects.
+
+- **Data refresh (2026-10-20):** sources genuinely re-downloaded with the cache cleared (HRSA, HCAI, CDC PLACES, VTA all fetched that day). Freshness windows now follow the monthly refresh (DEC-091), the HCAI links point at the 2025 releases, and a cached file keeps its real download date. Result: 8 current, 23 fixed vintage, 1 unavailable (the Healthy Places Index, which needs a manual request), 0 overdue. The monthly auto-refresh is `.github/workflows/scheduled-refresh.yml`; if it fails, GitHub emails the repository owner and the live site keeps its last good data.
+- **Responsive audit:** every page at 320, 390, 768, 1024, 1280, 1440 wide plus a short laptop and a landscape phone: no horizontal overflow, no clipped text, no overlapping map controls; standalone controls are at least 24px tall.
+
+**Resume here:** if the user approves, push `design/v2-redesign` (this creates a Vercel preview; ask first),
+review the preview, then decide on merging. Do not touch `main` or production without explicit instruction.
+Known limits: a ZIP result opens a short "scores are per tract" note rather than a tract list; metric-level
+explanations for custom weights show domains only (metric explanations are precomputed for named focuses).
+
+## Previous work: Product-wide flow simplification (new branch `ux/product-wide-flow-simplification`)
 
 Applied the same clarity/interaction discipline that made the Advocate redesign work (one question at a
 time, progressive disclosure, one primary action, plain language) to every remaining route: Copilot,
