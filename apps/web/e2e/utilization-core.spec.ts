@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 
 /** Utilization was rebuilt as a task-first flow: "What would you like to
  * understand?" with three choices, replacing an immediate full facility
@@ -29,9 +30,9 @@ test.describe("Utilization -- task-first flow, facility, geographic, and trend v
     await expect(page.getByText("STANFORD HEALTH CARE")).toBeVisible();
 
     await page.getByRole("row", { name: /STANFORD HEALTH CARE/ }).click();
-    await expect(page.getByText("Payer mix")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Disposition")).toBeVisible();
-    await expect(page.getByText("Language")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Payer mix", exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Disposition", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Language", exact: true })).toBeVisible();
   });
 
   test("exploring where patients come from distinguishes observed ZIP data from modeled tract data", async ({
@@ -75,11 +76,7 @@ test.describe("Utilization -- task-first flow, facility, geographic, and trend v
   });
 
   test("no console errors across the task chooser and all three views", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await page.goto("/utilization");
     await expect(page.getByRole("heading", { name: "See how health services are used" })).toBeVisible({

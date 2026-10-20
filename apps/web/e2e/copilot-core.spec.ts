@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 
 /** Copilot was rebuilt as a guided evidence-explanation flow: choose an
  * action, choose a place (skipped if arriving with one already known),
@@ -12,9 +13,8 @@ async function chooseActionAndPlace(page: import("@playwright/test").Page, actio
   await page.goto("/copilot");
   await page.getByRole("button", { name: new RegExp(`^${actionLabelPrefix}:`) }).click();
   await expect(page.getByRole("heading", { name: "Which community?" })).toBeVisible();
-  await page.getByLabel("Find a place").fill(placeQuery);
-  await page.getByRole("button", { name: "Search" }).click();
-  await page.getByRole("button", { name: new RegExp(placeQuery, "i") }).first().click();
+  await page.getByRole("combobox", { name: "Find a place" }).fill(placeQuery);
+  await page.getByRole("option", { name: new RegExp(placeQuery, "i") }).first().click();
 }
 
 test.describe("Copilot -- guided evidence-explanation flow", () => {
@@ -105,9 +105,8 @@ test.describe("Copilot -- guided evidence-explanation flow", () => {
   }) => {
     await chooseActionAndPlace(page, "Compare two places", "Sunnyvale");
     await expect(page.getByRole("heading", { name: "Which community would you like to compare it with?" })).toBeVisible();
-    await page.getByLabel("Find a place").fill("Gilroy");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Gilroy/ }).first().click();
+    await page.getByRole("combobox", { name: "Find a place" }).fill("Gilroy");
+    await page.getByRole("option", { name: /Gilroy/ }).first().click();
     await expect(page.getByRole("heading", { name: "What should the explanation focus on?" })).toBeVisible();
     await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
     await page.getByRole("button", { name: "Create explanation" }).click();
@@ -117,8 +116,8 @@ test.describe("Copilot -- guided evidence-explanation flow", () => {
     });
     // Each source line is relabeled with its own real place name so a
     // reader can tell which community a given fact belongs to.
-    await expect(page.getByText(/Sunnyvale city --/).first()).toBeVisible();
-    await expect(page.getByText(/Gilroy city --/).first()).toBeVisible();
+    await expect(page.getByText(/Sunnyvale city:/).first()).toBeVisible();
+    await expect(page.getByText(/Gilroy city:/).first()).toBeVisible();
   });
 
   test("the result view offers to add the evidence to an advocacy project", async ({ page }) => {
@@ -147,11 +146,7 @@ test.describe("Copilot -- guided evidence-explanation flow", () => {
   });
 
   test("no console errors across a full ask cycle", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await chooseActionAndPlace(page, "Explain a community", "Gilroy");
     await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();

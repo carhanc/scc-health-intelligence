@@ -1,4 +1,5 @@
 import { test, expect, request } from "@playwright/test";
+import { openTract, tractHeading } from "./helpers";
 
 test.describe("Explore -- missing data is never rendered as zero", () => {
   test("a tract with a null score (if one exists in current live data) shows a dash, never 0", async ({ page }) => {
@@ -25,19 +26,17 @@ test.describe("Explore -- missing data is never rendered as zero", () => {
         "apps/web/test/geography-detail.test.tsx instead.",
     );
 
-    await page.goto(`/explore?geography=tract&id=${unscored!.tract_geoid_2020}`);
-    await expect(page.getByRole("heading", { name: `Tract ${unscored!.tract_geoid_2020}` })).toBeVisible({
-      timeout: 10_000,
-    });
+    await openTract(page, unscored!.tract_geoid_2020);
+    await expect(tractHeading(page, unscored!.tract_geoid_2020)).toBeVisible();
 
-    const scoreDisplay = page.locator("p.text-3xl").first();
-    await expect(scoreDisplay).toContainText("—");
+    const scoreDisplay = page.getByRole("img", { name: /screening score: not available/i }).first();
+    await expect(scoreDisplay).toContainText("N/A");
     await expect(scoreDisplay).not.toContainText(/^0/);
   });
 
   test("a metric with no raw value shows 'No data', never a numeric 0", async ({ page }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+    await openTract(page, "06085500100");
+    await page.getByRole("tab", { name: "Numbers" }).click();
 
     // Expand every domain disclosure and confirm no metric row shows a
     // bare "0" where the underlying value is actually absent -- every
@@ -49,7 +48,8 @@ test.describe("Explore -- missing data is never rendered as zero", () => {
     // assuming exactly one summary per <details> -- clicking outermost
     // to innermost this way opens each ancestor before its nested
     // summaries are reached.
-    const summaries = page.locator("summary");
+    const summaries = page.getByRole("complementary", { name: "Neighborhood explorer" }).locator("summary");
+    await expect(summaries.first()).toBeVisible({ timeout: 15_000 });
     const count = await summaries.count();
     for (let i = 0; i < count; i++) {
       await summaries.nth(i).click();

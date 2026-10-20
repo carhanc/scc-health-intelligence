@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { GeographyDetail } from "@/app/explore/geography-detail";
+import { TractPanel } from "@/app/map-home/tract-panel";
 import { api } from "@/lib/api";
 import type { ScoreExplanationResponse, TractProfile } from "@/lib/api";
 
@@ -94,7 +94,7 @@ const dataLimitedExplanation: ScoreExplanationResponse = {
   data_mode: "demo",
 };
 
-describe("GeographyDetail (tract, missing data)", () => {
+describe("TractPanel (tract, missing data)", () => {
   beforeEach(() => {
     vi.mocked(api.getAllTractBoundaries).mockResolvedValue({
       type: "FeatureCollection",
@@ -110,12 +110,14 @@ describe("GeographyDetail (tract, missing data)", () => {
     vi.mocked(api.explainScore).mockResolvedValueOnce(dataLimitedExplanation);
 
     renderWithClient(
-      <GeographyDetail
-        selected={{ geographyType: "tract", geoid: "06085500300", displayName: "Census Tract 5003", source: "url" }}
+      <TractPanel
+        tractGeoid="06085500300"
         scenarioId="default_integrated_screen_v1"
+        focusRows={[]}
+        comparing={false}
         onCompare={() => {}}
-        onClearSelection={() => {}}
-        onSelect={() => {}}
+        onCloseCompare={() => {}}
+        onBack={() => {}}
       />,
     );
 
@@ -134,12 +136,14 @@ describe("GeographyDetail (tract, missing data)", () => {
     vi.mocked(api.explainScore).mockResolvedValueOnce(dataLimitedExplanation);
 
     renderWithClient(
-      <GeographyDetail
-        selected={{ geographyType: "tract", geoid: "06085500300", displayName: "Census Tract 5003", source: "url" }}
+      <TractPanel
+        tractGeoid="06085500300"
         scenarioId="default_integrated_screen_v1"
+        focusRows={[]}
+        comparing={false}
         onCompare={() => {}}
-        onClearSelection={() => {}}
-        onSelect={() => {}}
+        onCloseCompare={() => {}}
+        onBack={() => {}}
       />,
     );
 
@@ -229,16 +233,22 @@ describe("GeographyDetail (tract, missing data)", () => {
     });
 
     renderWithClient(
-      <GeographyDetail
-        selected={{ geographyType: "tract", geoid: "06085500300", displayName: "Census Tract 5003", source: "url" }}
+      <TractPanel
+        tractGeoid="06085500300"
         scenarioId="default_integrated_screen_v1"
+        focusRows={[]}
+        comparing={false}
         onCompare={() => {}}
-        onClearSelection={() => {}}
-        onSelect={() => {}}
+        onCloseCompare={() => {}}
+        onBack={() => {}}
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("What is shaping this score")).toBeInTheDocument());
+    // Metric-level detail lives on the Numbers tab.
+    const topDriverList = screen.getByRole("list", { name: "Top factors shaping this profile" });
+    const driverItems = within(topDriverList).getAllByRole("listitem");
+    fireEvent.click(screen.getByRole("tab", { name: "Numbers" }));
     await waitFor(() => expect(screen.getByText("Insufficient data")).toBeInTheDocument());
     expect(screen.getByText(/Obesity rate/)).toBeInTheDocument();
     // Not counted as zero or silently folded in as a real driver row --
@@ -249,8 +259,6 @@ describe("GeographyDetail (tract, missing data)", () => {
     // the accessibility tree the way a real browser does (unrelated
     // <li>s inside the collapsed "What this result does not mean"
     // disclosure would otherwise also match).
-    const topDriverList = screen.getByRole("list", { name: "Top factors shaping this profile" });
-    const driverItems = within(topDriverList).getAllByRole("listitem");
     expect(driverItems).toHaveLength(1);
     expect(driverItems[0]?.textContent).toContain("Diabetes prevalence");
     expect(driverItems[0]?.textContent).not.toContain("Obesity rate");

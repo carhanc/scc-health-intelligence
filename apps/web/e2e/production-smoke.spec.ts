@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 import AxeBuilder from "@axe-core/playwright";
 
 /**
@@ -18,21 +19,20 @@ import AxeBuilder from "@axe-core/playwright";
  * against production.
  */
 test.describe("Production smoke test", () => {
-  test("Overview loads with no console errors and no serious/critical accessibility violations", async ({
+  test("Map home loads with no console errors and no serious/critical accessibility violations", async ({
     page,
   }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /Understand health equity/i })).toBeVisible({
-      timeout: 20_000,
+    await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByRole("region", { name: /Where to look first/ }).getByRole("button").first()).toBeVisible({
+      timeout: 30_000,
     });
 
-    expect(errors, `Console/page errors on Overview: ${JSON.stringify(errors)}`).toEqual([]);
+    expect(errors, `Console/page errors on the map home: ${JSON.stringify(errors)}`).toEqual([]);
 
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
@@ -42,11 +42,7 @@ test.describe("Production smoke test", () => {
   test("Advocate loads and the deterministic workflow completes with no console errors", async ({
     page,
   }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await page.goto("/advocate");
     await expect(page.getByRole("heading", { name: "Turn evidence into action", level: 1 })).toBeVisible({
@@ -59,7 +55,7 @@ test.describe("Production smoke test", () => {
   test("every primary nav destination returns a real page, not an error screen", async ({ page }) => {
     const routes = [
       "/",
-      "/explore",
+      "/explore", // redirects to the map
       "/prioritize",
       "/access-lab",
       "/utilization",

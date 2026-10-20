@@ -9,16 +9,18 @@ import AxeBuilder from "@axe-core/playwright";
  * handed to the user for genuinely visual judgments axe cannot make).
  */
 test.describe("Accessibility (axe-core)", () => {
-  test("Overview has no serious or critical violations", async ({ page }) => {
+  test("Map home (county view, ranked list, legend) has no serious or critical violations", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText(/tracts in the top quartile/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("region", { name: /Where to look first/ }).getByRole("button").first()).toBeVisible({
+      timeout: 30_000,
+    });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Explore (initial map browse view, no selection) has no serious or critical violations", async ({ page }) => {
-    await page.goto("/explore");
+  test("Map home (map fully loaded, nothing selected) has no serious or critical violations", async ({ page }) => {
+    await page.goto("/");
     await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
       timeout: 15_000,
     });
@@ -27,20 +29,21 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Explore (browse table view, no selection) has no serious or critical violations", async ({ page }) => {
-    await page.goto("/explore");
-    await page.getByRole("button", { name: "Table", exact: true }).click();
-    await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
+  test("Map home with the all-neighborhoods table open has no serious or critical violations", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /See all .* as a table/ }).click();
+    await expect(page.getByRole("dialog").getByRole("table")).toBeVisible({ timeout: 20_000 });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Explore with a tract selected (score, domains, evidence drawer) has no serious or critical violations", async ({
+  test("Map home with a tract selected (score, domains, evidence drawer) has no serious or critical violations", async ({
     page,
   }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+    await page.goto("/?geography=tract&id=06085500100");
+    await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("tab", { name: "Numbers" }).click();
     // Expand a domain disclosure and open the evidence drawer so their
     // content is included in the scan too. Scoped past the "Conditions"
     // heading -- the map's own MapLibre attribution control is itself a
@@ -56,10 +59,10 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 
-  test("Explore with a city selected (highest-concern-tract drill-down) has no serious or critical violations", async ({
+  test("Map home with a city selected (highest-concern-tract drill-down) has no serious or critical violations", async ({
     page,
   }) => {
-    await page.goto("/explore?geography=place&id=0668000");
+    await page.goto("/?geography=place&id=0668000");
     await expect(page.getByText("Highest-concern areas in San Jose", { exact: false })).toBeVisible({
       timeout: 10_000,
     });
@@ -92,10 +95,8 @@ test.describe("Accessibility (axe-core)", () => {
     page,
   }) => {
     await page.goto("/prioritize");
-    await page.getByRole("button", { name: "Adjust priorities" }).click();
-    await page.getByRole("button", { name: "Create a custom focus" }).click();
-    await expect(page.getByText("Custom focus", { exact: true })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Use this custom focus" }).click();
+    await page.getByRole("button", { name: "Build your own" }).click();
+    await expect(page.getByRole("slider").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
     let results = await new AxeBuilder({ page }).analyze();
     let serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
@@ -136,7 +137,7 @@ test.describe("Accessibility (axe-core)", () => {
     await page.goto("/utilization?tab=facilities");
     await expect(page.getByText("STANFORD HEALTH CARE")).toBeVisible({ timeout: 15_000 });
     await page.getByRole("row", { name: /STANFORD HEALTH CARE/ }).click();
-    await expect(page.getByText("Payer mix")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Payer mix", exact: true })).toBeVisible({ timeout: 10_000 });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
@@ -178,7 +179,7 @@ test.describe("Accessibility (axe-core)", () => {
 
   test("Access Lab summary (tract chosen) has no serious or critical violations", async ({ page }) => {
     await page.goto("/access-lab?geography=tract&id=06085500100&name=Census%20Tract%205001");
-    await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Nearest clinical care: walking")).toBeVisible({ timeout: 15_000 });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
@@ -221,9 +222,8 @@ test.describe("Accessibility (axe-core)", () => {
   test("Advocate Place step (search results shown) has no serious or critical violations", async ({ page }) => {
     await page.goto("/advocate");
     await page.getByRole("button", { name: /^Choose a community:/ }).click();
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page.getByRole("button", { name: /Sunnyvale/ }).first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("combobox", { name: "Find a place" }).fill("Sunnyvale");
+    await expect(page.getByRole("option", { name: /Sunnyvale/ }).first()).toBeVisible({ timeout: 10_000 });
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
@@ -232,9 +232,8 @@ test.describe("Accessibility (axe-core)", () => {
   test("Advocate Focus step has no serious or critical violations", async ({ page }) => {
     await page.goto("/advocate");
     await page.getByRole("button", { name: /^Choose a community:/ }).click();
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
+    await page.getByRole("combobox", { name: "Find a place" }).fill("Sunnyvale");
+    await page.getByRole("option", { name: /Sunnyvale/ }).first().click();
     await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
       timeout: 10_000,
     });
@@ -255,9 +254,8 @@ test.describe("Accessibility (axe-core)", () => {
   }) => {
     await page.goto("/advocate");
     await page.getByRole("button", { name: /^Choose a community:/ }).click();
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
+    await page.getByRole("combobox", { name: "Find a place" }).fill("Sunnyvale");
+    await page.getByRole("option", { name: /Sunnyvale/ }).first().click();
     await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
       timeout: 10_000,
     });
@@ -321,9 +319,8 @@ test.describe("Accessibility (axe-core)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
 
     await page.getByRole("button", { name: /^Explain a community:/ }).click();
-    await page.getByLabel("Find a place").fill("Gilroy");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /Gilroy/ }).first().click();
+    await page.getByRole("combobox", { name: "Find a place" }).fill("Gilroy");
+    await page.getByRole("option", { name: /Gilroy/ }).first().click();
     await expect(page.getByRole("heading", { name: "What should the explanation focus on?" })).toBeVisible();
 
     results = await new AxeBuilder({ page }).analyze();
@@ -350,22 +347,25 @@ test.describe("Keyboard navigation and focus", () => {
     await expect(page).toHaveURL(/#main-content$/);
   });
 
-  test("the full Explore workflow -- search, select, expand evidence, close -- works with keyboard only", async ({
+  test("the full map workflow -- search, select, expand evidence, close -- works with keyboard only", async ({
     page,
   }) => {
-    await page.goto("/explore");
+    await page.goto("/");
     await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
 
-    await page.getByLabel("Find a place").fill("06085500100");
+    // Type-ahead: typing opens suggestions, Arrow keys move through them and
+    // Enter picks one -- no mouse and no separate Search button.
+    const box = page.getByRole("combobox", { name: "Find a place" });
+    await box.fill("06085500100");
+    await expect(page.getByRole("option", { name: /06085500100/ }).first()).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
 
-    const result = page.getByRole("button", { name: /06085500100/ });
-    await expect(result).toBeVisible({ timeout: 10_000 });
-    await result.focus();
+    await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
+
+    const numbersTab = page.getByRole("tab", { name: "Numbers" });
+    await numbersTab.focus();
     await page.keyboard.press("Enter");
-
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-
     const evidenceButton = page.getByRole("button", { name: "View sources & evidence" });
     await evidenceButton.focus();
     await page.keyboard.press("Enter");
@@ -388,12 +388,9 @@ test.describe("Keyboard navigation and focus", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.getByLabel("Find a place")).toBeVisible();
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.keyboard.press("Enter");
-
-    const result = page.getByRole("button", { name: /Sunnyvale/ }).first();
-    await expect(result).toBeVisible({ timeout: 10_000 });
-    await result.focus();
+    await page.getByRole("combobox", { name: "Find a place" }).fill("Sunnyvale");
+    await expect(page.getByRole("option", { name: /Sunnyvale/ }).first()).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
 
     const recommendedFocus = page.getByRole("button", { name: /^Health equity overview, recommended:/ });

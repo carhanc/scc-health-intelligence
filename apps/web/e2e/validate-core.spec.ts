@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 
 /** Validate was rebuilt as a trust-first Overview (grouped source
  * status instead of six equal-sized cards) plus a simplified 5-section
@@ -50,9 +51,9 @@ test.describe("Validate -- overview, methods, checks and uncertainty, limitation
     await expect(page.getByRole("heading", { name: "Criterion validity", exact: false })).toBeVisible();
     // "BLOCKED" alone also matches the explanatory prose above ("...would
     // show \"BLOCKED\" instead of a correlation..."); the actual guard
-    // badge text is "BLOCKED -- tautological" -- neither validity check
+    // badge text is "BLOCKED: tautological" -- neither validity check
     // should produce one for any of the 8 scenarios.
-    await expect(page.getByText("BLOCKED -- tautological")).toHaveCount(0);
+    await expect(page.getByText("BLOCKED: tautological")).toHaveCount(0);
     await expect(page.getByText(/Spearman r = /).first()).toBeVisible({ timeout: 15_000 });
   });
 
@@ -71,11 +72,7 @@ test.describe("Validate -- overview, methods, checks and uncertainty, limitation
   });
 
   test("no console errors across all five sections", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await page.goto("/validate");
     await expect(page.getByRole("heading", { name: "Trust, methods, and data quality" })).toBeVisible({

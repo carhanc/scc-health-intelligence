@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 
 /** Access Lab was rebuilt as a place-first flow: only a search field
  * until a community is chosen (no travel-mode toggle, no methodology
@@ -10,9 +11,8 @@ import { test, expect } from "@playwright/test";
 
 async function selectTract(page: import("@playwright/test").Page, query: string) {
   await page.goto("/access-lab");
-  await page.getByLabel("Find a place").fill(query);
-  await page.getByRole("button", { name: "Search" }).click();
-  const result = page.getByRole("button", { name: new RegExp(query, "i") }).first();
+  await page.getByRole("combobox", { name: "Find a place" }).fill(query);
+  const result = page.getByRole("option", { name: new RegExp(query, "i") }).first();
   await expect(result).toBeVisible({ timeout: 10_000 });
   await result.click();
 }
@@ -35,7 +35,7 @@ test.describe("Access Lab -- place-first flow, travel mode, and real access data
     await selectTract(page, "06085500100");
     await expect(page).toHaveURL(/geography=tract&id=06085500100/);
     await expect(page.getByRole("heading", { name: "How are people traveling?" })).toBeVisible();
-    await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Nearest clinical care: walking")).toBeVisible({ timeout: 10_000 });
     // Real distance figures, not placeholders -- "mi" unit always present.
     await expect(page.getByText(/\d+\.\d mi/).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Scheduled transit access" })).toBeVisible();
@@ -44,11 +44,11 @@ test.describe("Access Lab -- place-first flow, travel mode, and real access data
 
   test("switching travel mode updates the displayed distances", async ({ page }) => {
     await page.goto("/access-lab?geography=tract&id=06085500100");
-    await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Nearest clinical care: walking")).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("radio", { name: "Driving" }).click();
     await expect(page).toHaveURL(/mode=drive/);
-    await expect(page.getByText("Nearest clinical care -- driving")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Nearest clinical care: driving")).toBeVisible({ timeout: 10_000 });
   });
 
   test("the advocacy handoff uses the real place name from search, not a raw GEOID", async ({ page }) => {
@@ -144,9 +144,9 @@ test.describe("Access Lab -- place-first flow, travel mode, and real access data
     ).toBeVisible({ timeout: 10_000 });
     // A blind usability review flagged this guidance as a dead end --
     // "pick a place" named an action with no way to actually do it.
-    const exploreLink = page.getByRole("link", { name: /pick a place on the map in Explore/i });
+    const exploreLink = page.getByRole("link", { name: /pick a place on the map/i });
     await expect(exploreLink).toBeVisible();
-    await expect(exploreLink).toHaveAttribute("href", "/explore");
+    await expect(exploreLink).toHaveAttribute("href", "/");
   });
 
   test("a fully unreachable backend produces a plain, recoverable error on the access summary -- no raw pipeline/script names", async ({
@@ -167,14 +167,10 @@ test.describe("Access Lab -- place-first flow, travel mode, and real access data
   });
 
   test("no console errors or hydration warnings on initial load or after choosing a place", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await selectTract(page, "06085500100");
-    await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Nearest clinical care: walking")).toBeVisible({ timeout: 15_000 });
 
     expect(errors).toEqual([]);
   });

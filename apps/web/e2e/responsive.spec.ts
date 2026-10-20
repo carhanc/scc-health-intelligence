@@ -20,93 +20,71 @@ for (const bp of BREAKPOINTS) {
   test.describe(`Responsive @ ${bp.name} (${bp.width}px)`, () => {
     test.use({ viewport: { width: bp.width, height: bp.height } });
 
-    test("Overview: navigation, hero, and task actions are all reachable without horizontal scroll", async ({
+    test("Map home: navigation, search, lens chips, and the ranked list are reachable without horizontal scroll", async ({
       page,
     }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: /Understand health equity/i })).toBeVisible({
-        timeout: 15_000,
+      await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
+        timeout: 30_000,
       });
 
-      // No horizontal overflow at any of the required widths -- a
-      // content-width wider than the viewport is exactly the "just
-      // stacked, not redesigned" anti-pattern the closeout calls out.
+      // The page must never be wider than the viewport.
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "page must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
       if (bp.width < 1024) {
-        // Below the desktop-sidebar breakpoint, navigation must be
-        // reachable via the mobile menu button, not a permanently
-        // visible sidebar competing for space.
+        // Below the desktop breakpoint the four destinations live behind the menu button.
         await expect(page.getByRole("button", { name: "Open navigation menu" })).toBeVisible();
         await page.getByRole("button", { name: "Open navigation menu" }).click();
-        await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
-        await page.getByRole("button", { name: "Close", exact: true }).click();
+        await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Getting to care" })).toBeVisible();
+        await page.getByRole("button", { name: "Close navigation menu" }).click();
       } else {
-        await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Explore" })).toBeVisible();
+        await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Getting to care" })).toBeVisible();
       }
 
-      await expect(page.getByRole("link", { name: "Explore a community" })).toBeVisible();
+      // The side panel (a bottom sheet on phones) always shows the search box.
+      await expect(page.getByRole("combobox", { name: "Find a place" })).toBeVisible();
     });
 
-    test("Explore: search and screening-view control remain usable", async ({ page }) => {
-      await page.goto("/explore");
-      await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText("Screening view:")).toBeVisible();
-      await expect(page.getByRole("button", { name: "Change view" })).toBeVisible();
-
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth, "Explore must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
-
-      await page.getByLabel("Find a place").fill("06085500100");
-      await page.getByRole("button", { name: "Search" }).click();
-      const result = page.getByRole("button", { name: /06085500100/ });
-      await expect(result).toBeVisible({ timeout: 10_000 });
+    test("Map home: search, pick a tract, and read its score at this width", async ({ page }) => {
+      await page.goto("/");
+      const box = page.getByRole("combobox", { name: "Find a place" });
+      await expect(box).toBeVisible({ timeout: 30_000 });
+      await box.fill("06085500100");
+      const result = page.getByRole("option", { name: /06085500100/ }).first();
+      await expect(result).toBeVisible({ timeout: 15_000 });
       await result.click();
 
-      await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-    });
+      await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible();
 
-    test("Explore browse map: the default map view does not overflow horizontally", async ({ page }) => {
-      await page.goto("/explore");
-      await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
-        timeout: 15_000,
-      });
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+      expect(scrollWidth, "map home must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Explore browse table: table remains readable (horizontally scrollable if needed, not clipped)", async ({
-      page,
-    }) => {
-      await page.goto("/explore");
-      await page.getByRole("button", { name: "Table", exact: true }).click();
-      const table = page.getByRole("table");
-      await expect(table).toBeVisible({ timeout: 15_000 });
-      // A data table with many columns may legitimately need its own
-      // internal horizontal scroll on narrow viewports -- that is
-      // acceptable; the page itself must not overflow.
+    test("Map home: the all-neighborhoods table stays inside the screen", async ({ page }) => {
+      await page.goto("/");
+      await page.getByRole("button", { name: /See all .* as a table/ }).scrollIntoViewIfNeeded();
+      await page.getByRole("button", { name: /See all .* as a table/ }).click();
+      const table = page.getByRole("dialog").getByRole("table");
+      await expect(table).toBeVisible({ timeout: 20_000 });
+      // The table may scroll inside its own box; the page itself must not overflow.
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
     });
 
     test("Tract detail, comparison, and evidence drawer remain operable", async ({ page }) => {
-      await page.goto("/explore?geography=tract&id=06085500100");
-      await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-      // The raw "Combined concern score" caption now lives behind the
-      // collapsed "How this was calculated" disclosure by design (docs/
-      // design/health-equity-product-consolidation.md's headline-result
-      // requirement) -- the always-visible proof of a rendered result is
-      // the plain-language screening-view caption in the headline block.
+      await page.goto("/?geography=tract&id=06085500100");
+      await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText("Health equity screening score", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Compare" }).click();
       await expect(page.getByRole("region", { name: "Compare with another place" })).toBeVisible();
 
+      await page.getByRole("tab", { name: "Numbers" }).click();
       await page.getByRole("button", { name: "View sources & evidence" }).click();
       const dialog = page.getByRole("dialog", { name: "Sources and evidence" });
       await expect(dialog).toBeVisible();
@@ -116,7 +94,7 @@ for (const bp of BREAKPOINTS) {
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
     });
 
-    test("Prioritize: ranked-area cards, the priorities disclosure, and custom sliders remain usable", async ({
+    test("Prioritize: ranked-area cards, the focus chips, and custom sliders remain usable", async ({
       page,
     }) => {
       await page.goto("/prioritize");
@@ -128,8 +106,7 @@ for (const bp of BREAKPOINTS) {
       const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
       expect(scrollWidth, "Prioritize must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
-      await page.getByRole("button", { name: "Adjust priorities" }).click();
-      await page.getByRole("button", { name: "Create a custom focus" }).click();
+      await page.getByRole("button", { name: "Build your own" }).click();
       await expect(page.getByRole("slider", { name: "Health needs" })).toBeVisible({ timeout: 10_000 });
 
       const scrollWidth2 = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -182,9 +159,8 @@ for (const bp of BREAKPOINTS) {
       expect(scrollWidth, "Advocate must not overflow horizontally").toBeLessThanOrEqual(clientWidth + 1);
 
       await page.getByRole("button", { name: /^Choose a community:/ }).click();
-      await page.getByLabel("Find a place").fill("Sunnyvale");
-      await page.getByRole("button", { name: "Search" }).click();
-      await page.getByRole("button", { name: /Sunnyvale/ }).first().click();
+      await page.getByRole("combobox", { name: "Find a place" }).fill("Sunnyvale");
+      await page.getByRole("option", { name: /Sunnyvale/ }).first().click();
       await expect(page.getByRole("heading", { name: "What would you like to focus on?" })).toBeVisible({
         timeout: 10_000,
       });
@@ -217,9 +193,8 @@ for (const bp of BREAKPOINTS) {
 
       await page.getByRole("button", { name: /^Explain a community:/ }).click();
       await expect(page.getByLabel("Find a place")).toBeVisible();
-      await page.getByLabel("Find a place").fill("Gilroy");
-      await page.getByRole("button", { name: "Search" }).click();
-      await page.getByRole("button", { name: /Gilroy/ }).first().click();
+      await page.getByRole("combobox", { name: "Find a place" }).fill("Gilroy");
+      await page.getByRole("option", { name: /Gilroy/ }).first().click();
       await page.getByRole("button", { name: /^Health equity overview, recommended:/ }).click();
       await page.getByRole("button", { name: "Create explanation" }).click();
       await expect(page.getByRole("heading", { name: "Gilroy city" })).toBeVisible({ timeout: 15_000 });

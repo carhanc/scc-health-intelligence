@@ -12,10 +12,9 @@ test.describe("Usability Task 3 -- compare two cities", () => {
     // Comparisons work tract-to-tract (scores are tract-level, not
     // aggregated to a city) -- the realistic path is: find a city, then
     // drill into one of its real highest-concern tracts, then compare.
-    await page.goto("/explore");
-    await page.getByLabel("Find a place").fill("San Jose");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: /San Jose/ }).first().click();
+    await page.goto("/");
+    await page.getByRole("combobox", { name: "Find a place" }).fill("San Jose");
+    await page.getByRole("option", { name: /San Jose/ }).first().click();
     const drillDownHeading = page.getByText(/Highest-concern areas in San Jose/);
     await expect(drillDownHeading).toBeVisible({ timeout: 10_000 });
 
@@ -31,9 +30,8 @@ test.describe("Usability Task 3 -- compare two cities", () => {
     // The comparison box only accepts a tract selection (scores are
     // tract-level, not aggregated to a city) -- search a known
     // Sunnyvale-area tract GEOID directly.
-    await comparisonPanel.getByLabel("Find a place").fill("06085500100");
-    await comparisonPanel.getByRole("button", { name: "Search" }).click();
-    await comparisonPanel.getByRole("button", { name: /06085500100/ }).click();
+    await comparisonPanel.getByRole("combobox", { name: "Find a place" }).fill("06085500100");
+    await comparisonPanel.getByRole("option", { name: /06085500100/ }).click();
 
     await expect(page.getByText(/Comparing tract .* with tract 06085500100/)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/scores.*(higher|lower).*than tract/)).toBeVisible();
@@ -44,8 +42,8 @@ test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", ()
   test("the stability badge and its explanation are visible right next to the headline result, not buried", async ({
     page,
   }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+    await page.goto("/?geography=tract&id=06085500100");
+    await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
 
     // The stability badge sits in the compact confidence line right
     // after the top drivers -- above the fold, before any disclosure
@@ -58,8 +56,8 @@ test.describe("Usability Task 5 -- tell whether a tract's ranking is stable", ()
     const badge = page.locator("span[title]").filter({
       hasText: /^(Robust|Moderately stable|Assumption-sensitive|Data-limited)$/,
     });
-    await expect(badge).toBeVisible();
-    const title = await badge.getAttribute("title");
+    await expect(badge.first()).toBeVisible();
+    const title = await badge.first().getAttribute("title");
     expect(title, "stability badge must explain what the label means, not just show a word").toMatch(
       /priorities|weight|assumption|reliable|holds up/i,
     );
@@ -70,8 +68,8 @@ test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limit
   test("the evidence drawer lists a source citation for every metric, and each domain disclosure shows its limitation", async ({
     page,
   }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+    await page.goto("/?geography=tract&id=06085500100");
+    await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
 
     // Path A: expand a domain and read one metric's limitation inline.
     // Scoped to the first <details> after the "Conditions" heading --
@@ -79,6 +77,7 @@ test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limit
     // <details><summary> element and, now that the map stays mounted on
     // this page, would otherwise win a page-wide `.first()` lookup ahead
     // of the real domain disclosures.
+    await page.getByRole("tab", { name: "Numbers" }).click();
     const conditionsHeading = page.getByText("Conditions that may shape health equity here");
     await conditionsHeading.locator("xpath=following::details[1]/summary").click();
     await expect(page.getByText(/Limitation:/).first()).toBeVisible();
@@ -97,20 +96,16 @@ test.describe("Usability Task 6 -- find a metric's publisher, vintage, and limit
 });
 
 test.describe("Usability Task 7 -- understand what the platform cannot conclude", () => {
-  test("the Overview trust section and the tract score panel both state the non-causal, screening-only framing in plain language", async ({
+  test("the map home and the tract score panel both state the non-causal, screening-only framing in plain language", async ({
     page,
   }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "How to read what this platform shows you" })).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByText("Screening, not causation")).toBeVisible();
-    await expect(
-      page.getByText(/it is not a claim that any specific program will fix it/),
-    ).toBeVisible();
+    await page.getByText("How to read this map").click();
+    await expect(page.getByText(/This is screening, not causation/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/not what causes them or whether a specific program would fix them/)).toBeVisible();
 
-    await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/not a diagnosis or causal conclusion/)).toBeVisible();
+    await page.goto("/?geography=tract&id=06085500100");
+    await expect(page.getByRole("heading", { name: /Tract 06085500100/ })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/not a diagnosis or a cause/)).toBeVisible();
   });
 });
