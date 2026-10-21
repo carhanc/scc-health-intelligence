@@ -103,6 +103,6 @@ export function buildCompareEvidence(
   placeBEvidence: AdvocacyEvidenceItem[],
 ): AdvocacyEvidenceItem[] {
   const relabel = (name: string) => (items: AdvocacyEvidenceItem[]) =>
-    items.map((item) => ({ ...item, label: `${name} -- ${item.label}` }));
+    items.map((item) => ({ ...item, label: `${name}: ${item.label}` }));
   return [...relabel(placeAName)(placeAEvidence), ...relabel(placeBName)(placeBEvidence)];
 }

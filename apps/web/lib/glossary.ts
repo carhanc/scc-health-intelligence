@@ -16,17 +16,17 @@ export const GLOSSARY = {
   modeledEstimate:
     "A distance or travel time calculated from road/transit network data, not a measured or reported real-world observation.",
   scenario:
-    "A named set of priority weights across health, access, environment, and resource domains -- changing it re-ranks tracts under a different combination of concerns.",
+    "A named set of priority weights across health, access, environment, and resource domains; changing it re-ranks tracts under a different combination of concerns.",
   healthEquity:
     "Health equity means everyone has a fair and just opportunity to attain their highest level of health (CDC).",
   censusTract:
-    "A small, relatively permanent statistical subdivision of a county defined by the U.S. Census Bureau, roughly 1,000-8,000 residents -- the smallest geography this platform scores.",
+    "A small, relatively permanent statistical subdivision of a county defined by the U.S. Census Bureau, roughly 1,000-8,000 residents, the smallest geography this platform scores.",
   percentile:
-    "Where a value ranks compared to every other Santa Clara County tract, from 0 (lowest) to 100 (highest) -- \"higher than 75% of tracts\" means only a quarter of tracts have a higher value.",
+    "Where a value ranks compared to every other Santa Clara County tract, from 0 (lowest) to 100 (highest): \"higher than 75% of tracts\" means only a quarter of tracts have a higher value.",
   driver:
-    "A specific measure that contributed points to this tract's combined score -- how much it contributed depends on both its own value and how heavily this scenario weights its domain.",
+    "A specific measure that contributed points to this tract's combined score; how much it contributed depends on both its own value and how heavily this scenario weights its domain.",
   confidence:
-    "How complete and precise the underlying data is for a tract's score -- separate from stability, which is about how much a rank shifts under different priority weightings.",
+    "How complete and precise the underlying data is for a tract's score, separate from stability, which is about how much a rank shifts under different priority weightings.",
 };
 
 export type GlossaryKey = keyof typeof GLOSSARY;

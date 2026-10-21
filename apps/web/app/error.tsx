@@ -30,7 +30,7 @@ export default function Error({
         description={
           <>
             This is a bug in the application, not a data problem. Try again, or head back to the
-            overview.
+            map.
             {error.digest && (
               <span className="mt-2 block text-xs text-[var(--color-text-tertiary)]">
                 Reference: {error.digest}
@@ -39,7 +39,7 @@ export default function Error({
           </>
         }
         action={{ label: "Try again", onClick: reset }}
-        secondaryAction={{ label: "Return to overview", href: "/" }}
+        secondaryAction={{ label: "Return to the map", href: "/" }}
       />
     </div>
   );

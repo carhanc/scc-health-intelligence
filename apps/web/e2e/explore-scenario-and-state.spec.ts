@@ -1,67 +1,69 @@
 import { test, expect } from "@playwright/test";
+import { TRACT_A, TRACT_B, openMap, openTract, readScore, searchAndPick, tractHeading } from "./helpers";
 
-const KNOWN_TRACT_A = "06085500100";
-const KNOWN_TRACT_B = "06085503112";
+test.describe("Map home -- focus switching and URL/browser state", () => {
+  test("choosing a different focus area changes the map's ranking and a neighborhood's score", async ({ page }) => {
+    await openTract(page, TRACT_A);
+    await expect(page.getByText(/Scored under Health equity overview/)).toBeVisible();
+    const before = await readScore(page);
 
-test.describe("Explore -- scenario switching and URL/browser state", () => {
-  test("switching priorities changes the displayed results", async ({ page }) => {
-    await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_A}`);
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });
-
-    // Scoped next to "Screening view:" -- the scenario name also
-    // legitimately appears again in the "Scored under X's weighting"
-    // reference line further down the profile.
-    await expect(page.getByText("Screening view:").locator("..").getByText("Health equity overview")).toBeVisible();
-    const scoreBefore = await page.locator("p.text-3xl").first().textContent();
-
-    await page.getByRole("button", { name: "Change view" }).click();
-    await page.getByRole("button", { name: "See more focus areas" }).click();
-    await page.getByRole("button", { name: /^Food access:/ }).click();
-
+    // Go back to the county, pick another focus, then reopen the tract.
+    await page.getByRole("button", { name: "Back to the county" }).click();
+    await page.getByRole("button", { name: "More focus areas" }).click();
+    await page.getByRole("button", { name: /^Food access/ }).click();
     await expect(page).toHaveURL(/scenario=food_access_v1/);
-    await expect(page.getByText("Screening view:").locator("..").getByText("Food access")).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByRole("button", { name: /^Food access/ })).toHaveAttribute("aria-pressed", "true");
 
-    // The score box must re-fetch and (for almost any real tract) show a
-    // different number under different domain weights.
+    await searchAndPick(page, TRACT_A, new RegExp(TRACT_A));
+    await expect(page.getByText(/Scored under Food access/)).toBeVisible({ timeout: 15_000 });
     await expect(async () => {
-      const scoreAfter = await page.locator("p.text-3xl").first().textContent();
-      expect(scoreAfter).not.toBe(scoreBefore);
+      expect(await readScore(page)).not.toBe(before);
     }).toPass({ timeout: 10_000 });
   });
 
-  test("reloading the page preserves the selected tract and scenario", async ({ page }) => {
-    await page.goto(`/explore?geography=tract&id=${KNOWN_TRACT_B}&scenario=diabetes_prevention_v1`);
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_B}` })).toBeVisible({ timeout: 10_000 });
-    // Scoped next to "Screening view:" -- "Diabetes prevention" also
-    // legitimately appears elsewhere on the page (a real driving metric
-    // is literally named "Diabetes prevalence").
-    const viewLabel = page.getByText("Screening view:").locator("..").getByText("Diabetes prevention");
-    await expect(viewLabel).toBeVisible({ timeout: 10_000 });
+  test("reloading preserves the selected tract and focus area", async ({ page }) => {
+    await openTract(page, TRACT_B, "&scenario=diabetes_prevention_v1");
+    await expect(page.getByText(/Scored under Diabetes prevention/)).toBeVisible({ timeout: 15_000 });
 
     await page.reload();
-
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_B}` })).toBeVisible({ timeout: 10_000 });
-    await expect(viewLabel).toBeVisible({ timeout: 10_000 });
+    await expect(tractHeading(page, TRACT_B)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Scored under Diabetes prevention/)).toBeVisible({ timeout: 15_000 });
   });
 
   test("browser back and forward restore the previously selected tract", async ({ page }) => {
-    await page.goto("/explore");
-    await page.getByLabel("Find a place").fill(KNOWN_TRACT_A);
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: new RegExp(KNOWN_TRACT_A) }).click();
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });
+    await openMap(page);
+    await searchAndPick(page, TRACT_A, new RegExp(TRACT_A));
+    await expect(tractHeading(page, TRACT_A)).toBeVisible({ timeout: 15_000 });
 
-    await page.getByLabel("Find a place").fill(KNOWN_TRACT_B);
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("button", { name: new RegExp(KNOWN_TRACT_B) }).click();
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_B}` })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Back to the county" }).click();
+    await searchAndPick(page, TRACT_B, new RegExp(TRACT_B));
+    await expect(tractHeading(page, TRACT_B)).toBeVisible({ timeout: 15_000 });
 
     await page.goBack();
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_A}` })).toBeVisible({ timeout: 10_000 });
+    await page.goBack();
+    await expect(tractHeading(page, TRACT_A)).toBeVisible({ timeout: 15_000 });
 
     await page.goForward();
-    await expect(page.getByRole("heading", { name: `Tract ${KNOWN_TRACT_B}` })).toBeVisible({ timeout: 10_000 });
+    await page.goForward();
+    await expect(tractHeading(page, TRACT_B)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("pressing Escape returns from a neighborhood to the whole county", async ({ page }) => {
+    await openTract(page, TRACT_A);
+    await page.keyboard.press("Escape");
+    await expect(page).not.toHaveURL(/geography=/);
+    await expect(page.getByRole("button", { name: "Back to the county" })).not.toBeVisible();
+    await expect(page.getByText("What matters most to you?")).toBeVisible();
+  });
+
+  test("building your own weighting recolors the ranking and shares as a link", async ({ page }) => {
+    await openMap(page);
+    await page.getByRole("button", { name: "Build your own" }).click();
+    await expect(page).toHaveURL(/scenario=__custom__/, { timeout: 10_000 });
+    await expect(page.getByRole("slider").first()).toBeVisible();
+    await expect(page.getByRole("region", { name: /Where to look first/ }).getByRole("button").first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page).toHaveURL(/weights=/, { timeout: 10_000 });
   });
 });

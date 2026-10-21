@@ -142,7 +142,7 @@ export function CopilotClient() {
   const result = createMutation.data;
 
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <TaskPageHeader
         title="Understand the evidence"
         purpose="Choose a place and get a clear, sourced explanation using this platform's data."
@@ -151,7 +151,7 @@ export function CopilotClient() {
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-secondary)]">
         <span>Uses platform evidence only</span>
         <details className="inline-block">
-          <summary className="inline cursor-pointer font-medium text-[var(--color-interactive)] hover:underline">
+          <summary className="inline-block cursor-pointer font-medium text-[var(--color-interactive)] hover:underline">
             About how answers are created
           </summary>
           <div className="mt-2 max-w-2xl space-y-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text-secondary)]">
@@ -192,7 +192,7 @@ export function CopilotClient() {
                   type="button"
                   onClick={() => handleChooseAction(a.id)}
                   aria-label={`${a.label}: ${a.description}`}
-                  className="w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4 text-left transition-colors hover:bg-[var(--color-surface-sunken)]"
+                  className="choice-card"
                 >
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">{a.label}</p>
                   <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{a.description}</p>
@@ -387,7 +387,7 @@ function CopilotResultView({
   // only that exact static line; every evidence bullet after it is real
   // data and stays untouched.
   const displayText = response.text.replace(
-    /^\[Deterministic mode -- guided template, not generative AI\. Configure an AI provider server-side for drafted prose\.\]\n?/,
+    /^\[Deterministic mode, guided template, not generative AI\. Configure an AI provider server-side for drafted prose\.\]\n?/,
     "",
   );
 
@@ -418,7 +418,7 @@ function CopilotResultView({
           {placeA.displayName}
           {placeB && ` vs. ${placeB.displayName}`}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge tone={response.is_ai_generated ? "interactive" : "neutral"}>
             {response.is_ai_generated ? `AI-generated (${response.model})` : "Grounded in platform evidence"}
           </Badge>
@@ -442,7 +442,7 @@ function CopilotResultView({
         {response.evidence_ids_unsupported.length > 0 && (
           <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--color-alert-subtle)] p-2 text-xs text-[var(--color-alert)]">
             The model referenced {response.evidence_ids_unsupported.length} citation(s) that do not match
-            any evidence actually provided -- removed from the trusted citation list below.
+            any evidence actually provided, removed from the trusted citation list below.
           </p>
         )}
 
@@ -498,7 +498,7 @@ function CopilotResultView({
 
         <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
           This platform does not identify individuals or estimate individual-level risk. A high score or
-          rate identifies a place for closer investigation -- it does not establish that any specific
+          rate identifies a place for closer investigation; it does not establish that any specific
           factor causes an outcome, or that any specific intervention would help.
         </p>
 

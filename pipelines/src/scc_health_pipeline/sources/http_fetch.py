@@ -52,6 +52,9 @@ def fetch_with_retry(
 
     if dest_path.exists():
         existing_sha = _sha256_of_file(dest_path)
+        # A reused file was retrieved when it was written, not now. Stamping it
+        # with today's date would make an old download look freshly checked.
+        original_retrieval = datetime.fromtimestamp(dest_path.stat().st_mtime, UTC)
         return RawArtifact(
             resource_id=resource.resource_id,
             source_id=source_id,
@@ -60,17 +63,25 @@ def fetch_with_retry(
             sha256=existing_sha,
             bytes=dest_path.stat().st_size,
             content_type=resource.expected_content_type,
-            retrieved_at=datetime.now(UTC).isoformat(),
+            retrieved_at=original_retrieval.isoformat(),
             status="cached",
             notes="Reused existing immutable raw artifact; delete data/raw to force refresh.",
         )
 
     last_error: str = ""
+    # Some servers' caches can hold a stored "request rejected" page for one exact
+    # address. If a response comes back as an error page, retry with a throwaway
+    # query parameter so the cache is bypassed (the file itself is unchanged).
+    bust_cache = False
     for attempt in range(1, context.max_retries + 1):
+        request_url = resource.url
+        if bust_cache:
+            joiner = "&" if "?" in request_url else "?"
+            request_url = f"{request_url}{joiner}cache_bust={int(time.time())}"
         try:
             with httpx.stream(
                 "GET",
-                resource.url,
+                request_url,
                 timeout=context.timeout_seconds,
                 follow_redirects=True,
             ) as response:
@@ -81,6 +92,7 @@ def fetch_with_retry(
                         f"Server returned content-type '{content_type}', expected "
                         f"'{resource.expected_content_type}' -- likely an error page, not data."
                     )
+                    bust_cache = True
                     raise ValueError(last_error)
 
                 tmp_path = dest_path.with_suffix(dest_path.suffix + ".part")

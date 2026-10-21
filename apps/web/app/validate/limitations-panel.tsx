@@ -21,7 +21,7 @@ export function LimitationsPanel() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        Every limitation this platform is aware of, stated plainly -- including gaps that are still open, not just
+        Every limitation this platform is aware of, stated plainly, including gaps that are still open, not just
         ones already worked around.
       </p>
       {query.data.limitations.map((l) => (
@@ -112,7 +112,7 @@ export function ReproducibilityPanel() {
           <ul className="mt-1.5 space-y-1 text-xs">
             {reproQuery.data.recent_builds.slice(0, 8).map((b) => (
               <li key={b.build_id} className="text-[var(--color-text-secondary)]">
-                {new Date(b.finished_at).toLocaleString()} -- {b.phase.replace(/_/g, " ")}
+                {new Date(b.finished_at).toLocaleString()}: {b.phase.replace(/_/g, " ")}
               </li>
             ))}
           </ul>

@@ -387,12 +387,12 @@ function ExplainCard({
       )}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Link
-          href={`/explore?geography=tract&id=${encodeURIComponent(row.tract_geoid_2020)}${
+          href={`/?geography=tract&id=${encodeURIComponent(row.tract_geoid_2020)}${
             scenarioId ? `&scenario=${encodeURIComponent(scenarioId)}` : ""
           }`}
           className="text-xs font-medium text-[var(--color-interactive)] hover:underline"
         >
-          View full sources &amp; evidence in Explore
+          View full sources &amp; evidence on the map
         </Link>
         <UseInAdvocateButton
           geography={{

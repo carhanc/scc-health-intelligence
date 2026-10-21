@@ -57,7 +57,7 @@ export function GapPanel({
         <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
           Compares each tract&apos;s health-burden percentile against its measured resource-access
           percentile ({mode === "walk" ? "walking" : "driving"} access considering both nearby services and local
-          demand). This shows where the two overlap -- it does not establish that low access causes worse health
+          demand). This shows where the two overlap; it does not establish that low access causes worse health
           outcomes, or that adding a resource would improve them.
         </p>
 

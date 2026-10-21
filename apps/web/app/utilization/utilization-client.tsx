@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { setQuery } from "@/lib/url-state";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabPanel } from "@scc-health/ui";
 import { TaskPageHeader } from "../task-page-header";
 import { FacilityPanel } from "./facility-panel";
@@ -24,7 +25,7 @@ const TASK_CHOICES: { id: TabId; label: string; description: string }[] = [
   {
     id: "trends",
     label: "See changes over time",
-    description: "Countywide emergency-department trends from 2008 to 2024.",
+    description: "Countywide emergency-department trends since 2008.",
   },
 ];
 
@@ -39,7 +40,6 @@ const TAB_ITEMS = [
  * defaulting straight into the full facility list (docs/design/product-
  * wide-flow-simplification-research.md "UTILIZATION"). */
 export function UtilizationClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") as TabId | null;
 
@@ -50,13 +50,13 @@ export function UtilizationClient() {
         if (value === null) params.delete(key);
         else params.set(key, value);
       }
-      router.push(`/utilization?${params.toString()}`);
+      setQuery("/utilization", params);
     },
-    [router, searchParams],
+    [searchParams],
   );
 
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <TaskPageHeader
         title="See how health services are used"
         purpose="Explore emergency-department use by facility, community, and year."
@@ -67,7 +67,7 @@ export function UtilizationClient() {
           Figures here are <strong className="font-semibold text-[var(--color-text-primary)]">observed</strong>{" "}
           counts at their real published geography (county, facility, or patient ZIP code) unless a table
           is explicitly labeled{" "}
-          <strong className="font-semibold text-[var(--color-text-primary)]">modeled</strong> -- this
+          <strong className="font-semibold text-[var(--color-text-primary)]">modeled</strong>; this
           platform never claims tract-level observed utilization, since HCAI does not publish it.
         </p>
       </details>
@@ -84,7 +84,7 @@ export function UtilizationClient() {
                 type="button"
                 onClick={() => updateParams({ tab: choice.id })}
                 aria-label={`${choice.label}: ${choice.description}`}
-                className="w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4 text-left transition-colors hover:bg-[var(--color-surface-sunken)]"
+                className="choice-card"
               >
                 <p className="text-sm font-semibold text-[var(--color-text-primary)]">{choice.label}</p>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{choice.description}</p>

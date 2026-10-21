@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { GeographyDetail } from "@/app/explore/geography-detail";
+import { TractPanel } from "@/app/map-home/tract-panel";
 import { api } from "@/lib/api";
 import type {
   ScoreExplanationResponse,
@@ -206,7 +206,7 @@ const domainsFixture: DomainListResponse = {
   ],
 };
 
-describe("TractDetail driver ranking (DEC-074 regression)", () => {
+describe("TractPanel driver ranking (DEC-074 regression)", () => {
   it("names the metric with the largest CONTRIBUTION as the top driver, not the metric with the highest raw percentile", async () => {
     vi.mocked(api.getTractProfile).mockResolvedValue(profileFixture);
     vi.mocked(api.explainScore).mockResolvedValue(unequalWeightExplanation);
@@ -214,12 +214,14 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
     vi.mocked(api.getDomains).mockResolvedValue(domainsFixture);
 
     renderWithClient(
-      <GeographyDetail
-        selected={{ geographyType: "tract", geoid: "06085500400", displayName: "Census Tract 5004", source: "url" }}
+      <TractPanel
+        tractGeoid="06085500400"
         scenarioId="custom_unequal_v1"
+        focusRows={[]}
+        comparing={false}
         onCompare={() => {}}
-        onClearSelection={() => {}}
-        onSelect={() => {}}
+        onCloseCompare={() => {}}
+        onBack={() => {}}
       />,
     );
 
@@ -229,7 +231,7 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
     // raw percentile (90 vs 70). The simplified "What is shaping this
     // profile?" top-driver list (docs/design/
     // health-equity-product-consolidation.md) must name it first.
-    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("What is shaping this score")).toBeInTheDocument());
     const driverItems = screen.getAllByRole("listitem");
     expect(driverItems[0]?.textContent).toMatch(/Moderate-percentile, highest-weight metric/);
     // The old, buggy sort (by domain_score/percentile) would have picked
@@ -244,16 +246,18 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
     vi.mocked(api.getDomains).mockResolvedValue(domainsFixture);
 
     renderWithClient(
-      <GeographyDetail
-        selected={{ geographyType: "tract", geoid: "06085500400", displayName: "Census Tract 5004", source: "url" }}
+      <TractPanel
+        tractGeoid="06085500400"
         scenarioId="custom_unequal_v1"
+        focusRows={[]}
+        comparing={false}
         onCompare={() => {}}
-        onClearSelection={() => {}}
-        onSelect={() => {}}
+        onCloseCompare={() => {}}
+        onBack={() => {}}
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("What is shaping this profile?")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("What is shaping this score")).toBeInTheDocument());
     // Driver rows are the only <li> elements on this page (DomainDisclosure's
     // metric rows are plain <div>s) -- scoping to listitem role avoids also
     // matching the same metric labels rendered inside the (separate,
@@ -276,12 +280,14 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
     vi.mocked(api.getDomains).mockResolvedValue(domainsFixture);
 
     renderWithClient(
-      <GeographyDetail
-        selected={{ geographyType: "tract", geoid: "06085500400", displayName: "Census Tract 5004", source: "url" }}
+      <TractPanel
+        tractGeoid="06085500400"
         scenarioId="custom_unequal_v1"
+        focusRows={[]}
+        comparing={false}
         onCompare={() => {}}
-        onClearSelection={() => {}}
-        onSelect={() => {}}
+        onCloseCompare={() => {}}
+        onBack={() => {}}
       />,
     );
 
@@ -289,7 +295,8 @@ describe("TractDetail driver ranking (DEC-074 regression)", () => {
     // sentence and the rank denominator must both reflect that real
     // number, proving neither is a hardcoded literal.
     await waitFor(() => expect(screen.getByText(/of 200 Santa Clara County tracts/)).toBeInTheDocument());
-    expect(screen.getByText(/Countywide rank \(of 200\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Confidence" }));
+    expect(await screen.findByText(/Countywide rank \(of 200\)/)).toBeInTheDocument();
     expect(screen.queryByText(/of 408/)).not.toBeInTheDocument();
   });
 });

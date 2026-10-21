@@ -1,196 +1,158 @@
 import { test, expect } from "@playwright/test";
+import {
+  TRACT_A,
+  TRACT_GEOID_PATTERN,
+  mapRegion,
+  openMap,
+  openTract,
+  searchAndPick,
+  searchBox,
+  tractHeading,
+} from "./helpers";
 
-const TRACT_GEOID_PATTERN = /^06085\d{6}$/;
-
-test.describe("Explore -- search, selection, and view switching", () => {
-  test("search by city name finds a real place", async ({ page }) => {
-    await page.goto("/explore");
-    // First navigation of the suite pays Next.js dev mode's on-demand
-    // compile cost for this route; a generous timeout here reflects a
-    // real user's first visit, not a production concern (a built app has
-    // no on-demand compilation).
-    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
-    await page.getByLabel("Find a place").fill("Sunnyvale");
-    await page.getByRole("button", { name: "Search" }).click();
-
-    const result = page.getByRole("button", { name: /Sunnyvale/ });
-    await expect(result).toBeVisible({ timeout: 10_000 });
+test.describe("Map home -- search, selection, and the table", () => {
+  test("typing a city name suggests that city", async ({ page }) => {
+    await openMap(page);
+    await searchBox(page).fill("Sunnyvale");
+    await expect(page.getByRole("option", { name: /Sunnyvale/ }).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("clicking a tract on the map loads that exact tract's profile", async ({ page }) => {
-    await page.goto("/explore");
-    // Wait for the map's own tract-choropleth layer to actually paint --
-    // MapLibre renders via WebGL canvas, which Playwright's Chromium
-    // supports via software rendering (no display server needed).
-    const mapRegion = page.getByRole("application", { name: /Map of Santa Clara County/ });
-    await expect(mapRegion).toBeVisible({ timeout: 15_000 });
-    // `toBeVisible` doesn't guarantee the element is scrolled into the
-    // viewport -- it starts below the fold on this page, and a raw
-    // page.mouse.click at an off-screen coordinate silently hits nothing.
-    await mapRegion.scrollIntoViewIfNeeded();
-    // Give the boundaries fetch + first paint a moment; the map has no
-    // "ready" signal exposed to the DOM, so a short settle wait here is
-    // the same allowance a real user's eyes need before clicking.
-    await page.waitForTimeout(2000);
+  test("clicking a tract on the map opens that exact tract's profile", async ({ page }) => {
+    await openMap(page);
+    const region = mapRegion(page);
+    // Give the boundaries fetch and first paint a moment; the map exposes no
+    // "ready" signal to the DOM, so this is the same allowance a person's
+    // eyes need before clicking.
+    await page.waitForTimeout(3000);
 
-    const box = await mapRegion.boundingBox();
+    const box = await region.boundingBox();
     if (!box) throw new Error("map region has no bounding box");
-    // Click near the center of the rendered map, which -- after
-    // fitBounds() -- is guaranteed to be inside the county and therefore
-    // inside some tract polygon.
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    // The county is fitted into the area to the right of the side panel, so
+    // aim for the middle of that area, which is inside some tract.
+    const isDesktop = (page.viewportSize()?.width ?? 0) >= 1024;
+    let x: number;
+    let y: number;
+    if (isDesktop) {
+      const panelWidth = 440 + 16;
+      x = box.x + panelWidth + (box.width - panelWidth) / 2;
+      y = box.y + box.height / 2;
+    } else {
+      // On phones the panel is a bottom sheet (312px when collapsed); aim at
+      // the middle of the map above it.
+      x = box.x + box.width / 2;
+      y = box.y + 72 + (box.height - 312 - 72) / 2;
+    }
+    await page.mouse.click(x, y);
 
-    // The URL is the source of truth for what got selected.
     await expect(page).toHaveURL(/geography=tract&id=06085\d{6}/, { timeout: 10_000 });
-    const url = new URL(page.url());
-    const clickedGeoid = url.searchParams.get("id");
+    const clickedGeoid = new URL(page.url()).searchParams.get("id");
     expect(clickedGeoid).toMatch(TRACT_GEOID_PATTERN);
 
-    // The detail panel must show that exact tract -- not "tract", not a
-    // mismatched one, and not an error.
-    await expect(page.getByRole("heading", { name: `Tract ${clickedGeoid}` })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Couldn't load this place")).not.toBeVisible();
-    await expect(page.getByText(/not found/)).not.toBeVisible();
+    await expect(tractHeading(page, clickedGeoid!)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("We couldn't load this place")).not.toBeVisible();
   });
 
-  test("the Map/Table toggle switches the visible browse view", async ({ page }) => {
-    await page.goto("/explore");
-    await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(page.getByRole("table")).not.toBeVisible();
-
-    await page.getByRole("button", { name: "Table", exact: true }).click();
-    await expect(page.getByRole("table")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).not.toBeVisible();
-
-    await page.getByRole("button", { name: "Map", exact: true }).click();
-    await expect(page.getByRole("application", { name: /Map of Santa Clara County/ })).toBeVisible({
-      timeout: 15_000,
-    });
+  test("searching a full 11-character tract number opens that tract", async ({ page }) => {
+    await openMap(page);
+    await searchAndPick(page, TRACT_A, new RegExp(TRACT_A));
+    await expect(page).toHaveURL(new RegExp(`geography=tract&id=${TRACT_A}`));
+    await expect(tractHeading(page, TRACT_A)).toBeVisible({ timeout: 15_000 });
   });
 
-  test("searching a full 11-character tract number loads that tract's profile", async ({ page }) => {
-    await page.goto("/explore");
-    await page.getByLabel("Find a place").fill("06085500100");
-    await page.getByRole("button", { name: "Search" }).click();
-
-    const result = page.getByRole("button", { name: /06085500100/ });
-    await expect(result).toBeVisible({ timeout: 10_000 });
-    await result.click();
-
-    await expect(page).toHaveURL(/geography=tract&id=06085500100/);
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 10_000 });
+  test("selecting a neighborhood from the ranked list opens its profile", async ({ page }) => {
+    await openMap(page);
+    const list = page.getByRole("region", { name: /Where to look first/ });
+    const first = list.getByRole("button").first();
+    await expect(first).toBeVisible({ timeout: 30_000 });
+    await first.click();
+    await expect(page).toHaveURL(/geography=tract&id=06085\d{6}/);
+    await expect(page.getByRole("heading", { name: /^Tract 06085\d{6}/ })).toBeVisible({ timeout: 15_000 });
   });
 
-  test("selecting a tract from the browse table loads its full profile", async ({ page }) => {
-    await page.goto("/explore");
-    await page.getByRole("button", { name: "Table", exact: true }).click();
+  test("the table lists every neighborhood and selecting a row opens its profile", async ({ page }) => {
+    await openMap(page);
+    await page.getByRole("button", { name: /See all .* as a table/ }).click();
 
-    const table = page.getByRole("table");
-    await expect(table).toBeVisible({ timeout: 15_000 });
+    const dialog = page.getByRole("dialog", { name: "All neighborhoods, as a table" });
+    const table = dialog.getByRole("table");
+    await expect(table).toBeVisible({ timeout: 20_000 });
 
-    const firstDataRow = table.locator("tbody tr").first();
-    await expect(firstDataRow).toBeVisible({ timeout: 10_000 });
-    const geoidCell = firstDataRow.locator("td").first();
-    const geoidText = (await geoidCell.textContent())?.trim();
-    expect(geoidText).toMatch(TRACT_GEOID_PATTERN);
+    const firstRow = table.locator("tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 10_000 });
+    const geoid = (await firstRow.locator("td").nth(1).textContent())?.trim();
+    expect(geoid).toMatch(TRACT_GEOID_PATTERN);
 
-    await firstDataRow.click();
-
-    await expect(page).toHaveURL(new RegExp(`geography=tract&id=${geoidText}`));
-    await expect(page.getByRole("heading", { name: `Tract ${geoidText}` })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Couldn't load this place")).not.toBeVisible();
-    // The browse table is replaced by the full-width profile once
-    // something is selected, not left competing for space beside it.
-    await expect(page.getByRole("table")).not.toBeVisible();
+    await firstRow.click();
+    await expect(page).toHaveURL(new RegExp(`geography=tract&id=${geoid}`));
+    await expect(tractHeading(page, geoid!)).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).not.toBeVisible();
   });
 
   test("keyboard selection of a table row works the same as a click", async ({ page }) => {
-    await page.goto("/explore");
-    await page.getByRole("button", { name: "Table", exact: true }).click();
-    const table = page.getByRole("table");
-    await expect(table).toBeVisible({ timeout: 15_000 });
+    await openMap(page);
+    await page.getByRole("button", { name: /See all .* as a table/ }).click();
+    const table = page.getByRole("dialog").getByRole("table");
+    await expect(table).toBeVisible({ timeout: 20_000 });
 
-    const firstDataRow = table.locator("tbody tr").first();
-    const geoidText = (await firstDataRow.locator("td").first().textContent())?.trim();
-
-    await firstDataRow.focus();
+    const firstRow = table.locator("tbody tr").first();
+    const geoid = (await firstRow.locator("td").nth(1).textContent())?.trim();
+    await firstRow.focus();
     await page.keyboard.press("Enter");
 
-    await expect(page).toHaveURL(new RegExp(`geography=tract&id=${geoidText}`));
-    await expect(page.getByRole("heading", { name: `Tract ${geoidText}` })).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(new RegExp(`geography=tract&id=${geoid}`));
+    await expect(tractHeading(page, geoid!)).toBeVisible({ timeout: 15_000 });
   });
 
-  test("selecting a city shows its human-readable name, never a raw place GEOID, including after reload and browser back/forward (Phase 6.5 regression)", async ({
+  test("selecting a city shows its human-readable name, never a raw place GEOID, including after reload and back/forward", async ({
     page,
   }) => {
-    await page.goto("/explore");
-    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
-    await page.getByLabel("Find a place").fill("San Jose");
-    await page.getByRole("button", { name: "Search" }).click();
-    const result = page.getByRole("button", { name: /San Jose/ });
-    await expect(result).toBeVisible({ timeout: 10_000 });
-    await result.click();
+    await openMap(page);
+    await searchAndPick(page, "San Jose", /San Jose/);
 
-    // The place's real name is the primary display (the heading) --
-    // "Place ID {geoid}" is legitimate, clearly labeled secondary
-    // metadata directly below it, not a stand-in for the name.
     const heading = page.getByRole("heading", { name: "San Jose city", exact: true });
-    await expect(heading).toBeVisible({ timeout: 10_000 });
+    await expect(heading).toBeVisible({ timeout: 15_000 });
 
-    // Selecting a geography is always URL-driven (the same code path a
-    // fresh page load or a bookmarked/shared link takes) -- a reload must
-    // not regress the resolved name back to the raw place GEOID.
     await page.reload();
-    await expect(heading).toBeVisible({ timeout: 10_000 });
+    await expect(heading).toBeVisible({ timeout: 30_000 });
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/explore$/);
+    await expect(page).not.toHaveURL(/geography=place/);
     await page.goForward();
-    await expect(heading).toBeVisible({ timeout: 10_000 });
+    await expect(heading).toBeVisible({ timeout: 15_000 });
   });
 
-  test("supervisor district search and selection shows the district name, not just a bare number", async ({
-    page,
-  }) => {
-    await page.goto("/explore");
-    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
-    await page.getByLabel("Find a place").fill("district 3");
-    await page.getByRole("button", { name: "Search" }).click();
-
-    const result = page.getByRole("button", { name: /District 3/ });
-    await expect(result).toBeVisible({ timeout: 10_000 });
-    await result.click();
+  test("supervisor district search and selection shows the district name, not just a number", async ({ page }) => {
+    await openMap(page);
+    await searchAndPick(page, "district 3", /District 3/);
 
     await expect(page).toHaveURL(/geography=supervisor_district&id=3/);
-    await expect(page.getByRole("heading", { name: "Supervisor District 3" })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Highest-concern areas in District 3")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Supervisor District 3" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Highest-concern areas in District 3")).toBeVisible({ timeout: 15_000 });
   });
 
-  test("ZIP code search finds the matching ZCTA", async ({ page }) => {
-    await page.goto("/explore");
-    await expect(page.getByLabel("Find a place")).toBeVisible({ timeout: 20_000 });
-    await page.getByLabel("Find a place").fill("94086");
-    await page.getByRole("button", { name: "Search" }).click();
-
-    await expect(page.getByText("ZIP Code Tabulation Area 94086")).toBeVisible({ timeout: 10_000 });
+  test("a ZIP code search finds the matching ZIP area", async ({ page }) => {
+    await openMap(page);
+    await searchBox(page).fill("94086");
+    await expect(page.getByRole("option", { name: /94086/ }).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("what would you like to do next offers Copilot, Prioritize, and Access Lab, each carrying the tract along", async ({
-    page,
-  }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
-    await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
+  test("the next-step links carry the tract along to Copilot and Access Lab", async ({ page }) => {
+    await openTract(page, TRACT_A);
 
     const copilotLink = page.getByRole("link", { name: "Ask Copilot about this tract" });
-    await expect(copilotLink).toHaveAttribute("href", /\/copilot\?geography=tract&id=06085500100&name=/);
+    await expect(copilotLink).toHaveAttribute("href", new RegExp(`/copilot\\?geography=tract&id=${TRACT_A}&name=`));
 
     const accessLabLink = page.getByRole("link", { name: "See its access to care" });
-    await expect(accessLabLink).toHaveAttribute("href", /\/access-lab\?geography=tract&id=06085500100&name=/);
+    await expect(accessLabLink).toHaveAttribute("href", new RegExp(`/access-lab\\?geography=tract&id=${TRACT_A}&name=`));
 
     await accessLabLink.click();
-    await expect(page.getByRole("heading", { name: "How are people traveling?" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Census Tract 5001/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "How are people traveling?" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Census Tract 5001/i).first()).toBeVisible();
+  });
+
+  test("the old /explore address still works and lands on the map", async ({ page }) => {
+    await page.goto(`/explore?geography=tract&id=${TRACT_A}`);
+    await expect(page).toHaveURL(new RegExp(`^http://localhost:3000/\\?geography=tract&id=${TRACT_A}`));
+    await expect(tractHeading(page, TRACT_A)).toBeVisible({ timeout: 30_000 });
   });
 });

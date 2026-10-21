@@ -40,14 +40,22 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 # refreshes this dataset, used as the staleness-window unit. Sources
 # absent from this table are historical/one-time releases and are
 # evaluated as "intentional_older" rather than against a cadence window.
+# The platform refreshes monthly (.github/workflows/scheduled-refresh.yml and
+# docs/data/refresh-runbook.md say so explicitly: "nothing here requires daily
+# refresh"). HRSA and HCAI publish continuously, but a source can only be as
+# fresh as our own refresh, so the window for those is one monthly cycle plus a
+# few days of slack for the scheduled run itself. A missed run still shows up
+# honestly: past this window a source reads "lagged", and past twice it, "stale".
+_MONTHLY_REFRESH_DAYS = 35
+
 _CADENCE_DAYS: dict[str, int] = {
     "cdc_places_tract_2025": 365,
-    "hcai_facility_attributes": 7,
-    "hrsa_health_center_sites": 1,
-    "hrsa_hpsa_primary_care": 1,
-    "hrsa_hpsa_dental": 1,
-    "hrsa_hpsa_mental_health": 1,
-    "hrsa_mua_p": 1,
+    "hcai_facility_attributes": _MONTHLY_REFRESH_DAYS,
+    "hrsa_health_center_sites": _MONTHLY_REFRESH_DAYS,
+    "hrsa_hpsa_primary_care": _MONTHLY_REFRESH_DAYS,
+    "hrsa_hpsa_dental": _MONTHLY_REFRESH_DAYS,
+    "hrsa_hpsa_mental_health": _MONTHLY_REFRESH_DAYS,
+    "hrsa_mua_p": _MONTHLY_REFRESH_DAYS,
     "vta_gtfs": 90,
 }
 

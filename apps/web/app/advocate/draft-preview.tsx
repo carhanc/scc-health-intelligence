@@ -82,7 +82,7 @@ export function DraftPreview({
 
   function draftAsPlainText(): string {
     const lines: string[] = [];
-    lines.push(`${brief.geography_label}${brief.scenario_label ? ` -- ${brief.scenario_label}` : ""}`);
+    lines.push(`${brief.geography_label}${brief.scenario_label ? `: ${brief.scenario_label}` : ""}`);
     for (const key of SECTIONS_BY_OUTPUT_TYPE[brief.output_type] ?? Object.keys(brief.sections)) {
       if (!brief.sections[key]) continue;
       lines.push("", SECTION_LABELS[key] ?? key, brief.sections[key]!);
@@ -169,7 +169,7 @@ export function DraftPreview({
             <div>
               <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
                 {brief.geography_label}
-                {brief.scenario_label && ` -- ${brief.scenario_label}`}
+                {brief.scenario_label && `: ${brief.scenario_label}`}
               </h3>
               <p className="text-xs text-[var(--color-text-tertiary)]">
                 Created {new Date(brief.generated_at).toLocaleString()} for {brief.audience} audience{" "}
@@ -215,7 +215,7 @@ export function DraftPreview({
 
           {/* Most output types already include a "sources_and_limitations"
               section as real document content above (see
-              SECTIONS_BY_OUTPUT_TYPE) -- showing this disclosure too would
+              SECTIONS_BY_OUTPUT_TYPE), showing this disclosure too would
               duplicate the same source list twice on screen. Only render it
               for output types whose document body doesn't already cover
               sources (currently just public_comment). */}

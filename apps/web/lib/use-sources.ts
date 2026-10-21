@@ -32,3 +32,14 @@ export function useSourcesById(): Map<string, SourceStatusEntry> {
   }
   return map;
 }
+
+/** Every source entry exactly as the manifest lists it (duplicates included),
+ * so counts shown anywhere match the Validate and Data pages. */
+export function useSourceEntries(): SourceStatusEntry[] {
+  const query = useQuery({
+    queryKey: ["sources", "by-id"],
+    queryFn: () => api.getSources(),
+    staleTime: 5 * 60 * 1000,
+  });
+  return query.data?.sources ?? [];
+}

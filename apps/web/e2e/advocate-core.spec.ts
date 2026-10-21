@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 
 /** Starts a brand-new project from the landing state, chooses a place,
  * confirms the recommended focus, and lands on the Evidence stage with
@@ -10,9 +11,8 @@ async function startProjectFromPlace(page: Page, placeQuery: string) {
   await page.getByRole("button", { name: /^Choose a community:/ }).click();
 
   await expect(page.getByRole("heading", { name: "Choose a community" })).toBeVisible();
-  await page.getByLabel("Find a place").fill(placeQuery);
-  await page.getByRole("button", { name: "Search" }).click();
-  const result = page.getByRole("button", { name: new RegExp(placeQuery, "i") }).first();
+  await page.getByRole("combobox", { name: "Find a place" }).fill(placeQuery);
+  const result = page.getByRole("option", { name: new RegExp(placeQuery, "i") }).first();
   await expect(result).toBeVisible({ timeout: 10_000 });
   await result.click();
 
@@ -237,11 +237,7 @@ test.describe("Advocate -- core project workflow", () => {
   });
 
   test("no console errors across the full place-to-draft workflow", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await startProjectFromPlace(page, "Sunnyvale");
     await includeNthAvailableFact(page, 0);

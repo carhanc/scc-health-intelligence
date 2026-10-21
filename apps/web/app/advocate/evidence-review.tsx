@@ -15,6 +15,7 @@ import { CUSTOM_SCENARIO_ID } from "../prioritize/scenario-selector";
  * fabricate a fact the platform didn't already return. */
 const SOURCE_PAGE_CATEGORIES: Record<string, string[]> = {
   Explore: ["scenario_score", "metric"],
+  Map: ["scenario_score", "metric"],
   Prioritize: ["scenario_score", "metric"],
   "Access Lab": ["access"],
   Utilization: ["utilization"],

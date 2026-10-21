@@ -2,28 +2,36 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
-import { NAV_ITEMS } from "./nav-items";
-import { useSourcesById } from "@/lib/use-sources";
-import type { FreshnessState } from "@scc-health/ui";
+import { useEffect, useState } from "react";
+import { NAV_GROUPS, SECONDARY_ROUTES, groupForPath } from "./nav-items";
+import { TrustSignal } from "./trust-signal";
 
-// Same grouping already used on Validate/Data (coverage-panel.tsx,
-// data-explorer.tsx) -- kept local rather than a new shared module for
-// three lines, matching that existing precedent.
-const AVAILABLE_STATES: FreshnessState[] = ["newest_verified", "intentional_older"];
-const NEEDS_ATTENTION_STATES: FreshnessState[] = ["lagged", "stale"];
+function LogoMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 shrink-0 self-center">
+      <polygon points="3,7 12,3 13.5,13 4.5,15.5" fill="#a8d98c" />
+      <polygon points="12,3 21,7.5 19.5,16.5 13.5,13" fill="#f2a950" />
+      <polygon points="4.5,15.5 13.5,13 19.5,16.5 11,21.5" fill="#d4533a" />
+    </svg>
+  );
+}
 
-/** Persistent left navigation on desktop, an off-canvas drawer triggered
- * by a header button on small screens (docs/01 §3: "persistent left
- * navigation on desktop and a compact bottom or drawer navigation on
- * small screens" -- a drawer, not a bottom bar, since 9 items is too
- * many for a comfortable bottom tab row). */
+/** Slim top bar, four destinations, no sidebar. On the map page the
+ * content is full-bleed under the bar; everywhere else it sits in a
+ * centered column with sibling tabs and a footer. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const group = groupForPath(pathname);
+  const isMapHome = pathname === "/";
+
+  // Close the mobile menu whenever the route changes.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="flex min-h-dvh flex-col">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:shadow"
@@ -31,149 +39,214 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
 
-      {/* Mobile header */}
-      <header className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 lg:hidden">
-        <Link href="/" className="text-sm font-semibold text-[var(--color-text-primary)]">
-          Santa Clara Health Intelligence
-        </Link>
-        <button
-          type="button"
-          onClick={() => setMobileNavOpen(true)}
-          aria-expanded={mobileNavOpen}
-          aria-controls="mobile-nav"
-          className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)]"
-        >
-          <span className="sr-only">Open navigation menu</span>
-          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-6 w-6" fill="none">
-            <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </header>
-
-      {/* Mobile off-canvas nav */}
-      {mobileNavOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            aria-label="Close navigation menu"
-            onClick={() => setMobileNavOpen(false)}
-            className="absolute inset-0 bg-[var(--color-text-primary)]/40"
-          />
-          <nav
-            id="mobile-nav"
-            aria-label="Primary"
-            className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto bg-[var(--color-surface)] p-4 shadow-[var(--shadow-lg)]"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm font-semibold">Menu</span>
-              <button
-                type="button"
-                onClick={() => setMobileNavOpen(false)}
-                className="rounded-[var(--radius-sm)] p-1.5 hover:bg-[var(--color-surface-sunken)]"
-              >
-                <span className="sr-only">Close</span>
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none">
-                  <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-            <NavList pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
-            <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-              <TrustSignal />
-            </div>
-          </nav>
-        </div>
-      )}
-
-      {/* Desktop sidebar */}
-      <nav
-        aria-label="Primary"
-        className="hidden shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface)] lg:block"
-        style={{ width: "var(--nav-width)" }}
+      <header
+        className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface)]"
+        style={{ height: "var(--topbar-height)" }}
       >
-        <div className="sticky top-0 flex h-screen flex-col overflow-y-auto p-4">
-          <Link href="/" className="mb-6 block px-2 text-sm font-semibold leading-tight text-[var(--color-text-primary)]">
-            Santa Clara Health Intelligence
+        <div className="mx-auto flex h-full max-w-[1600px] items-center gap-6 px-4 sm:px-6 lg:px-8">
+          <Link
+            href="/"
+            aria-label="Santa Clara Health Intelligence, home"
+            className="flex shrink-0 items-baseline gap-2.5 rounded-[var(--radius-sm)]"
+          >
+            <LogoMark />
+            <span className="font-serif text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
+              Santa Clara
+            </span>
+            <span className="hidden text-sm text-[var(--color-text-secondary)] sm:inline">Health Intelligence</span>
           </Link>
-          <NavList pathname={pathname} />
-          <div className="mt-auto border-t border-[var(--color-border)] px-2 pt-4">
-            <TrustSignal />
+
+          <nav aria-label="Primary" className="ml-2 hidden lg:block">
+            <ul className="flex items-center gap-1">
+              {NAV_GROUPS.map((g) => {
+                const active = group?.id === g.id;
+                return (
+                  <li key={g.id}>
+                    <Link
+                      href={g.href}
+                      aria-current={active ? "page" : undefined}
+                      title={g.description}
+                      className={`rounded-[var(--radius-md)] px-3.5 py-2 text-sm font-medium transition-colors ${
+                        active
+                          ? "bg-[var(--color-interactive-subtle)] text-[var(--color-interactive-hover)]"
+                          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-text-primary)]"
+                      }`}
+                    >
+                      {g.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Link
+              href="/?search=1"
+              className="hidden items-center gap-2 rounded-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-interactive)] hover:text-[var(--color-interactive)] sm:inline-flex"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              Search a place
+            </Link>
+            <Link
+              href="/?search=1"
+              aria-label="Search a place"
+              className="rounded-[var(--radius-md)] p-2 text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)] sm:hidden"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-6 w-6" fill="none">
+                <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav"
+              className="rounded-[var(--radius-md)] p-2 text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)] lg:hidden"
+            >
+              <span className="sr-only">{menuOpen ? "Close navigation menu" : "Open navigation menu"}</span>
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-6 w-6" fill="none">
+                {menuOpen ? (
+                  <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                ) : (
+                  <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                )}
+              </svg>
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
+
+      {menuOpen && (
+        <nav
+          id="mobile-nav"
+          aria-label="Primary"
+          className="fixed inset-x-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 pb-4 pt-2 shadow-[var(--shadow-md)] lg:hidden"
+          style={{ top: "var(--topbar-height)" }}
+        >
+          <ul className="space-y-1">
+            {NAV_GROUPS.map((g) => {
+              const active = group?.id === g.id;
+              return (
+                <li key={g.id}>
+                  <Link
+                    href={g.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`block rounded-[var(--radius-md)] px-3 py-3 ${
+                      active ? "bg-[var(--color-interactive-subtle)]" : "hover:bg-[var(--color-surface-sunken)]"
+                    }`}
+                  >
+                    <span className="block text-base font-medium text-[var(--color-text-primary)]">{g.label}</span>
+                    <span className="block text-sm text-[var(--color-text-secondary)]">{g.description}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
+
+      <SectionBar pathname={pathname} />
 
       <main id="main-content" className="min-w-0 flex-1">
         {children}
       </main>
+
+      {!isMapHome && <SiteFooter />}
     </div>
   );
 }
 
-/** A persistent, real "can I trust this?" signal reachable from every
- * page -- a Health Advocacy Commission review found freshness/vintage
- * information was only visible if a user specifically navigated to
- * Validate or Data, with nothing in the global shell itself. Computed
- * from the same real source list Validate and Data already render, not
- * a separate/fabricated summary -- says nothing while that list is still
- * loading rather than showing a placeholder or a guess. */
-function TrustSignal() {
-  const sourcesById = useSourcesById();
-  const sources = Array.from(sourcesById.values());
-  if (sources.length === 0) return null;
+/** Sibling tabs for destinations that hold more than one page, or a way
+ * back for pages that are no longer top-level destinations. */
+function SectionBar({ pathname }: { pathname: string | null }) {
+  const group = groupForPath(pathname);
+  const secondary = pathname ? SECONDARY_ROUTES[pathname] : undefined;
 
-  const availableCount = sources.filter((s) => AVAILABLE_STATES.includes(s.freshness_state)).length;
-  const needsAttentionCount = sources.filter((s) => NEEDS_ATTENTION_STATES.includes(s.freshness_state)).length;
-  const allCurrent = needsAttentionCount === 0;
+  if (secondary) {
+    return (
+      <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="mx-auto flex max-w-[var(--container-max)] items-center gap-3 px-4 py-2.5 text-sm sm:px-6 lg:px-10">
+          <Link href={secondary.backHref} className="font-medium text-[var(--color-interactive)] hover:underline">
+            &larr; {secondary.backLabel}
+          </Link>
+          <span aria-hidden="true" className="text-[var(--color-border-strong)]">
+            /
+          </span>
+          <span className="text-[var(--color-text-secondary)]">{secondary.label}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!group || group.routes.length < 2) return null;
 
   return (
-    <Link
-      href="/validate"
-      className="flex items-start gap-1.5 rounded-[var(--radius-sm)] px-1 py-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-interactive)]"
-    >
-      <span
-        aria-hidden="true"
-        className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-          allCurrent ? "bg-[var(--color-success)]" : "bg-[var(--color-caution)]"
-        }`}
-      />
-      <span>
-        {allCurrent
-          ? `All ${sources.length} data sources current`
-          : `${availableCount} of ${sources.length} sources current`}
-        <br />
-        <span className="underline underline-offset-2">See data status &amp; sources</span>
-      </span>
-    </Link>
+    <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="mx-auto max-w-[var(--container-max)] px-4 sm:px-6 lg:px-10">
+        <ul aria-label={`${group.label} sections`} className="-mb-px flex gap-6">
+          {group.routes.map((r) => {
+            const active = pathname === r.href || (pathname?.startsWith(`${r.href}/`) ?? false);
+            return (
+              <li key={r.href}>
+                <Link
+                  href={r.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`block border-b-2 py-3 text-sm font-medium transition-colors ${
+                    active
+                      ? "border-[var(--color-interactive)] text-[var(--color-text-primary)]"
+                      : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  {r.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
   );
 }
 
-function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
+function SiteFooter() {
   return (
-    <ul className="space-y-0.5">
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href;
-        return (
-          <li key={item.id}>
-            <Link
-              href={item.href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              title={item.description}
-              className={`flex items-center justify-between rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-[var(--color-interactive-subtle)] text-[var(--color-interactive-hover)]"
-                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              {item.label}
-              {item.status === "coming_soon" && (
-                <span className="text-[10px] font-normal uppercase tracking-wide text-[var(--color-text-tertiary)]">
-                  Soon
-                </span>
-              )}
+    <footer className="mt-16 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 text-sm text-[var(--color-text-secondary)] sm:px-6 lg:px-10">
+        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
+            <Link href="/data" className="hover:text-[var(--color-interactive)] hover:underline">
+              Data &amp; methods
             </Link>
-          </li>
-        );
-      })}
-    </ul>
+            <Link href="/accessibility" className="hover:text-[var(--color-interactive)] hover:underline">
+              Accessibility
+            </Link>
+            <Link href="/privacy" className="hover:text-[var(--color-interactive)] hover:underline">
+              Privacy
+            </Link>
+            <a
+              href="https://github.com/carhanc/scc-health-intelligence/issues"
+              className="hover:text-[var(--color-interactive)] hover:underline"
+            >
+              Contact / report an issue
+            </a>
+          </nav>
+          <TrustSignal />
+        </div>
+        <p className="mt-5 text-xs leading-relaxed text-[var(--color-text-tertiary)]">
+          Santa Clara Health Intelligence is an open-data public-health intelligence platform. It supports
+          prioritization and advocacy; it does not replace community engagement, official county systems, clinical
+          judgment, or formal program evaluation. Built using publicly available data from Santa Clara County, HCAI,
+          the U.S. Census Bureau, OpenStreetMap, and other cited sources.{" "}
+          <strong className="font-semibold text-[var(--color-text-secondary)]">
+            Developed by Arhan Chakravarthy. In collaboration with Santa Clara County Health Advisory Commission.
+          </strong>
+        </p>
+      </div>
+    </footer>
   );
 }

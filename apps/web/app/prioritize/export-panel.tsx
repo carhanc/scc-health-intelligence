@@ -89,7 +89,7 @@ function MemoContent({
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-base font-semibold text-[var(--color-text-primary)]">
-            Priority recommendation memo -- {memo.scenario_label}
+            Priority recommendation memo: {memo.scenario_label}
           </h4>
           <p className="text-xs text-[var(--color-text-tertiary)]">
             Generated {new Date(memo.generated_at).toLocaleString()} <DataModeBadge mode={memo.data_mode} />
@@ -117,7 +117,7 @@ function MemoContent({
               </div>
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                 Strongest drivers: {t.top_domains.map((d) => domainLabel(d.domain)).join(", ")}
-                {" -- "}data coverage {Math.round(t.coverage_fraction * 100)}%.
+                {", "}data coverage {Math.round(t.coverage_fraction * 100)}%.
               </p>
             </li>
           ))}

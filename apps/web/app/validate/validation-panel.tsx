@@ -30,14 +30,14 @@ export function ValidationPanel() {
         <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Tautology guard</h2>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
           Before computing any correlation below, this platform checks whether the outcome is
-          actually a component of the score being validated -- a score can never be validated
+          actually a component of the score being validated; a score can never be validated
           against a variable used to construct it. Every row below passed that check; a row that
           failed it would show &quot;BLOCKED&quot; instead of a correlation, never a fabricated number.
         </p>
       </Card>
 
       <ValidationSection
-        title="Convergent validity -- against CDC/ATSDR Social Vulnerability Index"
+        title="Convergent validity: against CDC/ATSDR Social Vulnerability Index"
         description="Do this platform's priority scores agree, in direction, with an established, independently-built social vulnerability index? A real correlation here is evidence the scoring approach measures something recognizable, not proof it identifies causes or predicts outcomes."
         query={convergentQuery}
         rows={convergentQuery.data?.diagnostics ?? []}
@@ -45,8 +45,8 @@ export function ValidationPanel() {
       />
 
       <ValidationSection
-        title="Criterion validity -- against modeled emergency-department utilization"
-        description="Do tracts with a higher priority score also show more modeled emergency-department use? Real ZIP-level HCAI data had to be allocated down to the tract level to make this comparison possible at all -- see the Utilization page for that method and its limitations. A moderate, positive, non-tautological correlation is exactly what would be expected of a defensible screening tool -- not proof of causation."
+        title="Criterion validity: against modeled emergency-department utilization"
+        description="Do tracts with a higher priority score also show more modeled emergency-department use? Real ZIP-level HCAI data had to be allocated down to the tract level to make this comparison possible at all; see the Utilization page for that method and its limitations. A moderate, positive, non-tautological correlation is exactly what would be expected of a defensible screening tool, not proof of causation."
         query={criterionQuery}
         rows={criterionQuery.data?.results ?? []}
         dataMode={criterionQuery.data?.data_mode}
@@ -92,7 +92,7 @@ function ValidationSection({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium text-[var(--color-text-primary)]">{r.scenario_id}</span>
                 {r.is_tautological ? (
-                  <Badge tone="alert">BLOCKED -- tautological</Badge>
+                  <Badge tone="alert">BLOCKED: tautological</Badge>
                 ) : r.spearman_r !== null ? (
                   <span className="tabular-nums text-sm text-[var(--color-text-primary)]">
                     Spearman r = {r.spearman_r.toFixed(2)} (n = {r.n_paired_observations})

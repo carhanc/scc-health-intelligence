@@ -57,4 +57,8 @@ export {
   CONCERN_NO_DATA_COLOR,
   COLOR,
   scoreColorExpression,
+  concernColorFor,
+  computeConcernDomain,
+  FULL_CONCERN_DOMAIN,
+  type ConcernDomain,
 } from "./src/tokens";

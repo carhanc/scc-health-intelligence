@@ -6,15 +6,15 @@ import { test, expect } from "@playwright/test";
  * design/advocate-flow-simplification-visual-review.md "CROSS-PAGE
  * HANDOFF"). */
 test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => {
-  test("starting from Explore lands directly on Evidence with a plain-English confirmation, not the Place step", async ({
+  test("starting from the map lands directly on Evidence with a plain-English confirmation, not the Place step", async ({
     page,
   }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
+    await page.goto("/?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
 
     await expect(page).toHaveURL(/\/advocate\?workspace=.*added=1/, { timeout: 10_000 });
-    await expect(page.getByText("Evidence was added from Explore")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Evidence was added from Map")).toBeVisible({ timeout: 10_000 });
     // A real, specific fact count -- never "0 facts" while evidence is
     // still loading, and never the raw GEOID.
     await expect(page.getByText(/\d+ facts? about Census Tract.*ready to review/)).toBeVisible({
@@ -26,7 +26,7 @@ test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => 
       timeout: 10_000,
     });
     // The facts this page contributed appear first, clearly labeled.
-    await expect(page.getByText("ADDED FROM EXPLORE")).toBeVisible();
+    await expect(page.getByText("ADDED FROM MAP")).toBeVisible();
   });
 
   test("starting from a Prioritize recommendation carries the focus area along", async ({ page }) => {
@@ -59,7 +59,7 @@ test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => 
     page,
   }) => {
     await page.goto("/access-lab?geography=tract&id=06085500100");
-    await expect(page.getByText("Nearest clinical care -- walking")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Nearest clinical care: walking")).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "Add to advocacy project" }).click();
 
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });
@@ -86,7 +86,7 @@ test.describe("Advocate -- cross-page 'Add to advocacy project' handoff", () => 
   test("adding evidence a second time, with a real project already open, asks which project it belongs to", async ({
     page,
   }) => {
-    await page.goto("/explore?geography=tract&id=06085500100");
+    await page.goto("/?geography=tract&id=06085500100");
     await expect(page.getByRole("heading", { name: "Tract 06085500100" })).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "Add to advocacy project" }).first().click();
     await expect(page).toHaveURL(/\/advocate\?workspace=/, { timeout: 10_000 });

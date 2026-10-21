@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { trackConsoleErrors } from "./helpers";
 
 /** Prioritize was rebuilt around a concise, card-based "highest
  * screening concern" result shown by default, with the scenario/focus
@@ -23,44 +24,35 @@ test.describe("Prioritize -- ranked areas, adjustable priorities, compare, const
     await expect(page.getByText(/^#1 /).first()).toBeVisible();
   });
 
-  test("adjusting priorities opens the shared focus picker and updates the ranked areas", async ({ page }) => {
+  test("choosing a focus area updates the ranked areas", async ({ page }) => {
     await page.goto("/prioritize");
-    await page.getByRole("button", { name: "Adjust priorities" }).click();
-    await expect(page.getByRole("button", { name: /^Health equity overview, recommended:/ })).toBeVisible();
-    await page.getByRole("button", { name: /^Diabetes prevention:/ }).click();
-    await expect(page.getByText("Diabetes prevention").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Health equity overview" })).toHaveAttribute("aria-pressed", "true", {
+      timeout: 20_000,
+    });
+    await page.getByRole("button", { name: "Diabetes prevention" }).click();
+    await expect(page).toHaveURL(/scenario=diabetes_prevention_v1/);
+    await expect(page.getByRole("button", { name: "Diabetes prevention" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
   });
 
   test("a custom focus reveals weight sliders and weights always sum to 100%", async ({ page }) => {
     await page.goto("/prioritize");
-    await page.getByRole("button", { name: "Adjust priorities" }).click();
-    await page.getByRole("button", { name: "Create a custom focus" }).click();
+    await page.getByRole("button", { name: "Build your own" }).click();
 
-    // getByLabel("Health needs") also substring-matches the recommended
-    // focus card's own aria-label ("...view of health needs, access
-    // barriers..."), so scope to the slider role specifically.
     const healthNeedsSlider = page.getByRole("slider", { name: "Health needs" });
     await healthNeedsSlider.fill("80");
 
     const status = page.getByRole("status").filter({ hasText: "Applied weights" });
     await expect(status).toContainText("Total: 100%", { timeout: 10_000 });
-
-    await page.getByRole("button", { name: "Use this custom focus" }).click();
     await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/weights=/, { timeout: 10_000 });
   });
 
-  test("language access is shown as a real, explained unavailable option under See more, not a dominant warning", async ({
-    page,
-  }) => {
+  test("language access is explained as not scored yet, only under More focus areas", async ({ page }) => {
     await page.goto("/prioritize");
-    await expect(page.getByText("Not available yet")).not.toBeVisible();
-    await page.getByRole("button", { name: "Adjust priorities" }).click();
-    await expect(page.getByText("Not available yet")).not.toBeVisible();
-    await page.getByRole("button", { name: "See more focus areas" }).click();
-    await expect(page.getByText("Not available yet")).toBeVisible();
-    await expect(page.getByText("Language access", { exact: false })).toBeVisible();
-    await expect(page.getByText(/no tract-level language-barrier data source/i)).toBeVisible();
+    await expect(page.getByText(/Language access isn't scored yet/)).not.toBeVisible();
+    await page.getByRole("button", { name: "More focus areas" }).click();
+    await expect(page.getByText(/Language access isn't scored yet/)).toBeVisible();
   });
 
   test("view all 408 tracts reveals the full sortable table with a Show drivers explanation", async ({ page }) => {
@@ -80,7 +72,7 @@ test.describe("Prioritize -- ranked areas, adjustable priorities, compare, const
   }) => {
     await page.goto("/prioritize");
     await page.getByRole("button", { name: "Add practical constraints" }).click();
-    await expect(page.getByText("modeled planning scenarios", { exact: false })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("modeled planning scenarios", { exact: false }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("No solution satisfies these constraints")).toBeVisible();
   });
 
@@ -112,25 +104,19 @@ test.describe("Prioritize -- ranked areas, adjustable priorities, compare, const
     await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("link", { name: "View area" }).first()).toHaveAttribute(
       "href",
-      /\/explore\?geography=tract&id=/,
+      /\/\?geography=tract&id=/,
     );
     await expect(page.getByRole("button", { name: "Add to advocacy project" }).first()).toBeVisible();
   });
 
   test("no console errors on initial load or after adjusting to a custom focus", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (err) => errors.push(err.message));
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
-    });
+    const errors = trackConsoleErrors(page);
 
     await page.goto("/prioritize");
     await expect(page.getByRole("heading", { name: "Find areas for closer review" })).toBeVisible({
       timeout: 15_000,
     });
-    await page.getByRole("button", { name: "Adjust priorities" }).click();
-    await page.getByRole("button", { name: "Create a custom focus" }).click();
-    await page.getByRole("button", { name: "Use this custom focus" }).click();
+    await page.getByRole("button", { name: "Build your own" }).click();
     await expect(page.getByRole("heading", { name: "Highest screening concern" })).toBeVisible({ timeout: 15_000 });
 
     expect(errors).toEqual([]);

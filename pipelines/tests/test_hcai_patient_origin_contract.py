@@ -68,3 +68,52 @@ def test_native_zip_geography_is_never_silently_converted_to_tract(tmp_path: Pat
     df = pl.read_parquet(outputs[0])
     assert "patient_zip" in df.columns
     assert "tract_geoid_2020" not in df.columns  # crosswalking is a separate, later step
+
+
+def test_normalize_keeps_only_the_reporting_year_when_workbook_holds_several(
+    tmp_path: Path,
+) -> None:
+    """HCAI now publishes 2024 and 2025 in one workbook; only 2024 rows may be
+    labeled reporting_year=2024, so 2025 rows are never mixed in or double counted."""
+    import openpyxl
+    import polars as pl
+
+    wb = openpyxl.Workbook()
+    wb.active.title = "Patient Origin"
+    wb.create_sheet("Market Share")
+    data = wb.create_sheet("Data")
+    data.append(
+        [
+            "oshpd_id",
+            "pattype",
+            "PZIP",
+            "pcounty",
+            "FACILITY_NAME",
+            "COUNTY_NAME",
+            "discharges",
+            "year",
+        ]
+    )
+    data.append(["1", "ED", "95112", "SANTA CLARA", "A HOSPITAL", "SANTA CLARA", 10, 2024])
+    data.append(["1", "ED", "95112", "SANTA CLARA", "A HOSPITAL", "SANTA CLARA", 99, 2025])
+    raw_dir = tmp_path / "data" / "raw"
+    raw_dir.mkdir(parents=True)
+    path = raw_dir / "multi_year.xlsx"
+    wb.save(path)
+
+    artifact = RawArtifact(
+        resource_id="fixture",
+        source_id="hcai_patient_origin_market_share",
+        local_path=path,
+        url="file://fixture",
+        sha256="fixture",
+        bytes=path.stat().st_size,
+        content_type="x",
+        retrieved_at="2026-10-20T00:00:00+00:00",
+        status="success",
+    )
+    outputs = HcaiPatientOriginAdapter().normalize(artifact)
+    df = pl.read_parquet(outputs[0])
+    assert df.height == 1
+    assert df["discharges"][0] == 10
+    assert df["reporting_year"][0] == 2024

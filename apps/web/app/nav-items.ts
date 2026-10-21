@@ -1,84 +1,92 @@
-// Canonical navigation destinations (DEC-036: 9 items, matching
-// docs/00_PRODUCT_CHARTER.md §8.1 exactly). All 9 are real, built pages
-// as of Phase 9. `status: "coming_soon"` remains a valid, live-tested
-// state (DEC-037, apps/web/app-shell.tsx) for any future nav item added
-// ahead of its own page being built -- never a broken link in the
-// meantime -- it's simply unused by the current data.
+// Navigation model, v2 (docs/design/v2/design-brief.md).
+//
+// Nine sidebar destinations became four, grouped by the job the person is
+// doing rather than by how the product was built. Every original route is
+// still a real page (so every shared link and bookmark keeps working);
+// routes in the same group are reached through sibling tabs rendered by the
+// shell, not through separate top-level nav entries.
 
-export type NavStatus = "available" | "coming_soon";
-
-export interface NavItem {
-  id: string;
-  label: string;
+export interface NavRoute {
   href: string;
-  description: string;
-  status: NavStatus;
-  /** Which build phase (docs/07_BUILD_PHASES.md) delivers this page. */
-  phase?: string;
+  /** Short label used for the sibling tab. */
+  label: string;
 }
 
-export const NAV_ITEMS: NavItem[] = [
+export interface NavGroup {
+  id: "map" | "care" | "act" | "about";
+  label: string;
+  /** Where the top-level link goes. */
+  href: string;
+  /** One line, shown as the link's tooltip and in the mobile menu. */
+  description: string;
+  /** Every route that belongs to this group, in tab order. */
+  routes: NavRoute[];
+}
+
+export const NAV_GROUPS: NavGroup[] = [
   {
-    id: "overview",
-    label: "Overview",
+    id: "map",
+    label: "Map",
     href: "/",
-    description: "Start here: countywide picture and where to go next.",
-    status: "available",
+    description: "See where health need is highest, and why.",
+    routes: [{ href: "/", label: "Map" }],
   },
   {
-    id: "explore",
-    label: "Explore",
-    href: "/explore",
-    description: "Search a place and see its health, access, and resource profile.",
-    status: "available",
-  },
-  {
-    id: "prioritize",
-    label: "Prioritize",
-    href: "/prioritize",
-    description: "Rank communities by a specific issue, with sensitivity and stability shown.",
-    status: "available",
-  },
-  {
-    id: "access-lab",
-    label: "Access Lab",
+    id: "care",
+    label: "Getting to care",
     href: "/access-lab",
-    description: "Travel time, resource proximity, and mobile-clinic site planning.",
-    status: "available",
+    description: "How people reach care, and how emergency care is used.",
+    routes: [
+      { href: "/access-lab", label: "Travel to care" },
+      { href: "/utilization", label: "Emergency visits" },
+    ],
   },
   {
-    id: "utilization",
-    label: "Utilization",
-    href: "/utilization",
-    description: "Emergency-department utilization and patient-flow evidence.",
-    status: "available",
-  },
-  {
-    id: "validate",
-    label: "Validate",
-    href: "/validate",
-    description: "Methods, uncertainty, data quality, and independent validation.",
-    status: "available",
-  },
-  {
-    id: "advocate",
-    label: "Advocate",
+    id: "act",
+    label: "Take action",
     href: "/advocate",
-    description: "Turn evidence into a brief, staff questions, or talking points.",
-    status: "available",
+    description: "Turn the evidence into a brief, or ask a question.",
+    routes: [
+      { href: "/advocate", label: "Build a brief" },
+      { href: "/copilot", label: "Ask a question" },
+    ],
   },
   {
-    id: "copilot",
-    label: "Copilot",
-    href: "/copilot",
-    description: "Ask a plain-language question and get a grounded, cited answer.",
-    status: "available",
-  },
-  {
-    id: "data",
-    label: "Data",
-    href: "/data",
-    description: "Every data source, its status, freshness, and license.",
-    status: "available",
+    id: "about",
+    label: "About the data",
+    href: "/validate",
+    description: "Where the numbers come from and how they were checked.",
+    routes: [
+      { href: "/validate", label: "Trust & methods" },
+      { href: "/data", label: "Sources" },
+    ],
   },
 ];
+
+/** Routes that are real pages but deliberately not top-level destinations.
+ * They keep working and are reached from inside the page that uses them. */
+export const SECONDARY_ROUTES: Record<string, { groupId: NavGroup["id"]; label: string; backHref: string; backLabel: string }> = {
+  "/prioritize": {
+    groupId: "map",
+    label: "Advanced ranking tools",
+    backHref: "/",
+    backLabel: "Back to the map",
+  },
+  "/explore": {
+    groupId: "map",
+    label: "Explore",
+    backHref: "/",
+    backLabel: "Back to the map",
+  },
+};
+
+export function groupForPath(pathname: string | null): NavGroup | null {
+  if (!pathname) return null;
+  const secondary = SECONDARY_ROUTES[pathname];
+  if (secondary) return NAV_GROUPS.find((g) => g.id === secondary.groupId) ?? null;
+  if (pathname === "/") return NAV_GROUPS[0] ?? null;
+  return (
+    NAV_GROUPS.find((g) => g.id !== "map" && g.routes.some((r) => pathname === r.href || pathname.startsWith(`${r.href}/`))) ??
+    null
+  );
+}

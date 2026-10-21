@@ -59,7 +59,7 @@ export function WeightSliders({
       </div>
       <p className="text-xs text-[var(--color-text-secondary)]">
         Move each slider to say how much this factor should matter. The percentages on the right
-        always add up to 100% -- moving one slider changes how much every factor counts relative to
+        always add up to 100%; moving one slider changes how much every factor counts relative to
         the others, it does not need to be adjusted by hand.
       </p>
 

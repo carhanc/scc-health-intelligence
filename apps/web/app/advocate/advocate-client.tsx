@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { setQuery } from "@/lib/url-state";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { HorizontalSteps, type HorizontalStep } from "@scc-health/ui";
 import {
@@ -63,7 +64,6 @@ function resumeStageFor(ws: AdvocacyWorkspace): Stage {
 }
 
 export function AdvocateClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [workspace, setWorkspace] = useState<AdvocacyWorkspace | null>(null);
@@ -128,7 +128,7 @@ export function AdvocateClient() {
     const params = new URLSearchParams(searchParams.toString());
     if (params.get("workspace") !== workspace.workspaceId) {
       params.set("workspace", workspace.workspaceId);
-      router.replace(`/advocate?${params.toString()}`);
+      setQuery("/advocate", params, "replace");
     }
   }, [workspace?.workspaceId]);
 
@@ -332,7 +332,7 @@ export function AdvocateClient() {
 
   if (!workspace) {
     return (
-      <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+      <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
         <p className="text-sm text-[var(--color-text-secondary)]">Loading your project…</p>
       </div>
     );
@@ -396,7 +396,7 @@ export function AdvocateClient() {
   const showChrome = stage !== "landing";
 
   return (
-    <div className="mx-auto max-w-[var(--container-max)] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+    <div className="mx-auto max-w-[var(--container-max)] px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">

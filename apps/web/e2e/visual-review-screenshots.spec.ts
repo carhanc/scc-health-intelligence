@@ -4,7 +4,7 @@ import { test } from "@playwright/test";
  * Not a pass/fail test suite -- a real screenshot-generation tool for
  * manual visual review (docs/design/health-equity-ux-visual-review.md),
  * matching the same breakpoints as e2e/responsive.spec.ts. Screenshots
- * land in docs/design/screenshots/ and are .gitignored except for the
+ * land in docs/design/v2/screenshots/ and are .gitignored except for the
  * small curated set referenced directly from the review doc, to avoid
  * bloating the repository with ~60 regenerable PNGs on every run. Run
  * with: `npx playwright test e2e/visual-review-screenshots.spec.ts`
@@ -20,9 +20,8 @@ const BREAKPOINTS = [
 ];
 
 const PAGES = [
-  { slug: "overview", path: "/" },
-  { slug: "explore-map", path: "/explore" },
-  { slug: "explore-tract-detail", path: "/explore?geography=tract&id=06085503112&scenario=default_integrated_screen_v1" },
+  { slug: "map-home", path: "/" },
+  { slug: "map-tract-detail", path: "/?geography=tract&id=06085503112&scenario=default_integrated_screen_v1" },
   { slug: "prioritize", path: "/prioritize" },
   { slug: "access-lab", path: "/access-lab" },
   { slug: "utilization", path: "/utilization" },
@@ -37,10 +36,10 @@ for (const bp of BREAKPOINTS) {
     test(`${p.slug} @ ${bp.name}`, async ({ page }) => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await page.goto(`http://localhost:3000${p.path}`);
-      await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(bp.name.includes("explore") || p.slug.includes("explore") ? 2000 : 800);
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(p.slug.startsWith("map") ? 6000 : 1200);
       await page.screenshot({
-        path: `../../docs/design/screenshots/${p.slug}__${bp.name}.png`,
+        path: `../../docs/design/v2/screenshots/${p.slug}__${bp.name}.png`,
         fullPage: true,
       });
     });

@@ -164,12 +164,12 @@ function TractSection() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Geographic view -- modeled by tract</h2>
+      <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Geographic view: modeled by tract</h2>
       <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
         HCAI only publishes emergency-department patient-origin data by ZIP code, never by census
         tract. This table shows a <strong className="font-semibold text-[var(--color-text-primary)]">modeled allocation</strong>{" "}
         down to the tract level, built by spreading each ZIP&apos;s real observed encounter count
-        across its overlapping tracts by land area -- an approximation, not a directly observed
+        across its overlapping tracts by land area, an approximation, not a directly observed
         count. {reliable.length} of {withRate.length} tracts have a plausible estimate;{" "}
         {lowReliability.length} have a flagged, unreliable estimate because area-based allocation
         breaks down for a few large, sparsely-populated tracts. <DataModeBadge mode={query.data.data_mode} />
@@ -237,12 +237,12 @@ function ZipSection() {
   return (
     <section>
       <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-        Geographic view -- observed by patient ZIP code
+        Geographic view: observed by patient ZIP code
       </h2>
       <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
         {query.data.total_observed_encounters.toLocaleString()} real, observed 2024 emergency-department
-        encounters among Santa Clara County residents, by the patient&apos;s own ZIP code -- HCAI&apos;s
-        actual published geography, before any allocation to tracts.{" "}
+        encounters among Santa Clara County residents, by the patient&apos;s own ZIP code (HCAI&apos;s
+        actual published geography), before any allocation to tracts.{" "}
         <DataModeBadge mode={query.data.data_mode} />
       </p>
       <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">

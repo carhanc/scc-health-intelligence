@@ -3,18 +3,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 
+// Shared with the map (BASE_GEOMETRY_SCENARIO in app/map-home/county-map.tsx):
+// one cached request provides tract geometry, names and base scores for the
+// whole app instead of a second ~3 MB download just for names.
+const BASE_GEOMETRY_SCENARIO = "default_integrated_screen_v1";
+
 /**
- * A geoid -> human-readable tract name map for all 408 tracts, built
- * from the same `getAllTractBoundaries` call the Explore map already
- * uses (one request, not one per row) -- lets a large results table
- * avoid raw tract GEOIDs as its primary label without an N+1 request
- * pattern. Falls back to the raw GEOID only while loading or if a
+ * A geoid -> human-readable tract name map for all 408 tracts. Lets a large
+ * results table avoid raw tract GEOIDs as its primary label without an N+1
+ * request pattern. Falls back to the raw GEOID only while loading or if a
  * lookup misses, never silently.
  */
 export function useTractNames(): Map<string, string> {
   const query = useQuery({
-    queryKey: ["all-tract-boundaries", "names-only"],
-    queryFn: () => api.getAllTractBoundaries(),
+    queryKey: ["tract-boundaries", BASE_GEOMETRY_SCENARIO],
+    queryFn: () => api.getAllTractBoundaries(BASE_GEOMETRY_SCENARIO),
     staleTime: 5 * 60 * 1000,
   });
 

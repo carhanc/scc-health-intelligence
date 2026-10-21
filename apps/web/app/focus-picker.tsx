@@ -101,7 +101,7 @@ export function FocusPicker({
         </p>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
           {blurb}
-          {prominent && isEqual && " Every factor below counts equally -- this view does not favor any one of them."}
+          {prominent && isEqual && " Every factor below counts equally; this view does not favor any one of them."}
         </p>
         <div className="mt-3">
           <WeightBreakdown weights={weights} compact />
@@ -113,7 +113,7 @@ export function FocusPicker({
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--color-text-secondary)]">
-        Every view below uses the same 5 factors -- weighted differently. The bars under each option show
+        Every view below uses the same 5 factors, weighted differently. The bars under each option show
         exactly how much each factor counts toward that view's score, so no weighting here is a hidden or
         arbitrary choice.
       </p>

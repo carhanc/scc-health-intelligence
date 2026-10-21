@@ -66,8 +66,8 @@ export function CityDrillDown({
     return (
       <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
         Access Lab currently shows results by census tract. Search for a tract number, or{" "}
-        <Link href="/explore" className="text-[var(--color-interactive)] underline underline-offset-2">
-          pick a place on the map in Explore
+        <Link href="/" className="text-[var(--color-interactive)] underline underline-offset-2">
+          pick a place on the map
         </Link>{" "}
         and choose a tract within it.
       </p>
@@ -121,7 +121,7 @@ export function CityDrillDown({
             ))}
           </ul>
           <p className="mt-2 text-xs text-[var(--color-text-tertiary)]">
-            Tracts shown are the highest estimated-concern areas under Explore&apos;s default balanced-priorities
+            Tracts shown are the highest estimated-concern areas under the map&apos;s default balanced-priorities
             view, used here only to suggest a starting point.
           </p>
         </>

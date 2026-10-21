@@ -22,8 +22,20 @@ overrides:
   # the first patched lines until those ranges are tightened upstream.
   postcss: ">=8.5.23"
   nanoid: ">=3.3.18"
-  fast-uri: ">=3.1.5"
+  fast-uri: ">=4.1.4"
   js-yaml: ">=4.3.1"
-  sharp: ">=0.35.0"
-  "brace-expansion@<2.0.0": "1.1.18"
-  "brace-expansion@>=4.0.0 <5.0.9": "5.0.9"
+  sharp: ">=0.35.5"
+  "brace-expansion@<2.0.0": "1.1.20"
+  "brace-expansion@>=4.0.0 <5.0.11": "5.0.11"
+  browserslist: ">=4.28.7"
+  source-map-js: ">=1.2.2"
+  tinypool: ">=2.1.2"
+  vite: ">=7.3.7"
+
+auditConfig:
+  ignoreGhsas:
+    # braces (stack exhaustion on deeply nested patterns). No patched release is
+    # published yet (latest is 3.0.3). It is only used by lint tooling through
+    # fast-glob and micromatch, never by the website or API at runtime. Remove
+    # this line when braces 3.0.4 or newer is published.
+    - GHSA-vfj7-8cjw-p6xm

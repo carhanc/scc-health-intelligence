@@ -52,7 +52,7 @@ export function UncertaintyPanel() {
       {uncertaintyQuery.data && (
         <Card>
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Uncertainty -- {uncertaintyQuery.data.scenario_label}
+            Uncertainty: {uncertaintyQuery.data.scenario_label}
           </h2>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             {uncertaintyQuery.data.n_tracts_scored} of{" "}
@@ -86,7 +86,7 @@ export function UncertaintyPanel() {
       {sensitivityQuery.data && (
         <Card>
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Sensitivity to alternate weightings -- {sensitivityQuery.data.scenario_label}
+            Sensitivity to alternate weightings: {sensitivityQuery.data.scenario_label}
           </h2>
           <ul className="mt-2 space-y-1.5">
             {sensitivityQuery.data.preset_comparisons.map((c) => (

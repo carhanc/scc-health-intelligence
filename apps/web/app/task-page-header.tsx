@@ -17,8 +17,8 @@ export function TaskPageHeader({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)] sm:text-3xl">{title}</h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-[var(--color-text-secondary)]">{purpose}</p>
+        <h1 className="text-3xl font-medium leading-[1.1] text-[var(--color-text-primary)] sm:text-[2.5rem]">{title}</h1>
+        <p className="mt-3 max-w-2xl text-lg text-[var(--color-text-secondary)]">{purpose}</p>
       </div>
       {status && <div className="flex-none">{status}</div>}
     </div>
