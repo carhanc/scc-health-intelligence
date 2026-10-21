@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "pnpm@11.12.0",
+  "packageManager": "pnpm@11.13.1",
   "scripts": {
     "dev:web": "pnpm --filter @scc-health/web dev",
     "build:web": "pnpm --filter @scc-health/web build",
