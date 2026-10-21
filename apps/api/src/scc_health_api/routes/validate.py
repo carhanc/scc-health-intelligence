@@ -38,12 +38,12 @@ from scc_health_api.services.analytics_config import (
     load_scenario_metadata,
     load_sensitivity_preset_metadata,
 )
+from scc_health_api.services.source_manifest import load_source_manifest
 from scc_health_api.settings import Settings, get_settings
 
 router = APIRouter(prefix="/api/v1/validate", tags=["validate"])
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-DATA_MANIFEST_PATH = REPO_ROOT / "DATA_MANIFEST.json"
 
 _ANALYTICS_UNAVAILABLE_DETAIL = (
     "Phase 4 analytics tables are not present in the current warehouse. Run `make data` first."
@@ -387,12 +387,8 @@ def _weights_hash(weights: dict[str, float]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def _load_manifest_count() -> int:
-    if not DATA_MANIFEST_PATH.exists():
-        return 0
-    with DATA_MANIFEST_PATH.open(encoding="utf-8") as fh:
-        data = json.load(fh)
-    return len(data)
+def _load_manifest_count(conn: duckdb.DuckDBPyConnection | None = None) -> int:
+    return len(load_source_manifest(conn))
 
 
 @router.get("/reproducibility", response_model=ReproducibilityResponse)
@@ -411,6 +407,7 @@ def get_reproducibility(settings: Settings = Depends(get_settings)) -> Reproduci
                 "SELECT COUNT(*) FROM information_schema.tables "
                 "WHERE table_schema = 'meta' AND table_name = 'builds'"
             ).fetchone()
+            source_count = _load_manifest_count(conn)
             builds: list[BuildRecord] = []
             if row and row[0] > 0:
                 build_rows = conn.execute(
@@ -428,7 +425,7 @@ def get_reproducibility(settings: Settings = Depends(get_settings)) -> Reproduci
         data_mode=mode,
         scenario_hashes=scenario_hashes,
         recent_builds=builds,
-        data_manifest_source_count=_load_manifest_count(),
+        data_manifest_source_count=source_count,
         monte_carlo_seed=MONTE_CARLO_SEED,
         monte_carlo_draws=MONTE_CARLO_DRAWS,
         weight_sensitivity_seed=WEIGHT_SENSITIVITY_SEED,

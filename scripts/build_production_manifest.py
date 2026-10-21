@@ -125,6 +125,14 @@ def main() -> int:
         )
         return 1
 
+    if tables_by_schema.get("meta", {}).get("source_manifest", 0) == 0:
+        print(
+            "ERROR: meta.source_manifest is missing or empty. The release must carry the real "
+            "retrieval date of every source; run the full `make data` (its last step writes it).",
+            file=sys.stderr,
+        )
+        return 1
+
     total_rows = sum(sum(counts.values()) for counts in tables_by_schema.values())
     if total_rows == 0:
         print(

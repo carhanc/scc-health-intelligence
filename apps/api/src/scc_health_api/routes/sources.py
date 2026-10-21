@@ -10,9 +10,7 @@ for the internal transparency tool (not a public analytics page).
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,25 +24,17 @@ from scc_health_api.schemas.geography import (
     SourceStatusResponse,
 )
 from scc_health_api.services.freshness import classify_freshness
+from scc_health_api.services.source_manifest import load_source_manifest
 from scc_health_api.services.table_registry import ALL_TABLES, SOURCE_TO_TABLES
 from scc_health_api.settings import Settings, get_settings
 
 router = APIRouter(prefix="/api/v1", tags=["sources"])
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-MANIFEST_PATH = REPO_ROOT / "DATA_MANIFEST.json"
 
 # A preview must never return an unbounded table (e.g. 427k GTFS stop_times
 # rows) to a browser tab.
 _PREVIEW_ROW_LIMIT = 50
-
-
-def _load_manifest() -> list[dict[str, Any]]:
-    if not MANIFEST_PATH.exists():
-        return []
-    with MANIFEST_PATH.open(encoding="utf-8") as fh:
-        data: list[dict[str, Any]] = json.load(fh)
-    return data
 
 
 def _table_exists(conn: duckdb.DuckDBPyConnection, schema: str, table: str) -> bool:
@@ -63,11 +53,12 @@ def _row_count(conn: duckdb.DuckDBPyConnection, schema: str, table: str) -> int:
 @router.get("/sources", response_model=SourceStatusResponse)
 def get_sources(settings: Settings = Depends(get_settings)) -> SourceStatusResponse:
     path, mode = resolve_warehouse_path(settings)
-    entries = _load_manifest()
 
     conn: duckdb.DuckDBPyConnection | None = None
     if path is not None:
         conn = duckdb.connect(str(path), read_only=True)
+    # Retrieval dates come from the warehouse snapshot, so they match the data.
+    entries = load_source_manifest(conn)
 
     try:
         sources = []

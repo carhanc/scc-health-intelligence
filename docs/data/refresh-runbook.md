@@ -45,6 +45,10 @@ If the workflow fails at any of steps 1–5, the job's step summary reports exac
 
 GitHub → Actions → "Scheduled data refresh" → **Run workflow** (the `workflow_dispatch` trigger). Same build-validate-publish-deliver sequence, on demand.
 
+## What a release carries
+
+Each release has the warehouse (`scc_health.duckdb`) and a build summary (`DATA_MANIFEST.production.json`). The warehouse includes `meta.source_manifest`, a snapshot of `DATA_MANIFEST.json` taken at the end of `make data`, which is where `/api/v1/sources` gets each source's real retrieval date. The release step refuses to publish without it. After deploying a release, the server must also run API code that reads it (anything from DEC-092 onward).
+
 ## Confirming delivery worked
 
 ```bash
