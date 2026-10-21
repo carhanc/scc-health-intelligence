@@ -1151,4 +1151,16 @@ time pressure.
 
 ---
 
+### DEC-092 — Source retrieval dates ship inside the warehouse release
+
+**Context:** After a refreshed release was deployed, the live Data and Trust pages still showed July dates and six sources as overdue. `/api/v1/sources` read `retrieved_at` from `DATA_MANIFEST.json` in the code checkout and computed `freshness_state` from it at request time. The release only carried the warehouse and a build summary, so a new warehouse could never bring new dates with it, and the automatic monthly refresh could not keep the labels current.
+
+**Decision:** The last step of `make data` snapshots the source manifest into the warehouse as `meta.source_manifest` (one row per source, the full entry kept as JSON). The API reads the sources list, the evidence citations and the reproducibility source count from that table first and falls back to the file when a warehouse has no snapshot. `scripts/build_production_manifest.py` refuses to publish a release without the snapshot, so a release can no longer go out without its dates. Nothing on the frontend changes; the counts it shows are whatever the API reports.
+
+**Rationale:** Dates describe the data they sit next to, so they belong in the same artifact. Computing freshness at request time from those dates keeps the labels honest as time passes: a missed monthly run still moves sources to lagged and then stale.
+
+**Consequences:** A warehouse built before this change has no snapshot and keeps using the file. The next release published after this change carries the dates; the server must run the new API code and load that release. Expected live counts after a refresh: 32 sources, 8 newest verified, 23 fixed vintage, 1 unavailable (the Healthy Places Index), none lagged or stale.
+
+---
+
 *New decisions are appended here as they are made in each subsequent phase, never inserted out of order.*

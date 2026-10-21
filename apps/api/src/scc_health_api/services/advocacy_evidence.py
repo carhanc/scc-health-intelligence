@@ -16,16 +16,12 @@ re-aggregation is out of scope this phase.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 import duckdb
 
 from scc_health_api.schemas.advocacy import EvidenceItem
-
-REPO_ROOT = Path(__file__).resolve().parents[5]
-DATA_MANIFEST_PATH = REPO_ROOT / "DATA_MANIFEST.json"
+from scc_health_api.services.source_manifest import load_source_manifest
 
 
 def _ordinal(n: int) -> str:
@@ -33,12 +29,8 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
-def _load_manifest_by_source_id() -> dict[str, dict[str, Any]]:
-    if not DATA_MANIFEST_PATH.exists():
-        return {}
-    with DATA_MANIFEST_PATH.open(encoding="utf-8") as fh:
-        entries: list[dict[str, Any]] = json.load(fh)
-    return {e["source_id"]: e for e in entries}
+def _load_manifest_by_source_id(conn: duckdb.DuckDBPyConnection) -> dict[str, dict[str, Any]]:
+    return {e["source_id"]: e for e in load_source_manifest(conn)}
 
 
 def resolve_member_tracts(
@@ -309,7 +301,9 @@ def build_utilization_evidence(
             method="zip_to_tract_area_weighted_allocation",
             uncertainty_note=(
                 "One or more contributing tracts is flagged low-reliability due to area-weighting "
-                "artifacts." if any_low_reliability else None
+                "artifacts."
+                if any_low_reliability
+                else None
             ),
             limitation=(
                 "A modeled allocation from real ZIP-level HCAI data, not a directly observed "
@@ -401,7 +395,7 @@ def assemble_evidence(
     evidence at all -- `build_resource_evidence`'s county-wide fallback
     is only for a *real* geography with no assigned city, never a stand-in
     for "this geography doesn't exist."""
-    manifest = _load_manifest_by_source_id()
+    manifest = _load_manifest_by_source_id(conn)
     tracts = resolve_member_tracts(conn, geography_type, geography_id)
     geography_label = _geography_label(conn, geography_type, geography_id)
 

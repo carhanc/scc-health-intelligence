@@ -21,6 +21,7 @@ data:
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_access_metrics_pipeline
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_analytics_pipeline
 	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_utilization_pipeline
+	uv run --package scc-health-pipeline python -m scc_health_pipeline.run_source_manifest_snapshot
 	@echo "make data: geography spine (Phase 2) + core sources (Phase 3) + analytics/"
 	@echo "scoring/uncertainty/optimization (Phase 4) + resource canonicalization +"
 	@echo "OSM network graphs + real network/transit/E2SFCA access metrics (Phase 6) +"
