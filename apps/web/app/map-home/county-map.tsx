@@ -2,7 +2,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import { useQuery } from "@tanstack/react-query";
 import {
   CONCERN_SCALE,
@@ -29,6 +29,10 @@ const NO_DATA_HATCH_IMAGE = "no-data-hatch";
 const PLACE_OUTLINE_SOURCE = "selected-place-boundary";
 const PLACE_OUTLINE_LAYER = "selected-place-outline";
 const INK = "#12241f";
+
+/* MapLibre 6's worker files are copied into /public/maplibre by
+ * scripts/copy-maplibre-worker.mjs, because the bundler cannot resolve them. */
+if (typeof window !== "undefined") maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 /** OpenFreeMap's free, keyless "positron" style: a muted light basemap
  * whose low saturation lets the concern ramp carry the map. No API
