@@ -31,19 +31,28 @@ test.describe("Map home -- focus switching and URL/browser state", () => {
   });
 
   test("browser back and forward restore the previously selected tract", async ({ page }) => {
+    // Several searches and history steps; a slow machine needs more than the default 30 seconds.
+    test.setTimeout(90_000);
+    const countyView = page.getByText("What matters most to you?");
+
     await openMap(page);
     await searchAndPick(page, TRACT_A, new RegExp(TRACT_A));
     await expect(tractHeading(page, TRACT_A)).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: "Back to the county" }).click();
+    await expect(countyView).toBeVisible({ timeout: 15_000 });
     await searchAndPick(page, TRACT_B, new RegExp(TRACT_B));
     await expect(tractHeading(page, TRACT_B)).toBeVisible({ timeout: 15_000 });
 
+    // Walk the history one step at a time and check each stop, instead of pressing
+    // the button twice in a row, which a busy page can legitimately coalesce.
     await page.goBack();
+    await expect(countyView).toBeVisible({ timeout: 15_000 });
     await page.goBack();
     await expect(tractHeading(page, TRACT_A)).toBeVisible({ timeout: 15_000 });
 
     await page.goForward();
+    await expect(countyView).toBeVisible({ timeout: 15_000 });
     await page.goForward();
     await expect(tractHeading(page, TRACT_B)).toBeVisible({ timeout: 15_000 });
   });
