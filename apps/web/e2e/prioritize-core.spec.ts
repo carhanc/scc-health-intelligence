@@ -72,7 +72,7 @@ test.describe("Prioritize -- ranked areas, adjustable priorities, compare, const
   }) => {
     await page.goto("/prioritize");
     await page.getByRole("button", { name: "Add practical constraints" }).click();
-    await expect(page.getByText("modeled planning scenarios", { exact: false })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("modeled planning scenarios", { exact: false }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("No solution satisfies these constraints")).toBeVisible();
   });
 

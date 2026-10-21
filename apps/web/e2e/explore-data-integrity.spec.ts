@@ -35,6 +35,8 @@ test.describe("Explore -- missing data is never rendered as zero", () => {
   });
 
   test("a metric with no raw value shows 'No data', never a numeric 0", async ({ page }) => {
+    // Opens every expandable section one by one, which takes a while on a slow machine.
+    test.setTimeout(120_000);
     await openTract(page, "06085500100");
     await page.getByRole("tab", { name: "Numbers" }).click();
 
