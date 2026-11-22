@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   lint-and-test:
-    runs-on: macos-14 # Apple Silicon runner, matches the project's target platform
+    runs-on: macos-15 # Apple Silicon runner, matches the project's target platform
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -73,7 +73,7 @@ jobs:
         run: pnpm --filter @scc-health/web build
 
   security-audit:
-    runs-on: macos-14
+    runs-on: macos-15
     permissions:
       contents: read
     steps:
@@ -119,7 +119,7 @@ jobs:
         run: pnpm audit --audit-level=high
 
   e2e:
-    runs-on: macos-14
+    runs-on: macos-15
     needs: lint-and-test
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
