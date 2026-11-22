@@ -65,7 +65,7 @@ export function AboutBadge({ className = "", style }: { className?: string; styl
           className="animate-panel-in absolute bottom-full left-0 mb-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-[var(--radius-lg)] bg-[var(--color-surface)] p-4 text-sm shadow-[var(--shadow-lg)]"
         >
           <p className="font-semibold leading-snug text-[var(--color-text-primary)]">
-            Developed by Arhan Chakravarthy. In collaboration with Santa Clara County Health Advisory Commission.
+            Developed by Arhan Chakravarthy. In collaboration with Santa Clara County Health Advisory Commission and Santa Clara County Public Health Department.
           </p>
           <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
             Built on public data. It supports prioritization and advocacy and does not replace community
