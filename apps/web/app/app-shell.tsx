@@ -243,7 +243,7 @@ function SiteFooter() {
           judgment, or formal program evaluation. Built using publicly available data from Santa Clara County, HCAI,
           the U.S. Census Bureau, OpenStreetMap, and other cited sources.{" "}
           <strong className="font-semibold text-[var(--color-text-secondary)]">
-            Developed by Arhan Chakravarthy. In collaboration with Santa Clara County Health Advisory Commission.
+            Developed by Arhan Chakravarthy. In collaboration with Santa Clara County Health Advisory Commission and Santa Clara County Public Health Department.
           </strong>
         </p>
       </div>

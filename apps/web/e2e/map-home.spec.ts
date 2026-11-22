@@ -69,7 +69,9 @@ test.describe("Map home", () => {
     await button.click();
     const card = page.getByRole("region", { name: "About this platform" });
     await expect(card).toContainText("Developed by Arhan Chakravarthy");
-    await expect(card).toContainText("In collaboration with Santa Clara County Health Advisory Commission");
+    await expect(card).toContainText(
+      "In collaboration with Santa Clara County Health Advisory Commission and Santa Clara County Public Health Department",
+    );
     await expect(card.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
     await page.keyboard.press("Escape");
     await expect(card).not.toBeVisible();
